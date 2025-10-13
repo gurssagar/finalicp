@@ -1,11 +1,14 @@
-actor {
+import Time "mo:base/Time";
+import Array "mo:base/Array";
+
+persistent actor {
   public type Message = {
     text: Text;
     from: Text;
     timestamp: Int;
   };
 
-  stable var messages: [Message] = [];
+  var messages: [Message] = [];
 
   // Query function to get all messages
   public query func getMessages() : async [Message] {
