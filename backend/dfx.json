@@ -1,0 +1,15 @@
+{
+  "version": "0.15.0",
+  "canisters": {
+    "basic_backend": {
+      "type": "motoko",
+      "main": "src/basic_backend.mo",
+      "dependencies": []
+    }
+  },
+  "defaults": {
+    "build": {
+      "packtool": "moc"
+    }
+  }
+}

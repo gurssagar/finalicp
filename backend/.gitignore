@@ -1,0 +1,23 @@
+# DFX build artifacts
+.dfbuild/
+canisters/
+*.dfx
+*.wasm
+*.did
+
+# Node modules
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
