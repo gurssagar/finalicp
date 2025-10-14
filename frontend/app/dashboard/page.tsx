@@ -2,6 +2,7 @@ import { getCurrentSession } from '@/lib/actions/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { User, Settings, FileText, Upload, LogOut } from 'lucide-react';
+import ProfileChecker from '@/components/ProfileChecker';
 
 export default async function DashboardPage() {
   const session = await getCurrentSession();
@@ -11,7 +12,8 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ProfileChecker>
+      <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
@@ -118,6 +120,7 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ProfileChecker>
   );
 }
