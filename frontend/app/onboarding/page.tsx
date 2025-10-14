@@ -1,5 +1,6 @@
 import React from 'react'
 import Link from 'next/link'
+import { ProgressStepper } from '@/components/progress-stepper'
 export default function OnboardingWelcome() {
   
   return (
@@ -36,7 +37,10 @@ export default function OnboardingWelcome() {
         </div>
       </header>
       <main className="flex-1">
-        <div className="container mx-auto py-12 px-4">
+        <div className="container mx-auto py-8 px-4">
+          <div className="mb-8">
+            <ProgressStepper currentStep={1} totalSteps={5} />
+          </div>
           <div className="grid md:grid-cols-2 gap-8">
             <div className="flex flex-col justify-center">
               <h1 className="text-4xl md:text-5xl font-bold text-[#161616] mb-6">

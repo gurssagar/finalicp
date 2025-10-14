@@ -29,7 +29,11 @@ export default function ForgotPasswordForm() {
       const result = await response.json();
 
       if (result.success) {
-        setSuccess(result.message || 'Password reset link sent successfully!');
+        setSuccess(result.message || 'Password reset code sent successfully!');
+        // Redirect to OTP verification page after 2 seconds
+        setTimeout(() => {
+          router.push(`/verify-otp?email=${encodeURIComponent(email)}&purpose=password-reset`);
+        }, 2000);
       } else {
         setError(result.error || 'An error occurred');
       }

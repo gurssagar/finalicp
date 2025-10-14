@@ -1,46 +1,46 @@
 "use client"
-import React, { useState } from 'react'
+import React from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
 import { ProfilePreview } from '@/components/profilePreview'
 import { useRouter } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
-import { OtpInput } from '@/components/otp-input'
+import { User, Globe } from 'lucide-react'
+import { useOnboarding } from '@/hooks/useOnboarding'
+
 export function ProfileSetup() {
   const navigate = useRouter()
-  const [profileImage, setProfileImage] = useState<File | null>(null)
-  const [profileImageName, setProfileImageName] = useState('')
-  const [countryCode, setCountryCode] = useState('+1')
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [showVerification, setShowVerification] = useState(false)
-  const [verificationCode, setVerificationCode] = useState('')
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setProfileImage(e.target.files[0])
-      setProfileImageName(e.target.files[0].name)
+
+  const {
+    profile,
+    error,
+    setError,
+    updateProfile,
+    goToNextStep,
+    goToPreviousStep,
+    isLoading
+  } = useOnboarding()
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    updateProfile({ [name]: value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!profile.firstName || !profile.lastName) {
+      setError('First name and last name are required');
+      return;
     }
-  }
-  const handleNext = () => {
-    // Save profile details and navigate to next step
-    navigate.push('/verification-complete')
-  }
+
+    const success = await goToNextStep(4);
+    if (success) {
+      navigate.push('/onboarding/resume');
+    }
+  };
+
   const handleBack = () => {
-    navigate.push('/onboarding/address')
-  }
-  const handleVerifyCode = () => {
-    // Verify code logic here
-    console.log('Verifying code:', verificationCode)
-    // If successful, navigate to next step
-    navigate.push('/verification-complete')
-  }
-  const handleResendCode = () => {
-    // Resend code logic here
-    console.log('Resending code')
-  }
-  const handleSubmitPhone = () => {
-    // Submit phone number and show verification input
-    setShowVerification(true)
+    goToPreviousStep(4);
   }
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
@@ -53,132 +53,200 @@ export function ProfileSetup() {
                 <ProgressStepper currentStep={4} totalSteps={5} />
               </div>
               <h1 className="text-3xl font-bold text-[#161616] mb-8">
-                Add profile Image and verify your number
+                Complete Your Profile
               </h1>
-              <div className="mb-8">
-                <label className="block text-xs text-gray-500 mb-1 ml-1">
-                  ADD PROFILE PHOTO
-                </label>
-                <div className="border border-[#cacaca] rounded-md p-4 flex items-center">
-                  <label className="flex items-center cursor-pointer">
-                    <div className="mr-2">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="text-gray-500"
-                      >
-                        <rect
-                          x="3"
-                          y="3"
-                          width="18"
-                          height="18"
-                          rx="2"
-                          ry="2"
-                        ></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
-                      </svg>
-                    </div>
-                    <span className="text-gray-600 hover:underline">
-                      {profileImageName || 'Click here to upload Profile image'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleImageChange}
-                    />
-                  </label>
+              <p className="text-gray-600 mb-8">
+                Tell us more about yourself to get the most out of our platform
+              </p>
+
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                  {error}
                 </div>
-              </div>
-              <div className="mb-4">
-                <p className="text-gray-500 mb-2 ml-1">OPTIONAL</p>
-                {!showVerification ? (
-                  <div>
-                    <label className="block text-xs text-gray-500 mb-1 ml-1">
-                      PHONE NUMBER
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Information */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <h2 className="text-lg font-semibold text-[#161616] mb-4 flex items-center">
+                    <User size={20} className="mr-2 text-blue-600" />
+                    Basic Information
+                  </h2>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        First Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="firstName"
+                        value={profile.firstName}
+                        onChange={handleChange}
+                        required
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="First name"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Last Name *
+                      </label>
+                      <input
+                        type="text"
+                        name="lastName"
+                        value={profile.lastName}
+                        onChange={handleChange}
+                        required
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Last name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Bio
                     </label>
-                    <div className="flex">
-                      <div className="relative w-24">
-                        <select
-                          value={countryCode}
-                          onChange={(e) => setCountryCode(e.target.value)}
-                          className="w-full h-full py-3 px-2 border border-[#cacaca] rounded-l-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616]"
-                        >
-                          <option value="+1">+1</option>
-                          <option value="+44">+44</option>
-                          <option value="+91">+91</option>
-                        </select>
-                        <ChevronDown
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400"
-                          size={16}
-                        />
-                      </div>
+                    <textarea
+                      name="bio"
+                      value={profile.bio}
+                      onChange={handleChange}
+                      rows={3}
+                      maxLength={500}
+                      className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Tell us about yourself..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone
+                      </label>
                       <input
                         type="tel"
-                        placeholder="Enter Your Phone Number"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="flex-1 py-3 px-4 border-y border-r border-[#cacaca] rounded-r-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616]"
+                        name="phone"
+                        value={profile.phone}
+                        onChange={handleChange}
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="+1 (555) 123-4567"
                       />
                     </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-4">
-                      <label className="block text-sm text-gray-700 mb-2">
-                        Enter Verification code
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Location
                       </label>
-                      <OtpInput
-                        length={6}
-                        onChange={setVerificationCode}
-                        hasInitialValue={false}
+                      <input
+                        type="text"
+                        name="location"
+                        value={profile.location}
+                        onChange={handleChange}
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="City, Country"
                       />
                     </div>
-                    <button
-                      onClick={handleVerifyCode}
-                      className="w-full bg-[#000000] text-white py-3 rounded-full font-bold shadow-md hover:bg-gray-800 transition-colors mb-4"
-                    >
-                      Verify Code
-                    </button>
-                    <div className="flex items-center gap-1 justify-center">
-                      <span className="text-gray-600">Didn't Recieved ? </span>
-                      <button
-                        onClick={handleResendCode}
-                        className="text-[#2ba24c] hover:underline"
-                      >
-                        Resend Code
-                      </button>
+                  </div>
+                </div>
+
+                {/* Online Presence */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <h2 className="text-lg font-semibold text-[#161616] mb-4 flex items-center">
+                    <Globe size={20} className="mr-2 text-blue-600" />
+                    Online Presence
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Website
+                      </label>
+                      <input
+                        type="url"
+                        name="website"
+                        value={profile.website}
+                        onChange={handleChange}
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://yourwebsite.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        LinkedIn
+                      </label>
+                      <input
+                        type="url"
+                        name="linkedin"
+                        value={profile.linkedin}
+                        onChange={handleChange}
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://linkedin.com/in/yourprofile"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        GitHub
+                      </label>
+                      <input
+                        type="url"
+                        name="github"
+                        value={profile.github}
+                        onChange={handleChange}
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://github.com/yourusername"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Twitter
+                      </label>
+                      <input
+                        type="url"
+                        name="twitter"
+                        value={profile.twitter}
+                        onChange={handleChange}
+                        className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://twitter.com/yourusername"
+                      />
                     </div>
                   </div>
-                )}
-              </div>
-              {!showVerification && (
-                <div className="flex gap-4 mt-8">
+                </div>
+
+                <div className="flex gap-4">
                   <button
+                    type="button"
                     onClick={handleBack}
                     className="px-12 py-3 border border-[#000000] rounded-full font-bold text-[#161616] hover:bg-gray-100 transition-colors"
                   >
                     Back
                   </button>
                   <button
-                    onClick={phoneNumber ? handleSubmitPhone : handleNext}
-                    className="px-12 py-3 bg-[#000000] text-white rounded-full font-bold shadow-md hover:bg-gray-800 transition-colors"
+                    type="submit"
+                    disabled={isLoading}
+                    className="px-12 py-3 bg-[#000000] text-white rounded-full font-bold shadow-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Next
+                    {isLoading ? 'Saving...' : 'Next'}
                   </button>
                 </div>
-              )}
+              </form>
             </div>
             <div className="hidden md:block">
-              <ProfilePreview location="California, CA, USA" />
+              <ProfilePreview
+                firstName={profile.firstName}
+                lastName={profile.lastName}
+                bio={profile.bio}
+                phone={profile.phone}
+                location={profile.location}
+                website={profile.website}
+                linkedin={profile.linkedin}
+                github={profile.github}
+                twitter={profile.twitter}
+              />
             </div>
           </div>
         </div>
