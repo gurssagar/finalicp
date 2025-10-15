@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react';
-import { Header } from '@/components/Header';
+import { Header } from '@/components/Header1';
 import { Sidebar } from '@/components/Sidebar';
 import { ArrowUpRight, Check, Download, Plus } from 'lucide-react';
 export default function PayAndLoans() {
