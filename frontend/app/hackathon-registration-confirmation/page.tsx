@@ -1,6 +1,6 @@
 'use client'
 import React from 'react';
-import { Header } from '@/components/Header';
+import { Header } from '@/components/Header1';
 import { Sidebar } from '@/components/Sidebar';
 import { CheckCircle, ChevronLeft, Calendar, Clock, Users, Download } from 'lucide-react';
 import Link from 'next/link';
