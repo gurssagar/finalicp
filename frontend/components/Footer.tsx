@@ -1,7 +1,7 @@
-'use client'
-import React from 'react';
+import React from 'react'
 export function Footer() {
-  return <footer className="text-center text-sm text-gray-600 mt-8 mb-6">
+  return (
+    <footer className="text-center text-sm text-gray-600 mt-8 mb-6">
       <p>
         by Signing Up, i agree with Organaise{' '}
         <a href="#" className="text-[#3b7ded] hover:underline">
@@ -12,5 +12,6 @@ export function Footer() {
           terms and conditions
         </a>
       </p>
-    </footer>;
+    </footer>
+  )
 }
