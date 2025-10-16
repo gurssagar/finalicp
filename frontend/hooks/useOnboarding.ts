@@ -27,6 +27,7 @@ interface AddressData {
 interface ResumeData {
   fileName: string;
   file: File | null;
+  fileUrl?: string;
   hasResume: boolean;
 }
 
@@ -177,8 +178,8 @@ export function useOnboarding() {
         return !!(data.address.city && data.address.state && data.address.zipCode);
       case 4: // Profile
         return !!(data.profile.firstName && data.profile.lastName);
-      case 5: // Resume
-        return data.resume.hasResume;
+      case 5: // Resume (optional)
+        return true;
       default:
         return false;
     }
@@ -204,25 +205,15 @@ export function useOnboarding() {
           endpoint = '/api/profile/complete';
           payload = data.profile;
           break;
-        case 5: // Resume
-          if (data.resume.file) {
-            endpoint = '/api/onboarding/resume';
-            const formData = new FormData();
-            formData.append('file', data.resume.file);
-
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              body: formData,
-            });
-
-            if (!response.ok) {
-              const result = await response.json();
-              throw new Error(result.error || 'Failed to upload resume');
-            }
-
-            return true;
-          }
-          return true;
+        case 5: // Resume - Save complete onboarding data
+          endpoint = '/api/onboarding/complete';
+          payload = {
+            profile: data.profile,
+            skills: data.skills,
+            resume: data.resume,
+            address: data.address,
+          };
+          break;
         default:
           return true;
       }
@@ -288,6 +279,59 @@ export function useOnboarding() {
   const clearData = useCallback(() => {
     setData(DEFAULT_DATA);
     localStorage.removeItem(STORAGE_KEY);
+    // Don't remove onboarding_completed flag - it should persist
+  }, []);
+
+  // Complete onboarding and save all data
+  const completeOnboarding = useCallback(async () => {
+    setError('');
+    setIsLoading(true);
+
+    try {
+      // Save complete onboarding data to canister
+      const endpoint = '/api/onboarding/complete';
+      const payload = {
+        profile: data.profile,
+        skills: data.skills,
+        resume: data.resume,
+        address: data.address,
+      };
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || 'Failed to complete onboarding');
+      }
+
+      const result = await response.json();
+      console.log('Onboarding completed successfully:', result);
+
+      // Mark onboarding as completed
+      localStorage.setItem('onboarding_completed', 'true');
+
+      // Clear onboarding data from localStorage
+      clearData();
+
+      return result;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [data, clearData]);
+
+  // Reset onboarding completion (useful for logout)
+  const resetOnboardingCompletion = useCallback(() => {
+    localStorage.removeItem('onboarding_completed');
   }, []);
 
   // Memoized data object
@@ -314,5 +358,7 @@ export function useOnboarding() {
     goToNextStep,
     goToPreviousStep,
     clearData,
+    completeOnboarding,
+    resetOnboardingCompletion,
   };
 }

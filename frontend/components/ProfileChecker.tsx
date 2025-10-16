@@ -17,10 +17,18 @@ export default function ProfileChecker({ children }: { children: React.ReactNode
   useEffect(() => {
     const checkProfileCompleteness = async () => {
       try {
+        // Check if user just completed onboarding by checking localStorage
+        const onboardingCompleted = localStorage.getItem('onboarding_completed');
+        if (onboardingCompleted === 'true') {
+          setIsChecking(false);
+          return;
+        }
+
         const response = await fetch('/api/profile/check-completeness');
         const result: ProfileCompleteness = await response.json();
 
-        if (result.success && !result.isComplete) {
+        // Only redirect to onboarding if profile is incomplete AND not a fallback
+        if (result.success && !result.isComplete && !result.fallback) {
           // Redirect to onboarding if profile is incomplete
           router.push('/onboarding');
         }

@@ -5,37 +5,7 @@ export default function OnboardingWelcome() {
   
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      <header className="flex justify-between items-center p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <svg
-            width="40"
-            height="32"
-            viewBox="0 0 40 32"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M20.0001 0L0 11.5556V23.1111L20.0001 11.5556L40.0001 23.1111V11.5556L20.0001 0Z"
-              fill="#FF3B30"
-            />
-            <path
-              d="M0 23.1111L20.0001 11.5555V23.1111V34.6667L0 23.1111Z"
-              fill="#34C759"
-            />
-            <path
-              d="M40.0001 23.1111L20.0001 11.5555V23.1111V34.6667L40.0001 23.1111Z"
-              fill="#007AFF"
-            />
-          </svg>
-          <span className="ml-2 font-bold text-xl text-[#161616]">ICPWork</span>
-        </div>
-        <div className="text-[#161616]">
-          Want to Hire?{' '}
-          <a href="#" className="text-[#2ba24c] hover:underline">
-            Join As Client
-          </a>
-        </div>
-      </header>
+     
       <main className="flex-1">
         <div className="container mx-auto py-8 px-4">
           <div className="mb-8">

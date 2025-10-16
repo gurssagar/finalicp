@@ -39,7 +39,7 @@ export function AddressDetails() {
   }
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
-      <Header />
+     
       <div className="flex-1">
         <div className="container mx-auto py-8 px-4">
           <div className="grid md:grid-cols-3 gap-8">

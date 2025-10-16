@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentSession } from '@/lib/actions/auth';
+import { getSession } from '@/lib/auth';
 import { getUserActor } from '@/lib/ic-agent';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getCurrentSession();
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json({
@@ -14,21 +14,29 @@ export async function GET(request: NextRequest) {
     }
 
     try {
-      const actor = getUserActor();
+      const actor = await getUserActor();
 
-      // Get user profile from ICP backend
-      const userProfile = await actor.get_user_profile();
+      // Get user profile from ICP backend using the correct method
+      const userProfile = await actor.getProfile(session.userId);
 
-      // Check if required fields are filled
-      const requiredFields = ['first_name', 'last_name'];
-      const isProfileComplete = requiredFields.every(field =>
-        userProfile[field] && userProfile[field].trim() !== ''
-      );
+      if (!userProfile) {
+        return NextResponse.json({
+          success: true,
+          isComplete: false,
+          profile: null,
+          message: 'Profile not found',
+        });
+      }
+
+      // Check if required fields are filled (using camelCase from DID)
+      const isProfileComplete = userProfile.firstName && userProfile.lastName &&
+        userProfile.firstName.trim() !== '' && userProfile.lastName.trim() !== '';
 
       // Transform profile data for frontend
       const transformedProfile = {
-        firstName: userProfile.first_name || '',
-        lastName: userProfile.last_name || '',
+        firstName: userProfile.firstName || '',
+        lastName: userProfile.lastName || '',
+        email: session.email || '',
         bio: userProfile.bio || '',
         phone: userProfile.phone || '',
         location: userProfile.location || '',
@@ -37,7 +45,8 @@ export async function GET(request: NextRequest) {
         github: userProfile.github || '',
         twitter: userProfile.twitter || '',
         skills: userProfile.skills || [],
-        hasResume: userProfile.has_resume || false,
+        hasResume: !!userProfile.resumeUrl,
+        profileImage: userProfile.profileImageUrl || '',
       };
 
       return NextResponse.json({
@@ -50,11 +59,31 @@ export async function GET(request: NextRequest) {
     } catch (icpError) {
       console.error('ICP profile fetch error:', icpError);
 
-      // Fallback: return incomplete profile status
+      // Check if user has completed onboarding flag in localStorage
+      // This is a client-side fallback since we can't access localStorage in API route
+      // We'll return a neutral response that lets the ProfileChecker handle it
+
+      // Return basic profile info from session as fallback
+      const fallbackProfile = {
+        firstName: '',
+        lastName: '',
+        email: session.email || '',
+        bio: '',
+        phone: '',
+        location: '',
+        website: '',
+        linkedin: '',
+        github: '',
+        twitter: '',
+        skills: [],
+        hasResume: false,
+        profileImage: '',
+      };
+
       return NextResponse.json({
         success: true,
         isComplete: false,
-        profile: null,
+        profile: fallbackProfile,
         message: 'Profile needs completion (backend unavailable)',
         fallback: true
       });
