@@ -1,9 +1,65 @@
-import React from 'react'
-import { Bell, ChevronDown, Search } from 'lucide-react'
+'use client'
+import React from 'react';
+import { Bell, ChevronDown, Search, Briefcase, User, Settings } from 'lucide-react';
+import { useUserContext } from '@/contexts/UserContext';
+
 interface HeaderProps {
   showSearch?: boolean
 }
-export function Header({ showSearch = true }: HeaderProps) {
+
+export function Header({
+  showSearch = true
+}: HeaderProps) {
+  const { profile, isLoading, currentRole } = useUserContext();
+
+  const displayName = profile.firstName || profile.email?.split('@')[0] || 'User';
+  const fullName = profile.firstName && profile.lastName
+    ? `${profile.firstName} ${profile.lastName}`
+    : displayName;
+
+  // Get role display text and icon based on current role
+  const getRoleDisplay = () => {
+    switch (currentRole) {
+      case 'admin':
+        return {
+          text: 'Admin',
+          icon: <Settings size={16} />,
+          bgColor: 'bg-purple-100',
+          textColor: 'text-purple-700'
+        };
+      case 'freelancer':
+        return {
+          text: 'Freelancer',
+          icon: <Briefcase size={16} />,
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-700'
+        };
+      case 'client':
+        return {
+          text: 'Client',
+          icon: <User size={16} />,
+          bgColor: 'bg-green-100',
+          textColor: 'text-green-700'
+        };
+      case 'both':
+        return {
+          text: 'Client & Freelancer',
+          icon: <User size={16} />,
+          bgColor: 'bg-amber-100',
+          textColor: 'text-amber-700'
+        };
+      default:
+        return {
+          text: 'Client',
+          icon: <User size={16} />,
+          bgColor: 'bg-green-100',
+          textColor: 'text-green-700'
+        };
+    }
+  };
+
+  const roleDisplay = getRoleDisplay();
+
   return (
     <header className="flex justify-between items-center p-4 border-b border-gray-200 bg-white">
       {showSearch ? (
@@ -22,62 +78,67 @@ export function Header({ showSearch = true }: HeaderProps) {
       ) : (
         <div className="flex-1"></div>
       )}
+
       <div className="flex items-center gap-4 ml-auto">
+        {/* Notifications */}
         <div className="relative">
-          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center cursor-pointer">
+          <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center cursor-pointer hover:bg-gray-200 transition-colors">
             <Bell size={20} className="text-gray-600" />
             <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
               1
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 border border-gray-200 rounded-full cursor-pointer">
-          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M2 12H22"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12 2C14.5013 4.73835 15.9228 8.29203 16 12C15.9228 15.708 14.5013 19.2616 12 22C9.49872 19.2616 8.07725 15.708 8 12C8.07725 8.29203 9.49872 4.73835 12 2Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+
+        {/* User Type/Role */}
+        <div className={`flex items-center gap-2 px-3 py-1 rounded-full cursor-pointer hover:bg-opacity-80 transition-colors ${roleDisplay.bgColor}`}>
+          <div className="flex items-center justify-center">
+            {roleDisplay.icon}
           </div>
-          <span className="text-sm">Client</span>
-          <ChevronDown size={16} />
+          <span className={`text-sm font-medium ${roleDisplay.textColor}`}>
+            {isLoading ? 'Loading...' : roleDisplay.text}
+          </span>
+          <ChevronDown size={16} className={roleDisplay.textColor} />
         </div>
-        <div className="flex items-center gap-2 cursor-pointer">
-          <img
-            src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=300&auto=format&fit=crop"
-            alt="Profile"
-            className="w-10 h-10 rounded-full object-cover"
-          />
-          <div className="hidden md:flex items-center gap-1">
-            <span>Darshana</span>
-            <ChevronDown size={16} />
+
+        {/* User Profile */}
+        <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 rounded-full px-2 py-1 transition-colors">
+          {isLoading ? (
+            // Loading skeleton
+            <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse"></div>
+          ) : profile.profileImage ? (
+            <img
+              src={profile.profileImage}
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <span className="text-white font-semibold text-lg">
+                {displayName.charAt(0).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div className="hidden md:flex flex-col items-start">
+            {isLoading ? (
+              <>
+                <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-1"></div>
+                <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </>
+            ) : (
+              <>
+                <span className="font-medium text-gray-900">
+                  {fullName}
+                </span>
+                <span className="text-xs text-gray-500 truncate max-w-[150px]">
+                  {profile.email}
+                </span>
+              </>
+            )}
           </div>
+          <ChevronDown size={16} className="hidden md:block text-gray-500" />
         </div>
       </div>
     </header>
-  )
+  );
 }

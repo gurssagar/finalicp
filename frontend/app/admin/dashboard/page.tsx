@@ -4,6 +4,7 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { StatsCard } from '@/components/admin/StatsCard';
 import { DataTable } from '@/components/admin/DataTable';
+import Link from 'next/link';
 import { Banknote, Users, Building2, UserSquare, CheckCircle2, Trash2 } from 'lucide-react';
 export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,10 +133,12 @@ export default function AdminDashboard() {
                 <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
                   Available
                 </span>
-                <button className="flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                  <span className="text-lg">+</span>
-                  <span>New Project</span>
-                </button>
+                <Link href="/freelancer/add-service">
+                <button className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg">
+                    <span className="text-lg">+</span>
+                    <span>New Project</span>
+                  </button>
+                </Link>
               </div>
             </div>
             <p className="text-gray-500 mb-6">

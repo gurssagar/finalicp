@@ -11,51 +11,53 @@ export function Sidebar() {
   const navItems = [{
     icon: <LayoutGrid size={20} />,
     label: 'Dashboard',
-    path: '/profile/dashboard'
-  }, {
-    icon: <Users size={20} />,
-    label: 'Workers',
-    path: '/hire-talent'
+    path: '/freelancer/dashboard'
   }, {
     icon: <FolderOpen size={20} />,
     label: 'Browse Projects',
-    path: '/browse-projects'
+    path: '/freelancer/browse-projects'
   }, {
     icon: <Gift size={20} />,
     label: 'Bounties',
-    path: '/bounties'
-  }, {
+    path: '/freelancer/bounties'
+  },
+  {
+    icon: <User size={20} />,
+    label: 'My Services',
+    path: '/freelancer/my-services'
+  },  
+  {
     icon: <User size={20} />,
     label: 'My Projects',
-    path: '/my-projects'
+    path: '/freelancer/my-projects'
   }, {
     icon: <MessageSquare size={20} />,
     label: 'Messages',
-    path: '/messages'
+    path: '/freelancer/messages'
   }, {
     icon: <Code size={20} />,
     label: 'Hackathons',
-    path: '/hackathons'
+    path: '/freelancer/hackathons'
   }, {
     icon: <Wallet size={20} />,
     label: 'Pay & Loans',
-    path: '/pay-and-loans'
+    path: '/freelancer/pay-and-loans'
   }, {
     icon: <BarChart2 size={20} />,
     label: 'Analytics',
-    path: '/analytics'
+    path: '/freelancer/analytics'
   }, {
     icon: <RefreshCw size={20} />,
     label: 'ICP Work Swap',
-    path: '/icp-work-swap'
+    path: '/freelancer/swap'
   }, {
     icon: <Coffee size={20} />,
     label: 'Caffeine AI',
-    path: '/caffeine-ai'
+    path: '/freelancer/caffeine-ai'
   }, {
     icon: <CreditCard size={20} />,
     label: 'Crypto Card',
-    path: '/crypto-card'
+    path: '/freelancer/crypto-card'
   }];
   return <div className="w-64 border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
