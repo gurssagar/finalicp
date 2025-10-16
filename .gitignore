@@ -9,7 +9,8 @@ yarn-error.log*
 /frontend/out/
 /frontend/build/
 /frontend/dist/
-
+dfx.tar.gz
+dfx
 # Environment variables
 .env
 .env.local
@@ -19,7 +20,6 @@ yarn-error.log*
 .dfx
 .dfx.tar.gz
 .claude
-
 # IDE files
 .vscode/
 .idea/
