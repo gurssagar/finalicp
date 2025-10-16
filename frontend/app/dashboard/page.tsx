@@ -72,9 +72,7 @@ export default function DashboardHome() {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Sidebar */}
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
+      
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         <Header showSearch={false} />
