@@ -10,7 +10,9 @@ export default function AddServiceOverview() {
     formData,
     updateFormData,
     isSaved,
-    setSaved
+    setSaved,
+    submitService,
+    isSubmitting
   } = useServiceForm();
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showSubCategoryDropdown, setShowSubCategoryDropdown] = useState(false);
@@ -48,6 +50,19 @@ export default function AddServiceOverview() {
   };
   const handleContinue = () => {
     navigate.push('/add-service/projects');
+  };
+
+  const handleSubmitService = async () => {
+    const userId = 'TEST_FREELANCER_456'; // TODO: Get from auth context
+    
+    const result = await submitService(userId);
+    
+    if (result.success) {
+      alert(`Service created successfully! Created ${result.packages} packages.`);
+      navigate.push('/freelancer/my-services');
+    } else {
+      alert('Failed to create service: ' + result.error);
+    }
   };
   return <div className="flex flex-col min-h-screen bg-white">
       <header className="flex justify-between items-center p-4 border-b border-gray-200">
@@ -155,9 +170,16 @@ export default function AddServiceOverview() {
               </div>
             </div>
           </div>
-          <div className="flex justify-center">
-            <button onClick={handleContinue} className="px-12 py-3 bg-[#0B1F36] text-white rounded-full font-medium hover:bg-[#1a3a5f] transition-colors">
-              Continue
+          <div className="flex justify-center space-x-4">
+            <button onClick={handleContinue} className="px-8 py-3 border border-gray-300 text-gray-700 rounded-full font-medium hover:bg-gray-50 transition-colors">
+              Continue to Projects
+            </button>
+            <button 
+              onClick={handleSubmitService} 
+              disabled={isSubmitting || !formData.serviceTitle || !formData.description}
+              className="px-8 py-3 bg-[#0B1F36] text-white rounded-full font-medium hover:bg-[#1a3a5f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? 'Creating Service...' : 'Create Service Now'}
             </button>
           </div>
         </div>
