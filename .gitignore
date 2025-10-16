@@ -16,6 +16,9 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.dfx
+.dfx.tar.gz
+.claude
 
 # IDE files
 .vscode/

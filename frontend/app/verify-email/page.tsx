@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import OTPVerification from '@/components/auth/OTPVerification';
+import OTPVerification from '@/components/auth1/OTPVerification';
 
 export default function VerifyEmailPage() {
   const searchParams = useSearchParams();
