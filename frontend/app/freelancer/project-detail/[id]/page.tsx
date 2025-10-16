@@ -386,9 +386,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   return (
     <div className="flex min-h-screen bg-white">
       {/* Sidebar */}
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
+      
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col">

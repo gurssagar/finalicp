@@ -89,9 +89,7 @@ export default function SubmittedProjectsPage({ className }: SubmittedProjectsPa
   return (
     <div className={cn("flex min-h-screen bg-white", className)}>
       {/* Sidebar */}
-      <div className="hidden md:block">
-        <Sidebar />
-      </div>
+      
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
