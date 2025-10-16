@@ -9,6 +9,10 @@
       "type": "motoko",
       "main": "canisters/user.mo"
     },
+    "user_v2": {
+      "type": "motoko",
+      "main": "canisters/user_v2.mo"
+    },
     "hackathon": {
       "type": "motoko",
       "main": "canisters/hackathon_minimal.mo"

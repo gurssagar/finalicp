@@ -61,22 +61,30 @@ export interface OTPData {
 }
 
 // IC Agent configuration
-const IC_HOST = process.env.IC_HOST || 'http://localhost:4943';
-const USER_CANISTER_ID = process.env.USER_CANISTER_ID || '';
+const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST || 'http://localhost:4943';
+const USER_CANISTER_ID = process.env.NEXT_PUBLIC_USER_CANISTER_ID || '';
 
 let agent: HttpAgent | null = null;
 let userActor: _SERVICE | null = null;
 
 export async function getICAgent(): Promise<HttpAgent> {
   if (!agent) {
-    agent = new HttpAgent({ 
-      host: IC_HOST,
-      verifyQuerySignatures: false // Set to true in production
-    });
-    
-    // In development, we don't need to fetch the root key
-    if (IC_HOST.includes('localhost')) {
-      await agent.fetchRootKey();
+    try {
+      console.log('Creating IC agent with host:', IC_HOST);
+      agent = new HttpAgent({
+        host: IC_HOST,
+        verifyQuerySignatures: false // Set to true in production
+      });
+
+      // In development, we don't need to fetch the root key
+      if (IC_HOST.includes('localhost')) {
+        console.log('Fetching root key for localhost development');
+        await agent.fetchRootKey();
+      }
+      console.log('IC agent created successfully');
+    } catch (error) {
+      console.error('Failed to create IC agent:', error);
+      throw new Error(`Failed to connect to Internet Computer: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   return agent;
@@ -84,13 +92,20 @@ export async function getICAgent(): Promise<HttpAgent> {
 
 export async function getUserActor(): Promise<_SERVICE> {
   if (!userActor) {
-    const agent = await getICAgent();
-    const canisterId = Principal.fromText(USER_CANISTER_ID);
+    try {
+      console.log('Creating user actor with canister ID:', USER_CANISTER_ID);
+      const agent = await getICAgent();
+      const canisterId = Principal.fromText(USER_CANISTER_ID);
 
-    userActor = Actor.createActor(idlFactory, {
-      agent,
-      canisterId,
-    });
+      userActor = Actor.createActor(idlFactory, {
+        agent,
+        canisterId,
+      });
+      console.log('User actor created successfully');
+    } catch (error) {
+      console.error('Failed to create user actor:', error);
+      throw new Error(`Failed to connect to user canister: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
   return userActor;
 }
@@ -107,8 +122,8 @@ export async function createActorWithIDL<T>(
 
 // Environment variables validation
 export function validateICConfig(): void {
-  if (!process.env.USER_CANISTER_ID) {
-    throw new Error('USER_CANISTER_ID environment variable is required');
+  if (!process.env.NEXT_PUBLIC_USER_CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_USER_CANISTER_ID environment variable is required');
   }
 }
 

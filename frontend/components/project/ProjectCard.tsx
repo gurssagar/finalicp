@@ -1,62 +1,118 @@
-'use client';
+'use client'
 import React from 'react';
-import { Edit, Star } from 'lucide-react';
+import { Calendar, DollarSign, Users, Clock, Star } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 interface ProjectCardProps {
   project: {
-    id: number;
-    name: string;
+    id: string;
+    title: string;
     description: string;
-    image: string;
-    hackathon: string;
-    tags: string[];
-    status: string;
-    daysLeft: string;
-    teamLeader: string;
+    budget: string;
+    deadline: string;
+    teamSize: number;
+    status: 'active' | 'completed' | 'pending' | 'cancelled';
+    rating?: number;
+    tags?: string[];
+    client?: {
+      name: string;
+      avatar?: string;
+    };
   };
-  onClick: () => void;
+  className?: string;
+  onClick?: () => void;
 }
-export function ProjectCard({
-  project,
-  onClick
-}: ProjectCardProps) {
-  const handleEditClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    window.location.href = `/project-edit/${project.id}`;
+
+export function ProjectCard({ project, className, onClick }: ProjectCardProps) {
+  const statusColors = {
+    active: 'bg-green-100 text-green-800',
+    completed: 'bg-blue-100 text-blue-800',
+    pending: 'bg-yellow-100 text-yellow-800',
+    cancelled: 'bg-red-100 text-red-800'
   };
-  return <div className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow cursor-pointer flex flex-col md:flex-row" onClick={onClick}>
-      <div className="w-full md:w-64 h-48 md:h-auto flex-shrink-0">
-        <img src={project.image} alt={project.name} className="w-full h-full object-cover" />
+
+  return (
+    <div
+      className={cn(
+        'bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer',
+        className
+      )}
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+          {project.title}
+        </h3>
+        <span className={cn(
+          'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+          statusColors[project.status]
+        )}>
+          {project.status}
+        </span>
       </div>
-      <div className="flex-1 p-5 flex flex-col">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold">{project.name}</h2>
-              <span className={`text-xs px-2 py-1 rounded-full ${project.status === 'Live' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>
-                {project.status}
-              </span>
-              <span className="text-xs text-gray-500">{project.daysLeft}</span>
-            </div>
-            <p className="text-sm text-gray-500 mb-2">{project.hackathon}</p>
-          </div>
-          <button onClick={handleEditClick} className="p-2 rounded-full hover:bg-gray-100">
-            <Edit size={18} className="text-gray-500" />
-          </button>
+      
+      <p className="text-gray-600 text-sm mb-4 line-clamp-3">
+        {project.description}
+      </p>
+      
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="flex items-center text-sm text-gray-500">
+          <DollarSign className="w-4 h-4 mr-2" />
+          <span>{project.budget}</span>
         </div>
-        <p className="text-gray-700 mb-4 line-clamp-2">{project.description}</p>
-        <div className="mt-auto flex flex-wrap gap-2">
-          {project.tags.map((tag, index) => <span key={index} className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded">
+        
+        <div className="flex items-center text-sm text-gray-500">
+          <Calendar className="w-4 h-4 mr-2" />
+          <span>{project.deadline}</span>
+        </div>
+        
+        <div className="flex items-center text-sm text-gray-500">
+          <Users className="w-4 h-4 mr-2" />
+          <span>{project.teamSize} members</span>
+        </div>
+        
+        {project.rating && (
+          <div className="flex items-center text-sm text-gray-500">
+            <Star className="w-4 h-4 mr-2 text-yellow-400" />
+            <span>{project.rating}</span>
+          </div>
+        )}
+      </div>
+      
+      {project.tags && project.tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {project.tags.map((tag, index) => (
+            <span
+              key={index}
+              className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
+            >
               {tag}
-            </span>)}
-        </div>
-        <div className="mt-4 flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-            <span className="text-xs font-medium">
-              {project.teamLeader.charAt(0)}
             </span>
-          </div>
-          <span className="text-sm text-gray-600">{project.teamLeader}</span>
+          ))}
         </div>
-      </div>
-    </div>;
+      )}
+      
+      {project.client && (
+        <div className="flex items-center">
+          <div className="flex-shrink-0">
+            {project.client.avatar ? (
+              <img
+                src={project.client.avatar}
+                alt={project.client.name}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                <Users className="w-4 h-4 text-gray-400" />
+              </div>
+            )}
+          </div>
+          <div className="ml-3">
+            <p className="text-sm font-medium text-gray-900">{project.client.name}</p>
+            <p className="text-xs text-gray-500">Client</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/stats - Get marketplace statistics
 export async function GET(request: NextRequest) {
   try {
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.getStats();
 
     return NextResponse.json({
@@ -23,7 +33,7 @@ export async function GET(request: NextRequest) {
     console.error('Error fetching stats:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch marketplace statistics'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

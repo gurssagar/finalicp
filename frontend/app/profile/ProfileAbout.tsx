@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FreelancerProfileLayout } from '../../components/FreelancerProfileLayout';
+import { useRouter } from 'next/navigation';
+import { FreelancerProfileLayout } from '@/components/FreelancerProfileLayout';
 import { Check } from 'lucide-react';
 export function ProfileAbout() {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const [jobRole, setJobRole] = useState('UI UX Designer');
   const [jobDescription, setJobDescription] = useState('This is crispus explains my self as a consectetur adipiscing elit. Suspendisse eu pellentesque turpis. Vivamus a aliquam sapien, id euismod eros. Ut eget faucibus.');
   const [selectedTools, setSelectedTools] = useState<string[]>(['FIGMA', 'ADOBE XD']);
@@ -17,7 +17,7 @@ export function ProfileAbout() {
   };
   const handleContinue = () => {
     // Save data and navigate to next section
-    navigate('/profile/social');
+    navigate.push('/profile/social');
   };
   const handleJobRoleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setJobRole(e.target.value);

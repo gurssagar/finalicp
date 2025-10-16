@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useServiceForm } from '@/context/ServiceFormContext';
-import { ArrowLeft, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Check, CheckCircle, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 export default function ServicePreview() {
   const navigate = useRouter();
   const {
@@ -12,7 +13,11 @@ export default function ServicePreview() {
     clearFormData
   } = useServiceForm();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [publishError, setPublishError] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+  } | null>(null);
   
   // Get all images for the carousel
   const allImages = formData.coverImage ? [formData.coverImage, ...formData.portfolioImages] : formData.portfolioImages;
@@ -20,22 +25,52 @@ export default function ServicePreview() {
     navigate.push('/freelancer/add-service/others');
   };
   const handlePublish = async () => {
-    const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId');
+    // Get userId from session
+    let userId: string | null = null;
+    try {
+      const response = await fetch('/api/auth/me');
+      const data = await response.json();
+      
+      if (data.success && data.session) {
+        userId = data.session.userId;
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+    }
     
     if (!userId) {
-      setPublishError('Please log in to publish your service');
+      setNotification({
+        type: 'error',
+        title: 'Authentication Required',
+        message: 'Please log in to publish your service'
+      });
       return;
     }
 
+    // submitService already saves to marketplace canister via createService
     const result = await submitService(userId);
     
     if (result.success) {
+      // Show success notification
+      setNotification({
+        type: 'success',
+        title: 'Service Published Successfully!',
+        message: `Your service "${formData.serviceTitle}" has been created and is now live on the marketplace.`
+      });
+      
       // Clear form data after successful submission
       clearFormData();
-      // Navigate to services page
-      navigate.push('/freelancer/my-services');
+      
+      // Redirect to services page after 3 seconds
+      setTimeout(() => {
+        navigate.push('/freelancer/my-services');
+      }, 3000);
     } else {
-      setPublishError(result.error || 'Failed to publish service');
+      setNotification({
+        type: 'error',
+        title: 'Publication Failed',
+        message: result.error || 'Failed to publish service. Please try again.'
+      });
     }
   };
   const goToPreviousImage = () => {
@@ -48,6 +83,21 @@ export default function ServicePreview() {
     setCurrentImageIndex(index);
   };
   return <div className="min-h-screen bg-white">
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-50 w-96 animate-in slide-in-from-top-2">
+          <Alert variant={notification.type === 'success' ? 'default' : 'destructive'}>
+            {notification.type === 'success' ? (
+              <CheckCircle className="h-4 w-4" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            <AlertTitle>{notification.title}</AlertTitle>
+            <AlertDescription>{notification.message}</AlertDescription>
+          </Alert>
+        </div>
+      )}
+      
       <header className="border-b border-gray-200 py-4 px-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
@@ -90,11 +140,6 @@ export default function ServicePreview() {
             )}
           </div>
         </div>
-        {publishError && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {publishError}
-          </div>
-        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
             {/* Image Carousel */}

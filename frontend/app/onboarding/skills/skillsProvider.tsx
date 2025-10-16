@@ -26,6 +26,7 @@ const PREDEFINED_SKILLS = [
 export function SkillsSelection() {
   const [skillInput, setSkillInput] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isAddingSkill, setIsAddingSkill] = useState(false)
 
   const {
     skills,
@@ -49,26 +50,38 @@ export function SkillsSelection() {
     ).slice(0, 8);
   }, [skillInput, skills]);
 
-  const handleAddSkill = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleAddSkill = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && skillInput.trim()) {
       e.preventDefault()
-      const success = addSkill(skillInput.trim())
-      if (success) {
-        setSkillInput('')
-        setShowSuggestions(false)
-        setError('')
-      } else {
-        setError('Failed to add skill')
+      setIsAddingSkill(true)
+
+      try {
+        const success = addSkill(skillInput.trim())
+        if (success) {
+          setSkillInput('')
+          setShowSuggestions(false)
+          setError('')
+        } else {
+          setError('Failed to add skill')
+        }
+      } finally {
+        setIsAddingSkill(false)
       }
     }
   }
 
-  const handleAddSuggestedSkill = (skill: string) => {
-    const success = addSkill(skill)
-    if (success) {
-      setSkillInput('')
-      setShowSuggestions(false)
-      setError('')
+  const handleAddSuggestedSkill = async (skill: string) => {
+    setIsAddingSkill(true)
+
+    try {
+      const success = addSkill(skill)
+      if (success) {
+        setSkillInput('')
+        setShowSuggestions(false)
+        setError('')
+      }
+    } finally {
+      setIsAddingSkill(false)
     }
   }
 
@@ -127,8 +140,17 @@ export function SkillsSelection() {
                     onKeyDown={handleAddSkill}
                     onFocus={() => skillInput.trim() && setShowSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                    className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616] placeholder-gray-500"
+                    disabled={isAddingSkill}
+                    className={`w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616] placeholder-gray-500 ${
+                      isAddingSkill ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   />
+
+                  {isAddingSkill && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-400"></div>
+                    </div>
+                  )}
 
                   {showSuggestions && filteredSuggestions.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
@@ -136,7 +158,9 @@ export function SkillsSelection() {
                         <div
                           key={index}
                           onClick={() => handleAddSuggestedSkill(suggestion)}
-                          className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
+                          className={`px-4 py-2 text-sm text-gray-700 cursor-pointer ${
+                            isAddingSkill ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'
+                          }`}
                         >
                           {suggestion}
                         </div>
@@ -189,6 +213,7 @@ export function SkillsSelection() {
                 github={profile.github}
                 twitter={profile.twitter}
                 skills={skills.length > 0 ? skills : []}
+                profileImage={profile.profileImage}
               />
             </div>
           </div>

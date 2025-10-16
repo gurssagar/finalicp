@@ -250,21 +250,27 @@ export const ServiceFormProvider: React.FC<{
   };
 
   const uploadPortfolioImages = async (files: File[]): Promise<UploadResult[]> => {
+    console.log('ServiceFormContext: Starting portfolio image upload...', { filesCount: files.length });
     setUploadingImages(true);
     try {
       const results = await uploadMultipleImagesToTebi(files, 'portfolio');
+      console.log('ServiceFormContext: Upload results received:', results);
+      
       const successfulUploads = results.filter(r => r.success && r.url);
       const uploadedUrls = successfulUploads.map(r => r.url!);
+      console.log('ServiceFormContext: Successful uploads:', uploadedUrls);
 
       if (uploadedUrls.length > 0) {
         updateFormData({
           portfolioImages: [...formData.portfolioImages, ...uploadedUrls]
         });
         setSaved('portfolioImages', true);
+        console.log('ServiceFormContext: Updated form data with new images');
       }
 
       return results;
     } catch (error) {
+      console.error('ServiceFormContext: Upload error:', error);
       return [{
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed'

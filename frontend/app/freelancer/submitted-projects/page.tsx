@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '../../components/Sidebar';
-import { Header } from '../../components/Header1';
+import { Header1 } from '../../components/Header1';
 import { ProjectCard } from '../../components/project/ProjectCard';
 import { ChevronLeft, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -93,7 +93,7 @@ export default function SubmittedProjectsPage({ className }: SubmittedProjectsPa
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header />
+        <Header1 />
         <main className="flex-1 p-4 md:p-6" role="main">
           <div className="max-w-7xl mx-auto">
             {/* Back button */}

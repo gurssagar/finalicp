@@ -1,41 +1,93 @@
-'use client';
+'use client'
 import React from 'react';
+import { User, Mail, Phone, MapPin } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
 interface TeamMemberProps {
   member: {
-    id: number;
+    id: string;
     name: string;
     role: string;
-    location: string;
-    bio: string;
-    skills: string[];
-    image: string;
+    email?: string;
+    phone?: string;
+    location?: string;
+    avatar?: string;
+    skills?: string[];
+    bio?: string;
   };
+  className?: string;
 }
-export function TeamMember({
-  member
-}: TeamMemberProps) {
-  return <div className="border border-gray-200 rounded-lg p-6">
-      <div className="flex flex-col items-center mb-4">
-        <div className="w-20 h-20 rounded-full overflow-hidden mb-3">
-          <img src={member.image} alt={member.name} className="w-full h-full object-cover" onError={e => {
-          const target = e.target as HTMLImageElement;
-          target.src = 'https://via.placeholder.com/80';
-        }} />
+
+export function TeamMember({ member, className }: TeamMemberProps) {
+  return (
+    <div className={cn('bg-white rounded-lg border border-gray-200 p-6', className)}>
+      <div className="flex items-start space-x-4">
+        <div className="flex-shrink-0">
+          {member.avatar ? (
+            <img
+              src={member.avatar}
+              alt={member.name}
+              className="w-16 h-16 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center">
+              <User className="w-8 h-8 text-gray-400" />
+            </div>
+          )}
         </div>
-        <h3 className="text-xl font-bold">{member.name}</h3>
+        
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">{member.name}</h3>
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              {member.role}
+            </span>
+          </div>
+          
+          {member.bio && (
+            <p className="mt-2 text-sm text-gray-600">{member.bio}</p>
+          )}
+          
+          <div className="mt-3 space-y-2">
+            {member.email && (
+              <div className="flex items-center text-sm text-gray-500">
+                <Mail className="w-4 h-4 mr-2" />
+                <span>{member.email}</span>
+              </div>
+            )}
+            
+            {member.phone && (
+              <div className="flex items-center text-sm text-gray-500">
+                <Phone className="w-4 h-4 mr-2" />
+                <span>{member.phone}</span>
+              </div>
+            )}
+            
+            {member.location && (
+              <div className="flex items-center text-sm text-gray-500">
+                <MapPin className="w-4 h-4 mr-2" />
+                <span>{member.location}</span>
+              </div>
+            )}
+          </div>
+          
+          {member.skills && member.skills.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-gray-900 mb-2">Skills</h4>
+              <div className="flex flex-wrap gap-2">
+                {member.skills.map((skill, index) => (
+                  <span
+                    key={index}
+                    className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800"
+                  >
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-      <div className="flex items-center justify-center gap-2 mb-4">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="10" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span className="text-sm text-gray-600">{member.location}</span>
-      </div>
-      <p className="text-gray-700 text-sm mb-4">{member.bio}</p>
-      <div className="flex flex-wrap gap-2">
-        {member.skills.map((skill, index) => <span key={index} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
-            {skill}
-          </span>)}
-      </div>
-    </div>;
+    </div>
+  );
 }

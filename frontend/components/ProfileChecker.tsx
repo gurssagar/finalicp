@@ -4,10 +4,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface ProfileCompleteness {
+  success: boolean;
   isComplete: boolean;
-  requiredFields: string[];
-  optionalFields: string[];
+  profileSubmitted?: boolean;
+  requiredFields?: string[];
+  optionalFields?: string[];
   message: string;
+  fallback?: boolean;
 }
 
 export default function ProfileChecker({ children }: { children: React.ReactNode }) {
@@ -27,9 +30,9 @@ export default function ProfileChecker({ children }: { children: React.ReactNode
         const response = await fetch('/api/profile/check-completeness');
         const result: ProfileCompleteness = await response.json();
 
-        // Only redirect to onboarding if profile is incomplete AND not a fallback
-        if (result.success && !result.isComplete && !result.fallback) {
-          // Redirect to onboarding if profile is incomplete
+        // Only redirect to onboarding if profile is incomplete AND not submitted AND not a fallback
+        if (result.success && !result.isComplete && !result.profileSubmitted && !result.fallback) {
+          // Redirect to onboarding if profile is incomplete and not submitted
           router.push('/onboarding');
         }
       } catch (error) {

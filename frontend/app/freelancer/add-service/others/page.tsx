@@ -156,8 +156,18 @@ export default function AddServiceOthers() {
   }
 
   const handleSubmitService = async () => {
-    // Get user ID from authentication (this would come from your auth context)
-    const userId = localStorage.getItem('userId') || sessionStorage.getItem('userId')
+    // Get user ID from session
+    let userId: string | null = null;
+    try {
+      const response = await fetch('/api/auth/me');
+      const data = await response.json();
+      
+      if (data.success && data.session) {
+        userId = data.session.userId;
+      }
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+    }
 
     if (!userId) {
       alert('Please log in to submit your service')

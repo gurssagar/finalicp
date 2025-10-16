@@ -6,7 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 interface HeaderProps {
   showSearch?: boolean;
 }
-export function Header({
+export function Header1({
   showSearch = true
 }: HeaderProps) {
   const { profile, isLoading, currentRole } = useUserContext();

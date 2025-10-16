@@ -77,7 +77,41 @@ const idlFactory = ({ IDL }: any) => {
     }), err: IDL.Text })]),
     
     deleteService: IDL.Func([IDL.Text, IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
-    
+
+    getPackagesByService: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Vec(IDL.Record({
+      package_id: IDL.Text,
+      service_id: IDL.Text,
+      tier: IDL.Text,
+      title: IDL.Text,
+      description: IDL.Text,
+      price_e8s: IDL.Text,
+      delivery_days: IDL.Nat,
+      features: IDL.Vec(IDL.Text),
+      revisions_included: IDL.Nat,
+      status: IDL.Text,
+      created_at: IDL.Int,
+      updated_at: IDL.Int
+    })), err: IDL.Text })]),
+
+    createPackage: IDL.Func([IDL.Text, IDL.Record({
+      service_id: IDL.Text,
+      tier: IDL.Text,
+      title: IDL.Text,
+      description: IDL.Text,
+      price_e8s: IDL.Text,
+      delivery_days: IDL.Nat,
+      features: IDL.Vec(IDL.Text),
+      revisions_included: IDL.Nat,
+      status: IDL.Text
+    })], [IDL.Variant({ ok: IDL.Record({
+      package_id: IDL.Text,
+      service_id: IDL.Text,
+      tier: IDL.Text,
+      status: IDL.Text,
+      created_at: IDL.Int,
+      updated_at: IDL.Int
+    }), err: IDL.Text })]),
+
     // Add other methods as needed for testing
     getStats: IDL.Func([], [IDL.Record({
       total_services: IDL.Nat,
@@ -300,3 +334,4 @@ export function handleApiError(error: any): string {
   }
   return 'Unknown error occurred';
 }
+

@@ -1,23 +1,18 @@
-import { TestRunner, makeApiCall, TEST_CONFIG, MOCK_DATA } from './test-setup';
+import { TestRunner, makeApiCall, TEST_CONFIG, MOCK_DATA, resetMockData, assertEqual, assertNotNull, assertTrue, assertHasProperty } from './test-setup';
 
 export async function runServicesTests(): Promise<void> {
   const runner = new TestRunner();
 
+  // Reset mock data before running tests
+  resetMockData();
+
   // Test 1: List services (should work even with empty result)
   await runner.runTest('List Services - Empty Result', async () => {
     const { response, data } = await makeApiCall('/services');
-    
-    if (!response.ok) {
-      throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(data)}`);
-    }
-    
-    if (!data.success) {
-      throw new Error(`Expected success: true, got: ${JSON.stringify(data)}`);
-    }
-    
-    if (!Array.isArray(data.data)) {
-      throw new Error(`Expected data to be array, got: ${typeof data.data}`);
-    }
+
+    assertEqual(response.ok, true, `Expected 200, got ${response.status}: ${JSON.stringify(data)}`);
+    assertEqual(data.success, true, `Expected success: true, got: ${JSON.stringify(data)}`);
+    assertTrue(Array.isArray(data.data), `Expected data to be array, got: ${typeof data.data}`);
   });
 
   // Test 2: Create service
@@ -26,19 +21,11 @@ export async function runServicesTests(): Promise<void> {
       userId: TEST_CONFIG.testUserId,
       serviceData: MOCK_DATA.service
     });
-    
-    if (!response.ok) {
-      throw new Error(`Expected 200, got ${response.status}: ${JSON.stringify(data)}`);
-    }
-    
-    if (!data.success) {
-      throw new Error(`Expected success: true, got: ${JSON.stringify(data)}`);
-    }
-    
-    if (!data.data.service_id) {
-      throw new Error(`Expected service_id in response, got: ${JSON.stringify(data.data)}`);
-    }
-    
+
+    assertEqual(response.ok, true, `Expected 200, got ${response.status}: ${JSON.stringify(data)}`);
+    assertEqual(data.success, true, `Expected success: true, got: ${JSON.stringify(data)}`);
+    assertHasProperty(data.data, 'service_id', `Expected service_id in response, got: ${JSON.stringify(data.data)}`);
+
     // Store the service ID for other tests
     TEST_CONFIG.testServiceId = data.data.service_id;
   });

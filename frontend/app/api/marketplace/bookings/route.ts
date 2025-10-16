@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // Helper functions to get user information
 async function getClientEmail(clientId: string): Promise<string | null> {
@@ -39,6 +38,17 @@ async function getServiceTitle(packageId: string): Promise<string | null> {
 // GET /api/marketplace/bookings - List bookings for user
 export async function GET(request: NextRequest) {
   try {
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('user_id');
     const userType = searchParams.get('user_type') as 'client' | 'freelancer';
@@ -61,7 +71,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     let result;
 
     if (userType === 'client') {
@@ -79,14 +89,14 @@ export async function GET(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error fetching bookings:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch bookings'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }
@@ -122,7 +132,7 @@ export async function POST(request: NextRequest) {
     const idempotencyKey = `booking-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.bookPackage(clientId, packageId, idempotencyKey, specialInstructions);
 
     if ('ok' in result) {
@@ -163,14 +173,14 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error booking package:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to book package'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

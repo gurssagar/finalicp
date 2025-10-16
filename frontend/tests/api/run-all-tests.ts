@@ -1,90 +1,271 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env npx ts-node
+
+/**
+ * Main test runner for ICPWork API tests
+ *
+ * Usage:
+ *   npx ts-node tests/api/run-all-tests.ts                    # Run all tests
+ *   npx ts-node tests/api/run-all-tests.ts --services      # Run only services tests
+ *   npx ts-node tests/api/run-all-tests.ts --integration   # Run only integration tests
+ *   npx ts-node tests/api/run-all-tests.ts --performance   # Run only performance tests
+ */
 
 import { runServicesTests } from './services.test';
-import { runPackagesTests } from './packages.test';
-import { runBookingsTests } from './bookings.test';
-import { runStagesTests } from './stages.test';
+import { runIntegrationTests } from './integration.test';
+import { runErrorHandlingTests } from './error-handling.test';
+import { runDataValidationTests } from './data-validation.test';
+import { runPerformanceTests } from './performance.test';
 
-async function runAllTests() {
-  console.log('🚀 Starting Marketplace API Tests');
-  console.log('===================================\n');
+interface TestSuite {
+  name: string;
+  run: () => Promise<any>;
+  enabled: boolean;
+}
 
-  const startTime = Date.now();
-  const results = {
-    services: { passed: 0, failed: 0, total: 0 },
-    packages: { passed: 0, failed: 0, total: 0 },
-    bookings: { passed: 0, failed: 0, total: 0 },
-    stages: { passed: 0, failed: 0, total: 0 }
-  };
+const availableTestSuites: TestSuite[] = [
+  {
+    name: 'Services API Tests',
+    run: runServicesTests,
+    enabled: true
+  },
+  {
+    name: 'Integration Tests',
+    run: runIntegrationTests,
+    enabled: true
+  },
+  {
+    name: 'Error Handling Tests',
+    run: runErrorHandlingTests,
+    enabled: true
+  },
+  {
+    name: 'Data Validation Tests',
+    run: runDataValidationTests,
+    enabled: true
+  },
+  {
+    name: 'Performance Tests',
+    run: runPerformanceTests,
+    enabled: true
+  }
+];
 
-  try {
-    console.log('📋 Running Services Tests...');
-    const servicesResults = await runServicesTests();
-    results.services.passed = servicesResults.filter(r => r.passed).length;
-    results.services.failed = servicesResults.filter(r => !r.passed).length;
-    results.services.total = servicesResults.length;
-    console.log(`✅ Services Tests: ${results.services.passed}/${results.services.total} passed\n`);
+class TestOrchestrator {
+  private results: Array<{
+    suite: string;
+    results: any;
+    success: boolean;
+    error?: string;
+    duration: number;
+  }> = [];
 
-    console.log('📦 Running Packages Tests...');
-    const packagesResults = await runPackagesTests();
-    results.packages.passed = packagesResults.filter(r => r.passed).length;
-    results.packages.failed = packagesResults.filter(r => !r.passed).length;
-    results.packages.total = packagesResults.length;
-    console.log(`✅ Packages Tests: ${results.packages.passed}/${results.packages.total} passed\n`);
+  private startTime: number = 0;
+  private endTime: number = 0;
 
-    console.log('📝 Running Bookings Tests...');
-    const bookingsResults = await runBookingsTests();
-    results.bookings.passed = bookingsResults.filter(r => r.passed).length;
-    results.bookings.failed = bookingsResults.filter(r => !r.passed).length;
-    results.bookings.total = bookingsResults.length;
-    console.log(`✅ Bookings Tests: ${results.bookings.passed}/${results.bookings.total} passed\n`);
+  async runTests(filter?: string): Promise<void> {
+    this.startTime = Date.now();
 
-    console.log('🎯 Running Stages Tests...');
-    const stagesResults = await runStagesTests();
-    results.stages.passed = stagesResults.filter(r => r.passed).length;
-    results.stages.failed = stagesResults.filter(r => !r.passed).length;
-    results.stages.total = stagesResults.length;
-    console.log(`✅ Stages Tests: ${results.stages.passed}/${results.stages.total} passed\n`);
+    console.log('🚀 ICPWork API Test Runner');
+    console.log('============================');
+    console.log(`Starting tests at ${new Date().toISOString()}`);
+    console.log('');
 
-  } catch (error) {
-    console.error('❌ Test execution failed:', error);
-    process.exit(1);
+    const testSuites = this.getTestSuitesToRun(filter);
+
+    if (testSuites.length === 0) {
+      console.log('❌ No test suites found matching the filter');
+      console.log(`Available test suites: ${availableTestSuites.map(s => s.name).join(', ')}`);
+      process.exit(1);
+    }
+
+    console.log(`Running ${testSuites.length} test suite(s):`);
+    testSuites.forEach(suite => {
+      console.log(`  • ${suite.name}`);
+    });
+    console.log('');
+
+    for (const testSuite of testSuites) {
+      await this.runTestSuite(testSuite);
+    }
+
+    this.endTime = Date.now();
+    this.printFinalResults();
   }
 
-  const endTime = Date.now();
-  const duration = endTime - startTime;
+  private getTestSuitesToRun(filter?: string): TestSuite[] {
+    if (!filter) {
+      return availableTestSuites.filter(suite => suite.enabled);
+    }
 
-  // Print final summary
-  console.log('📊 Final Test Results');
-  console.log('====================');
-  console.log(`Services:  ${results.services.passed}/${results.services.total} passed (${results.services.failed} failed)`);
-  console.log(`Packages:  ${results.packages.passed}/${results.packages.total} passed (${results.packages.failed} failed)`);
-  console.log(`Bookings:  ${results.bookings.passed}/${results.bookings.total} passed (${results.bookings.failed} failed)`);
-  console.log(`Stages:    ${results.stages.passed}/${results.stages.total} passed (${results.stages.failed} failed)`);
-  
-  const totalPassed = results.services.passed + results.packages.passed + results.bookings.passed + results.stages.passed;
-  const totalTests = results.services.total + results.packages.total + results.bookings.total + results.stages.total;
-  const totalFailed = totalTests - totalPassed;
-  
-  console.log(`\n🎯 Overall Results:`);
-  console.log(`Total Tests: ${totalTests}`);
-  console.log(`Passed: ${totalPassed}`);
-  console.log(`Failed: ${totalFailed}`);
-  console.log(`Success Rate: ${((totalPassed / totalTests) * 100).toFixed(1)}%`);
-  console.log(`Duration: ${duration}ms`);
+    const filterLower = filter.toLowerCase();
+    return availableTestSuites.filter(suite =>
+      suite.enabled &&
+      suite.name.toLowerCase().includes(filterLower)
+    );
+  }
 
-  if (totalFailed > 0) {
-    console.log('\n❌ Some tests failed. Please check the output above for details.');
-    process.exit(1);
-  } else {
-    console.log('\n🎉 All tests passed!');
-    process.exit(0);
+  private async runTestSuite(testSuite: TestSuite): Promise<void> {
+    console.log(`📋 Running: ${testSuite.name}`);
+    console.log('─'.repeat(50));
+
+    const suiteStartTime = Date.now();
+    let success = true;
+    let error: string | undefined;
+    let results: any;
+
+    try {
+      results = await testSuite.run();
+      console.log('');
+    } catch (err) {
+      success = false;
+      error = err instanceof Error ? err.message : String(err);
+      console.log(`❌ ${testSuite.name} failed: ${error}`);
+      console.log('');
+    }
+
+    const suiteDuration = Date.now() - suiteStartTime;
+
+    this.results.push({
+      suite: testSuite.name,
+      results,
+      success,
+      error,
+      duration: suiteDuration
+    });
+  }
+
+  private printFinalResults(): void {
+    const totalDuration = this.endTime - this.startTime;
+    const totalSuites = this.results.length;
+    const successfulSuites = this.results.filter(r => r.success).length;
+    const failedSuites = totalSuites - successfulSuites;
+
+    console.log('🏁 Final Results');
+    console.log('================');
+
+    this.results.forEach(result => {
+      const status = result.success ? '✅' : '❌';
+      const duration = `(${result.duration}ms)`;
+      console.log(`${status} ${result.suite} ${duration}`);
+      if (result.error) {
+        console.log(`   Error: ${result.error}`);
+      }
+    });
+
+    console.log('');
+    console.log('📊 Summary');
+    console.log('==========');
+    console.log(`Total Test Suites: ${totalSuites}`);
+    console.log(`Successful: ${successfulSuites}`);
+    console.log(`Failed: ${failedSuites}`);
+    console.log(`Success Rate: ${totalSuites > 0 ? ((successfulSuites / totalSuites) * 100).toFixed(1) : 0}%`);
+    console.log(`Total Duration: ${totalDuration}ms`);
+
+    this.printTestStatistics();
+
+    if (failedSuites > 0) {
+      console.log('');
+      console.log('❌ Some tests failed. Please check the errors above.');
+      process.exit(1);
+    } else {
+      console.log('');
+      console.log('🎉 All tests passed successfully!');
+      process.exit(0);
+    }
+  }
+
+  private printTestStatistics(): void {
+    let totalTests = 0;
+    let totalPassed = 0;
+    let totalFailed = 0;
+
+    console.log('');
+    console.log('📈 Individual Test Statistics');
+    console.log('-------------------------------');
+
+    this.results.forEach(result => {
+      if (result.results && result.results.getSummary) {
+        const summary = result.results.getSummary();
+        totalTests += summary.total;
+        totalPassed += summary.passed;
+        totalFailed += summary.failed;
+
+        console.log(`${result.suite}:`);
+        console.log(`  Tests: ${summary.total}, Passed: ${summary.passed}, Failed: ${summary.failed}`);
+        if (summary.totalDuration) {
+          console.log(`  Duration: ${summary.totalDuration}ms`);
+        }
+      }
+    });
+
+    console.log('-------------------------------');
+    console.log(`Overall: ${totalTests} tests, ${totalPassed} passed, ${totalFailed} failed`);
   }
 }
 
-// Run tests if this file is executed directly
+function parseArguments(): { filter?: string; help: boolean } {
+  const args = process.argv.slice(2);
+
+  if (args.includes('--help') || args.includes('-h')) {
+    return { help: true };
+  }
+
+  const filterArg = args.find(arg => arg.startsWith('--'));
+  const filter = filterArg ? filterArg.substring(2) : undefined;
+
+  return { filter, help: false };
+}
+
+function showHelp(): void {
+  console.log('ICPWork API Test Runner');
+  console.log('======================');
+  console.log('');
+  console.log('Usage:');
+  console.log('  npx ts-node tests/api/run-all-tests.ts [options]');
+  console.log('');
+  console.log('Options:');
+  console.log('  --help, -h              Show this help message');
+  console.log('  --filter <name>        Run only test suites matching the filter');
+  console.log('');
+  console.log('Examples:');
+  console.log('  npx ts-node tests/api/run-all-tests.ts                    # Run all tests');
+  console.log('  npx ts-node tests/api/run-all-tests.ts --services         # Run only services tests');
+  console.log('  npx ts-node tests/api/run-all-tests.ts --integration      # Run only integration tests');
+  console.log('  npx ts-node tests/api/run-all-tests.ts --performance      # Run only performance tests');
+  console.log('  npx ts-node tests/api/run-all-tests.ts --error           # Run only error handling tests');
+  console.log('');
+  console.log('Available test suites:');
+  availableTestSuites.forEach(suite => {
+    console.log(`  • ${suite.name.toLowerCase().replace(/\s+/g, '-')}`);
+  });
+}
+
+async function main(): Promise<void> {
+  const { filter, help } = parseArguments();
+
+  if (help) {
+    showHelp();
+    return;
+  }
+
+  const orchestrator = new TestOrchestrator();
+  await orchestrator.runTests(filter);
+}
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error.message);
+  console.error(error.stack);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 if (require.main === module) {
-  runAllTests().catch(console.error);
+  main().catch(error => {
+    console.error('❌ Test runner failed:', error.message);
+    process.exit(1);
+  });
 }
-
-export { runAllTests };

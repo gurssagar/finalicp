@@ -8,7 +8,7 @@ export default function MyProjectsPage() {
   const navigate = useRouter();
   const [activeTab, setActiveTab] = useState('completed');
   const handleViewProject = () => {
-    navigate.push('/project-details');
+    navigate.push('/freelancer/project-details');
   };
   return <div className="flex min-h-screen bg-white">
       {/* Sidebar */}

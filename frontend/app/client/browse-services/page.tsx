@@ -1,9 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header } from '@/components/Header1';
 import { ServiceFilter } from '@/components/client/ServiceFilter';
-import { ServiceCard } from '@/components/client/ServiceCard';
+import { ServiceCardWithPricing } from '@/components/client/ServiceCardWithPricing';
 import { Button } from '@/components/ui/button';
 import { useServices } from '@/hooks/useServices';
 export default function BrowseServices() {
@@ -33,7 +32,7 @@ export default function BrowseServices() {
     setActiveCategory(category === activeCategory ? '' : category);
   };
   return <div className="flex flex-col min-h-screen bg-white">
-      <Header showSearch={true} />
+      
       <main className="flex-1 container mx-auto px-4 py-6">
         <div className="overflow-x-auto pb-4">
           <div className="flex space-x-4 min-w-max">
@@ -61,18 +60,17 @@ export default function BrowseServices() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
             {services.map(service => (
-              <ServiceCard 
-                key={service.service_id} 
+              <ServiceCardWithPricing
+                key={service.service_id}
                 service={{
                   id: service.service_id,
                   title: service.title,
-                  image: service.cover_image_url || "/default-service.jpg",
+                  image: service.cover_image_url || "/default-service.svg",
                   seller: `Freelancer ${service.freelancer_id.slice(-4)}`,
                   rating: service.rating_avg,
-                  reviews: `${service.total_orders}+`,
-                  price: 100 // TODO: Get from packages
-                }} 
-                onClick={() => handleServiceClick(service.service_id)} 
+                  reviews: `${service.total_orders}+`
+                }}
+                onClick={() => handleServiceClick(service.service_id)}
               />
             ))}
           </div>

@@ -1,5 +1,5 @@
 "use client"
-import React from 'react'
+import React, { useState } from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
@@ -10,6 +10,7 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 
 export function ProfileSetup() {
   const navigate = useRouter()
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
 
   const {
     profile,
@@ -23,6 +24,51 @@ export function ProfileSetup() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     updateProfile({ [name]: value });
+  };
+
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file');
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        setError('Image size must be less than 5MB');
+        return;
+      }
+
+      setIsUploadingImage(true);
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch('/api/upload/profile-image', {
+          method: 'POST',
+          body: formData,
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          updateProfile({ profileImage: result.fileUrl });
+          setError('');
+        } else {
+          setError(result.error || 'Failed to upload profile image');
+        }
+      } catch (error) {
+        console.error('Upload error:', error);
+        setError('Failed to upload profile image. Please try again.');
+      } finally {
+        setIsUploadingImage(false);
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,6 +112,53 @@ export function ProfileSetup() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Profile Picture */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <h2 className="text-lg font-semibold text-[#161616] mb-4 flex items-center">
+                    <User size={20} className="mr-2 text-blue-600" />
+                    Profile Picture
+                  </h2>
+
+                  <div className="flex items-center space-x-6">
+                    <div className="flex-shrink-0">
+                      {profile.profileImage ? (
+                        <img
+                          src={profile.profileImage}
+                          alt="Profile"
+                          className="w-20 h-20 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="text-gray-400" size={32} />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="cursor-pointer">
+                        <span
+                          className={`${
+                            isUploadingImage
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          } text-white px-4 py-2 rounded-md text-sm font-medium transition-colors`}
+                        >
+                          {isUploadingImage ? 'Uploading...' : 'Upload Photo'}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleProfileImageChange}
+                          disabled={isUploadingImage}
+                        />
+                      </label>
+                      <p className="text-xs text-gray-500 mt-1">
+                        JPG, PNG or GIF (max 5MB)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Basic Information */}
                 <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                   <h2 className="text-lg font-semibold text-[#161616] mb-4 flex items-center">
@@ -246,6 +339,7 @@ export function ProfileSetup() {
                 linkedin={profile.linkedin}
                 github={profile.github}
                 twitter={profile.twitter}
+                profileImage={profile.profileImage}
               />
             </div>
           </div>

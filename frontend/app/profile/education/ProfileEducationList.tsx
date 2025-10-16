@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FreelancerProfileLayout } from '../../components/FreelancerProfileLayout';
+import { useRouter } from 'next/navigation';
+import { FreelancerProfileLayout } from '@/components/FreelancerProfileLayout';
 import { Plus } from 'lucide-react';
 export function ProfileEducationList() {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const [educations, setEducations] = useState([{
     id: '1',
     school: 'Delhi University',
@@ -13,11 +13,11 @@ export function ProfileEducationList() {
   }]);
   const handleAddMoreEducation = () => {
     // Navigate to add education form
-    navigate('/profile/education');
+    navigate.push('/profile/education');
   };
   const handleContinue = () => {
     // Save data and navigate to next section
-    navigate('/profile/work');
+    navigate.push('/profile/work');
   };
   return <FreelancerProfileLayout activeTab="education" progress="1/3" detailsType="About">
       <div>

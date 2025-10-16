@@ -4,10 +4,10 @@ import { HackathonCanister } from '@/lib/hackathon-canister';
 // PUT /api/hackathon/registrations/[registrationId]/status - Update registration status
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { registrationId: string } }
+  { params }: { params: Promise<{ registrationId: string }> }
 ) {
   try {
-    const { registrationId } = params;
+    const { registrationId } = await params;
     const body = await request.json();
 
     if (!registrationId) {

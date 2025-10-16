@@ -36,13 +36,19 @@ class EmailService {
   private async getTransporter(): Promise<nodemailer.Transporter> {
     if (!this.transporter) {
       this.transporter = nodemailer.createTransport(this.config);
-      
+
       // Verify connection configuration
       try {
         await this.transporter.verify();
         console.log('SMTP connection verified successfully');
       } catch (error) {
-        console.error('SMTP connection failed:', error);
+        console.warn('SMTP connection failed, using development mode:', error);
+        // In development, we'll allow the signup to continue without email
+        // The user will see the OTP in the console logs
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('Email service is not configured properly. OTP will be logged to console.');
+          return this.transporter;
+        }
         throw new Error('Failed to connect to SMTP server');
       }
     }

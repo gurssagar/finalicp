@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export interface Service {
   service_id: string;
@@ -22,6 +22,7 @@ export interface Service {
 export interface ServiceFilters {
   category?: string;
   freelancer_id?: string;
+  freelancer_email?: string;
   search_term?: string;
   limit?: number;
   offset?: number;
@@ -54,17 +55,34 @@ export function useServices(freelancerId?: string, filters?: ServiceFilters) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Memoize filters to prevent infinite re-renders
+  const memoizedFilters = useMemo(() => filters, [
+    filters?.category,
+    filters?.freelancer_id,
+    filters?.freelancer_email,
+    filters?.search_term,
+    filters?.limit,
+    filters?.offset
+  ]);
+
   const fetchServices = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const queryParams = new URLSearchParams();
-      if (filters?.category) queryParams.append('category', filters.category);
-      if (filters?.freelancer_id) queryParams.append('freelancer_id', filters.freelancer_id);
-      if (filters?.search_term) queryParams.append('search_term', filters.search_term);
-      if (filters?.limit) queryParams.append('limit', filters.limit.toString());
-      if (filters?.offset) queryParams.append('offset', filters.offset.toString());
+      if (memoizedFilters?.category) queryParams.append('category', memoizedFilters.category);
+      
+      // Only use freelancer_id if we don't have an email filter
+      if (!memoizedFilters?.freelancer_email) {
+        if (freelancerId) queryParams.append('freelancer_id', freelancerId);
+        if (memoizedFilters?.freelancer_id) queryParams.append('freelancer_id', memoizedFilters.freelancer_id);
+      }
+      
+      if (memoizedFilters?.freelancer_email) queryParams.append('freelancer_email', memoizedFilters.freelancer_email);
+      if (memoizedFilters?.search_term) queryParams.append('search_term', memoizedFilters.search_term);
+      if (memoizedFilters?.limit) queryParams.append('limit', memoizedFilters.limit.toString());
+      if (memoizedFilters?.offset) queryParams.append('offset', memoizedFilters.offset.toString());
 
       const response = await fetch(`/api/marketplace/services?${queryParams.toString()}`);
       const data = await response.json();
@@ -79,7 +97,7 @@ export function useServices(freelancerId?: string, filters?: ServiceFilters) {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [freelancerId, memoizedFilters]);
 
   useEffect(() => {
     fetchServices();
@@ -202,5 +220,49 @@ export function useDeleteService() {
   }, []);
 
   return { deleteService, loading, error };
+}
+
+export function useServicePackages(serviceId?: string) {
+  const [packages, setPackages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPackages = useCallback(async () => {
+    if (!serviceId) {
+      setPackages([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/marketplace/services/${serviceId}/packages`);
+      const data = await response.json();
+
+      if (data.success) {
+        setPackages(data.data);
+      } else {
+        setError(data.error || 'Failed to fetch packages');
+      }
+    } catch (err) {
+      setError('Network error occurred');
+    } finally {
+      setLoading(false);
+    }
+  }, [serviceId]);
+
+  useEffect(() => {
+    fetchPackages();
+  }, [fetchPackages]);
+
+  const getMinPrice = useCallback(() => {
+    if (packages.length === 0) return 100; // Default fallback
+    const minPrice = Math.min(...packages.map(pkg => parseInt(pkg.price_e8s) / 100000000));
+    return minPrice;
+  }, [packages]);
+
+  return { packages, loading, error, refetch: fetchPackages, getMinPrice };
 }
 

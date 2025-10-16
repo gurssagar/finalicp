@@ -198,6 +198,7 @@ export function AddressDetails() {
                 github={profile.github}
                 twitter={profile.twitter}
                 skills={skills.length > 0 ? skills : []}
+                profileImage={profile.profileImage}
               />
             </div>
           </div>

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Sidebar } from '../../../components/Sidebar';
-import { Header } from '../../../components/Header1';
+import { Header1 } from '../../../components/Header1';
 import { ProjectTabs } from '../../../components/project/ProjectTabs';
 import { ChevronLeft, Edit, Share2, Star, Globe, Twitter, Heart } from 'lucide-react';
 import { TeamMember } from '../../../components/project/TeamMember';
@@ -390,7 +390,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header />
+        <Header1 />
         <main className="flex-1 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Back button */}

@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/packages - List packages by service
 export async function GET(request: NextRequest) {
   try {
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const serviceId = searchParams.get('service_id');
 
@@ -16,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.getPackagesByService(serviceId);
 
     if ('ok' in result) {
@@ -28,14 +38,14 @@ export async function GET(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error fetching packages:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch packages'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }
@@ -61,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.createPackage(userId, packageData);
 
     if ('ok' in result) {
@@ -72,14 +82,14 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error creating package:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to create package'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

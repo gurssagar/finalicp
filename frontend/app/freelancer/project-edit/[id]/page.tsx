@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Sidebar } from '../../../components/Sidebar';
-import { Header } from '../../../components/Header1';
+import { Header1 } from '../../../components/Header1';
 import { ChevronLeft, Save, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -756,7 +756,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
           <Sidebar />
         </div>
         <div className="flex-1 flex flex-col">
-          <Header />
+          <Header1 />
           <main className="flex-1 p-6 flex items-center justify-center">
             <div className="text-center">
               <div className="w-16 h-16 border-4 border-t-blue-500 border-gray-200 rounded-full animate-spin mx-auto mb-4" />

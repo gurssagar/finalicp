@@ -1,7 +1,7 @@
 import React from 'react'
 
 import { Sidebar } from '@/components/Sidebar'
-import { Header } from '@/components/Header1'
+import { Header1 } from '@/components/Header1'
 interface FreelancerLayoutProps {
   children: React.ReactNode
   title?: string
@@ -27,7 +27,7 @@ export default function FreelancerLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header showSearch={false} />
+        <Header1 showSearch={false} />
         
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">

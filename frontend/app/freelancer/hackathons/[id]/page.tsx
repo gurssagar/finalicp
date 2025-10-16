@@ -1,7 +1,7 @@
 'use client'
 import React, { useState } from 'react' 
 import { useRouter, useParams } from 'next/navigation'
-import { Header } from '@/components/Header1'
+import { Header1 } from '@/components/Header1'
 import { Sidebar } from '@/components/Sidebar'
 import { ChevronLeft, Share2, Twitter, Globe, Check } from 'lucide-react'
 import { HackathonTabs } from '@/components/hackathon/HackathonTabs'

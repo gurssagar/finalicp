@@ -50,29 +50,142 @@ export default function UpdateService() {
     tab?: string
   }>()
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   const { formData, updateFormData, setSaved } = useServiceForm()
   const [newQuestion, setNewQuestion] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  // Simulate loading state - in a real app this would fetch data from an API
+
+  // Get current user data
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-      // Populate the form with demo data
-      updateFormData(demoServiceData)
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [id, updateFormData])
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        const data = await response.json()
+
+        if (data.success && data.session) {
+          setUserId(data.session.userId)
+        } else {
+          setUserId(null)
+          setError('Please log in to update services')
+          setIsLoading(false)
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error)
+        setUserId(null)
+        setError('Failed to authenticate')
+        setIsLoading(false)
+      }
+    }
+
+    checkAuth()
+  }, [])
+
+  // Fetch service data from API
+  useEffect(() => {
+    if (!userId || !id) return
+
+    const fetchServiceData = async () => {
+      try {
+        const response = await fetch(`/api/marketplace/services/${id}`)
+        const data = await response.json()
+
+        if (data.success && data.data) {
+          const service = data.data
+
+          // Transform API data to form format
+          const transformedData = {
+            id: service.service_id,
+            serviceTitle: service.title,
+            mainCategory: service.main_category,
+            subCategory: service.sub_category,
+            description: service.description,
+            whatsIncluded: service.whats_included,
+            coverImage: service.cover_image_url || '/default-service.svg',
+            portfolioImages: service.portfolio_images || [],
+            tierMode: '3tier' as const,
+            basicTitle: 'Basic Package',
+            basicDescription: service.whats_included,
+            basicDeliveryDays: '3',
+            basicPrice: '99',
+            advancedTitle: 'Standard Package',
+            advancedDescription: 'Enhanced service with additional features',
+            advancedDeliveryDays: '5',
+            advancedPrice: '199',
+            premiumTitle: 'Premium Package',
+            premiumDescription: 'Complete service with all features and priority support',
+            premiumDeliveryDays: '7',
+            premiumPrice: '349',
+            clientQuestions: [
+              { id: '1', type: 'text', question: 'What is the primary goal of your project?', required: true },
+              { id: '2', type: 'text', question: 'Do you have any specific requirements or preferences?', required: false },
+            ],
+            faqs: []
+          }
+
+          updateFormData(transformedData)
+        } else {
+          setError(data.error || 'Failed to load service data')
+        }
+      } catch (error) {
+        console.error('Error fetching service data:', error)
+        setError('Failed to load service data')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchServiceData()
+  }, [id, userId, updateFormData])
   const handleBack = () => {
     navigate.push('/freelancer/my-services')
   }
   const handlePreview = () => {
     navigate.push(`/freelancer/update-service/${id}/service-preview`)
   }
-  const handleSave = () => {
-    // In a real app, this would save to the backend
-    setSuccessMessage('Changes saved successfully!')
-    setTimeout(() => setSuccessMessage(null), 3000)
+  const handleSave = async () => {
+    if (!userId || !id) {
+      setError('User authentication required')
+      return
+    }
+
+    try {
+      // Transform form data to API format
+      const serviceUpdates = {
+        title: formData.serviceTitle,
+        main_category: formData.mainCategory,
+        sub_category: formData.subCategory,
+        description: formData.description,
+        whats_included: formData.whatsIncluded,
+        cover_image_url: formData.coverImage,
+        portfolio_images: formData.portfolioImages,
+        status: 'Active'
+      }
+
+      const response = await fetch(`/api/marketplace/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: userId,
+          updates: serviceUpdates
+        })
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setSuccessMessage('Changes saved successfully!')
+        setTimeout(() => setSuccessMessage(null), 3000)
+      } else {
+        setError(result.error || 'Failed to save changes')
+      }
+    } catch (error) {
+      console.error('Error saving service:', error)
+      setError('Failed to save changes. Please try again.')
+    }
   }
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -89,7 +202,12 @@ export default function UpdateService() {
     if (newQuestion.trim()) {
       const updatedQuestions = [
         ...(formData.clientQuestions || []),
-        newQuestion.trim(),
+        {
+          id: Date.now().toString(),
+          type: 'text',
+          question: newQuestion.trim(),
+          required: false
+        },
       ]
       updateFormData({
         clientQuestions: updatedQuestions,
@@ -289,6 +407,30 @@ export default function UpdateService() {
             <button
               onClick={() => setSuccessMessage(null)}
               className="text-green-700"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        )}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 flex justify-between items-center">
+            <div className="flex items-center">
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              {error}
+            </div>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-700"
             >
               <X size={18} />
             </button>
@@ -670,12 +812,12 @@ export default function UpdateService() {
                   service.
                 </p>
                 <div className="space-y-3 mb-4">
-                  {formData.clientQuestions?.map((question: string, index: number) => (
+                  {formData.clientQuestions?.map((question: any, index: number) => (
                     <div
-                      key={index}
+                      key={question.id || index}
                       className="flex items-center justify-between bg-gray-50 p-3 rounded-lg"
                     >
-                      <span>{question}</span>
+                      <span>{question.question}</span>
                       <button
                         onClick={() => handleRemoveQuestion(index)}
                         className="text-red-500 hover:text-red-700"

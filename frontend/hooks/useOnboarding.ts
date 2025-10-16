@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface ProfileData {
@@ -13,6 +13,7 @@ interface ProfileData {
   linkedin: string;
   github: string;
   twitter: string;
+  profileImage?: string | null;
 }
 
 interface AddressData {
@@ -50,6 +51,7 @@ const DEFAULT_DATA: OnboardingData = {
     linkedin: '',
     github: '',
     twitter: '',
+    profileImage: null,
   },
   address: {
     isPrivate: true,
@@ -73,6 +75,8 @@ export function useOnboarding() {
   const [data, setData] = useState<OnboardingData>(DEFAULT_DATA);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -89,12 +93,29 @@ export function useOnboarding() {
     }
   }, []);
 
-  // Save data to localStorage whenever it changes
-  const saveToStorage = useCallback((newData: OnboardingData) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
-    } catch (err) {
-      console.error('Error saving onboarding data:', err);
+  // Save data to localStorage with debouncing
+  const saveToStorage = useCallback((newData: OnboardingData, immediate = false) => {
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    const save = () => {
+      setIsSaving(true);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newData));
+      } catch (err) {
+        console.error('Error saving onboarding data:', err);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    if (immediate) {
+      save();
+    } else {
+      // Debounce save to avoid excessive localStorage writes
+      debounceTimeoutRef.current = setTimeout(save, 500);
     }
   }, []);
 
@@ -152,11 +173,12 @@ export function useOnboarding() {
   // Get full location string for display
   const fullLocation = useMemo(() => {
     const { city, state, country } = data.address;
-    if (city && state) {
-      return `${city}, ${state}, ${country}`;
-    }
-    return '';
-  }, [data.address]);
+    const parts = [];
+    if (city) parts.push(city);
+    if (state) parts.push(state);
+    if (country && country !== 'USA') parts.push(country);
+    return parts.join(', ');
+  }, [data.address.city, data.address.state, data.address.country]);
 
   // Get full name for display
   const fullName = useMemo(() => {
@@ -165,7 +187,32 @@ export function useOnboarding() {
       return `${firstName} ${lastName}`.trim();
     }
     return '';
-  }, [data.profile]);
+  }, [data.profile.firstName, data.profile.lastName]);
+
+  // Memoize computed values for performance
+  const hasBasicProfile = useMemo(() => {
+    return !!(data.profile.firstName && data.profile.lastName);
+  }, [data.profile.firstName, data.profile.lastName]);
+
+  const hasCompleteAddress = useMemo(() => {
+    return !!(data.address.city && data.address.state && data.address.zipCode);
+  }, [data.address.city, data.address.state, data.address.zipCode]);
+
+  const hasSkills = useMemo(() => data.skills.length > 0, [data.skills.length]);
+
+  // Memoize profile completion percentage
+  const profileCompletionPercentage = useMemo(() => {
+    let completed = 0;
+    const total = 5;
+
+    if (hasSkills) completed++;
+    if (hasCompleteAddress) completed++;
+    if (hasBasicProfile) completed++;
+    if (data.profile.bio) completed++;
+    if (data.profile.phone) completed++;
+
+    return Math.round((completed / total) * 100);
+  }, [hasSkills, hasCompleteAddress, hasBasicProfile, data.profile.bio, data.profile.phone]);
 
   // Check if step is complete
   const isStepComplete = useCallback((step: number) => {
@@ -173,17 +220,17 @@ export function useOnboarding() {
       case 1: // Welcome (always complete)
         return true;
       case 2: // Skills
-        return data.skills.length > 0;
+        return hasSkills;
       case 3: // Address
-        return !!(data.address.city && data.address.state && data.address.zipCode);
+        return hasCompleteAddress;
       case 4: // Profile
-        return !!(data.profile.firstName && data.profile.lastName);
+        return hasBasicProfile;
       case 5: // Resume (optional)
         return true;
       default:
         return false;
     }
-  }, [data]);
+  }, [hasSkills, hasCompleteAddress, hasBasicProfile]);
 
   // Save to API
   const saveToAPI = useCallback(async (step: number) => {
@@ -279,6 +326,10 @@ export function useOnboarding() {
   const clearData = useCallback(() => {
     setData(DEFAULT_DATA);
     localStorage.removeItem(STORAGE_KEY);
+    // Clear debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
     // Don't remove onboarding_completed flag - it should persist
   }, []);
 
@@ -288,6 +339,9 @@ export function useOnboarding() {
     setIsLoading(true);
 
     try {
+      // Force immediate save before completing
+      saveToStorage(data, true);
+
       // Save complete onboarding data to canister
       const endpoint = '/api/onboarding/complete';
       const payload = {
@@ -327,11 +381,20 @@ export function useOnboarding() {
     } finally {
       setIsLoading(false);
     }
-  }, [data, clearData]);
+  }, [data, clearData, saveToStorage]);
 
   // Reset onboarding completion (useful for logout)
   const resetOnboardingCompletion = useCallback(() => {
     localStorage.removeItem('onboarding_completed');
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
   }, []);
 
   // Memoized data object
@@ -340,6 +403,7 @@ export function useOnboarding() {
   return {
     data: memoizedData,
     isLoading,
+    isSaving,
     error,
     setError,
     skills: data.skills,
@@ -348,6 +412,10 @@ export function useOnboarding() {
     resume: data.resume,
     fullLocation,
     fullName,
+    hasBasicProfile,
+    hasCompleteAddress,
+    hasSkills,
+    profileCompletionPercentage,
     updateSkills,
     addSkill,
     removeSkill,

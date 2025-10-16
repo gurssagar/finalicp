@@ -4,10 +4,10 @@ import { HackathonCanister } from '@/lib/hackathon-canister';
 // GET /api/hackathon/[hackathonId] - Get hackathon by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { hackathonId: string } }
+  { params }: { params: Promise<{ hackathonId: string }> }
 ) {
   try {
-    const { hackathonId } = params;
+    const { hackathonId } = await params;
 
     if (!hackathonId) {
       return NextResponse.json({
@@ -34,10 +34,10 @@ export async function GET(
 // PUT /api/hackathon/[hackathonId] - Update hackathon
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { hackathonId: string } }
+  { params }: { params: Promise<{ hackathonId: string }> }
 ) {
   try {
-    const { hackathonId } = params;
+    const { hackathonId } = await params;
     const body = await request.json();
 
     if (!hackathonId) {
@@ -108,10 +108,10 @@ export async function PUT(
 // DELETE /api/hackathon/[hackathonId] - Delete hackathon
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { hackathonId: string } }
+  { params }: { params: Promise<{ hackathonId: string }> }
 ) {
   try {
-    const { hackathonId } = params;
+    const { hackathonId } = await params;
 
     if (!hackathonId) {
       return NextResponse.json({

@@ -95,7 +95,7 @@ export default function ServiceDetails() {
       rating: service.rating_avg,
       reviews: `${service.total_orders}+`
     },
-    images: service.portfolio_images.length > 0 ? service.portfolio_images : ["/default-service.jpg"],
+    images: service.portfolio_images.length > 0 ? service.portfolio_images : ["/default-service.svg"],
     description: service.description,
     features: service.whats_included.split(',').map((item: string) => item.trim()),
     additionalInfo: [service.description],
@@ -244,12 +244,12 @@ export default function ServiceDetails() {
                     </button>
                     {/* Image pagination dots */}
                     <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                      {service.images.map((_, index) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400/60'}`} aria-label={`Go to image ${index + 1}`} />)}
+                      {service.images.map((_: any, index: number) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400/60'}`} aria-label={`Go to image ${index + 1}`} />)}
                     </div>
                   </>}
               </div>
               <div className="grid grid-cols-4 gap-2 mt-2">
-                {service.images.map((image, index) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`rounded-lg overflow-hidden border-2 ${currentImageIndex === index ? 'border-blue-500' : 'border-transparent'}`}>
+                {service.images.map((image: any, index: number) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`rounded-lg overflow-hidden border-2 ${currentImageIndex === index ? 'border-blue-500' : 'border-transparent'}`}>
                     <img src={image} alt={`Thumbnail ${index + 1}`} className="w-full h-16 object-cover" />
                   </button>)}
               </div>
@@ -259,11 +259,11 @@ export default function ServiceDetails() {
               <h2 className="text-xl font-semibold mb-4">Description</h2>
               <p className="text-gray-700 mb-4">{service.description}</p>
               <ul className="list-disc pl-5 space-y-1 mb-6">
-                {service.features.map((feature, index) => <li key={index} className="text-gray-700">
+                {service.features.map((feature: any, index: number) => <li key={index} className="text-gray-700">
                     {feature}
                   </li>)}
               </ul>
-              {service.additionalInfo.map((info, index) => <p key={index} className="text-gray-700 mb-2">
+              {service.additionalInfo.map((info: any, index: number) => <p key={index} className="text-gray-700 mb-2">
                   {info}
                 </p>)}
             </div>
@@ -274,14 +274,14 @@ export default function ServiceDetails() {
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr>
-                      {service.tierComparison.headers.map((header, index) => <th key={index} className="border border-gray-200 px-4 py-2 text-left bg-gray-50">
+                      {service.tierComparison.headers.map((header: any, index: number) => <th key={index} className="border border-gray-200 px-4 py-2 text-left bg-gray-50">
                           {header}
                         </th>)}
                     </tr>
                   </thead>
                   <tbody>
-                    {service.tierComparison.rows.map((row, rowIndex) => <tr key={rowIndex}>
-                        {row.map((cell, cellIndex) => <td key={cellIndex} className="border border-gray-200 px-4 py-2">
+                    {service.tierComparison.rows.map((row: any, rowIndex: number) => <tr key={rowIndex}>
+                        {row.map((cell: any, cellIndex: number) => <td key={cellIndex} className="border border-gray-200 px-4 py-2">
                             {cell}
                           </td>)}
                       </tr>)}
@@ -295,7 +295,7 @@ export default function ServiceDetails() {
                 Frequently Asked Questions
               </h2>
               <div className="space-y-4">
-                {service.faqs.map((faq, index) => <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                {service.faqs.map((faq: any, index: number) => <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
                     <button className="flex items-center justify-between w-full px-4 py-3 bg-white text-left" onClick={() => toggleFaq(index)}>
                       <span className={`font-medium ${expandedFaq === index ? 'text-green-600' : 'text-gray-800'}`}>
                         {faq.question}
@@ -328,7 +328,7 @@ export default function ServiceDetails() {
               </div>
               {/* Rating distribution */}
               <div className="space-y-2 mb-6">
-                {service.ratings.distribution.map(dist => <div key={dist.stars} className="flex items-center">
+                {service.ratings.distribution.map((dist: any) => <div key={dist.stars} className="flex items-center">
                     <span className="w-8">{dist.stars} ★</span>
                     <div className="flex-1 h-2 bg-gray-200 rounded-full mx-2">
                       <div className="h-2 bg-green-500 rounded-full" style={{
@@ -342,7 +342,7 @@ export default function ServiceDetails() {
               </div>
               {/* Comments */}
               <div className="space-y-4">
-                {service.comments.map((comment, index) => <div key={index} className="border-b border-gray-200 pb-4">
+                {service.comments.map((comment: any, index: number) => <div key={index} className="border-b border-gray-200 pb-4">
                     <div className="flex items-center mb-2">
                       <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop" alt={comment.user} className="w-10 h-10 rounded-full mr-3" />
                       <div>
@@ -365,7 +365,7 @@ export default function ServiceDetails() {
                 Explore Similar Services
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {service.similarServices.map(similar => <div key={similar.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                {service.similarServices.map((similar: any) => <div key={similar.id} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="relative h-48">
                       <img src={similar.image} alt={similar.title} className="w-full h-full object-cover" />
                       <div className="absolute bottom-2 right-2 flex space-x-1">

@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/job-posts - List job posts
 export async function GET(request: NextRequest) {
   try {
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     
     const filter = {
@@ -15,7 +26,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.listJobPosts(filter);
 
     if ('ok' in result) {
@@ -26,14 +37,14 @@ export async function GET(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 500 });
     }
   } catch (error: any) {
     console.error('Error listing job posts:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch job posts'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }
@@ -52,7 +63,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.createJobPost(userId, jobData);
 
     if ('ok' in result) {
@@ -63,14 +74,14 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 500 });
     }
   } catch (error: any) {
     console.error('Error creating job post:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to create job post'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

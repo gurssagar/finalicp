@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/packages/[packageId] - Get package by ID
 export async function GET(
@@ -8,6 +7,17 @@ export async function GET(
   { params }: { params: Promise<{ packageId: string }> }
 ) {
   try {
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
     const { packageId } = await params;
 
     if (!packageId) {
@@ -18,7 +28,7 @@ export async function GET(
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.getPackageById(packageId);
 
     if ('ok' in result) {
@@ -29,14 +39,14 @@ export async function GET(
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 404 });
     }
   } catch (error) {
     console.error('Error fetching package:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch package'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }
@@ -66,7 +76,7 @@ export async function PUT(
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.updatePackage(userId, packageId, updates);
 
     if ('ok' in result) {
@@ -77,14 +87,14 @@ export async function PUT(
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error updating package:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to update package'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }
@@ -107,7 +117,7 @@ export async function DELETE(
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     const result = await actor.deletePackage(userId, packageId);
 
     if ('ok' in result) {
@@ -118,14 +128,14 @@ export async function DELETE(
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error deleting package:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to delete package'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

@@ -1,25 +1,10 @@
-'use client'
-
-import AWS from 'aws-sdk'
-
-// Tebi S3 Configuration
-const tebiConfig = {
-  accessKeyId: process.env.NEXT_PUBLIC_TEBI_ACCESS_KEY_ID!,
-  secretAccessKey: process.env.NEXT_PUBLIC_TEBI_SECRET_ACCESS_KEY!,
-  region: process.env.NEXT_PUBLIC_TEBI_REGION || 'us-east-1',
-  bucket: process.env.NEXT_PUBLIC_TEBI_BUCKET_NAME!,
-  endpoint: process.env.NEXT_PUBLIC_TEBI_ENDPOINT!
+// Tebi S3 Configuration (client-side only needs public config)
+const getTebiConfig = () => {
+  return {
+    bucket: process.env.NEXT_PUBLIC_TEBI_BUCKET_NAME!,
+    endpoint: process.env.NEXT_PUBLIC_TEBI_ENDPOINT!
+  }
 }
-
-// Initialize S3 client for Tebi
-const s3 = new AWS.S3({
-  accessKeyId: tebiConfig.accessKeyId,
-  secretAccessKey: tebiConfig.secretAccessKey,
-  region: tebiConfig.region,
-  endpoint: tebiConfig.endpoint,
-  s3ForcePathStyle: true, // Required for some S3-compatible services
-  signatureVersion: 'v4'
-})
 
 export interface UploadResult {
   success: boolean
@@ -39,14 +24,6 @@ export async function uploadImageToTebi(
   folder: string = 'portfolio'
 ): Promise<UploadResult> {
   try {
-    // Check if Tebi S3 is properly configured
-    if (!tebiConfig.accessKeyId || !tebiConfig.secretAccessKey || !tebiConfig.bucket || !tebiConfig.endpoint) {
-      return {
-        success: false,
-        error: 'Tebi S3 is not configured. Please check your environment variables.'
-      }
-    }
-
     // Validate file
     if (!file) {
       return { success: false, error: 'No file provided' }
@@ -64,36 +41,27 @@ export async function uploadImageToTebi(
       return { success: false, error: 'File too large. Maximum size is 10MB.' }
     }
 
-    // Generate unique file key
-    const fileExtension = file.name.split('.').pop()
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(2, 8)
-    const key = `${folder}/${timestamp}-${randomString}.${fileExtension}`
+    // Create FormData to send to server
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('folder', folder)
 
-    // Prepare upload parameters
-    const params = {
-      Bucket: tebiConfig.bucket,
-      Key: key,
-      Body: file,
-      ContentType: file.type,
-      ACL: 'public-read' as const, // Make the file publicly accessible
-      Metadata: {
-        originalName: file.name,
-        uploadedAt: new Date().toISOString()
+    // Upload via server-side API
+    const response = await fetch('/api/upload/s3', {
+      method: 'POST',
+      body: formData
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: result.error || 'Upload failed'
       }
     }
 
-    // Upload to Tebi S3
-    const result = await s3.upload(params).promise()
-
-    // Return the public URL
-    const publicUrl = `${tebiConfig.endpoint.replace(/\/$/, '')}/${tebiConfig.bucket}/${key}`
-
-    return {
-      success: true,
-      url: publicUrl,
-      key: key
-    }
+    return result
 
   } catch (error) {
     console.error('Error uploading to Tebi S3:', error)
@@ -110,30 +78,11 @@ export async function uploadImageToTebi(
  * @returns Promise<UploadResult> containing the deletion result
  */
 export async function deleteImageFromTebi(key: string): Promise<UploadResult> {
-  try {
-    // Check if Tebi S3 is properly configured
-    if (!tebiConfig.accessKeyId || !tebiConfig.secretAccessKey || !tebiConfig.bucket || !tebiConfig.endpoint) {
-      return {
-        success: false,
-        error: 'Tebi S3 is not configured. Please check your environment variables.'
-      }
-    }
-
-    const params = {
-      Bucket: tebiConfig.bucket,
-      Key: key
-    }
-
-    await s3.deleteObject(params).promise()
-
-    return { success: true }
-
-  } catch (error) {
-    console.error('Error deleting from Tebi S3:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Deletion failed'
-    }
+  // TODO: Implement server-side delete API if needed
+  console.warn('deleteImageFromTebi is not yet implemented with server-side API')
+  return {
+    success: false,
+    error: 'Delete functionality not yet implemented'
   }
 }
 

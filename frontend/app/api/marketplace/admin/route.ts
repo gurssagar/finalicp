@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // POST /api/marketplace/admin - Admin operations (refund, reconciliation)
 export async function POST(request: NextRequest) {
   try {
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
     const body = await request.json();
     const { action, adminId, bookingId, amount_e8s, reason, startBlock, endBlock } = body;
 
@@ -23,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
+    const actor = await getMarketplaceActor();
     let result;
 
     switch (action) {
@@ -75,14 +85,14 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({
         success: false,
-        error: result.err
+        error: handleApiError(result.err)
       }, { status: 400 });
     }
   } catch (error) {
     console.error('Error performing admin action:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to perform admin action'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

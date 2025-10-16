@@ -37,30 +37,47 @@ export async function POST(request: NextRequest) {
 
     // Update user profile in ICP backend
     try {
-      const actor = getUserActor();
+      const actor = await getUserActor();
 
-      // Prepare profile data for ICP backend
+      // Prepare profile data for ICP backend using the correct field names
       const profileData = {
-        first_name: validatedData.firstName,
-        last_name: validatedData.lastName,
-        bio: validatedData.bio || '',
-        phone: validatedData.phone || '',
-        location: validatedData.location || '',
-        website: validatedData.website || '',
-        linkedin: validatedData.linkedin || '',
-        github: validatedData.github || '',
-        twitter: validatedData.twitter || '',
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        bio: validatedData.bio ? [validatedData.bio] : [],
+        phone: validatedData.phone ? [validatedData.phone] : [],
+        location: validatedData.location ? [validatedData.location] : [],
+        website: validatedData.website ? [validatedData.website] : [],
+        linkedin: validatedData.linkedin ? [validatedData.linkedin] : [],
+        github: validatedData.github ? [validatedData.github] : [],
+        twitter: validatedData.twitter ? [validatedData.twitter] : [],
+        skills: [],
+        experience: [],
+        education: [],
       };
 
       // Update the user's profile
-      const result = await actor.update_user_profile(profileData);
+      const updateResult = await actor.updateProfile(session.userId, profileData);
 
-      console.log('Profile updated in ICP:', result);
+      console.log('Profile updated in ICP:', updateResult);
+
+      if ('err' in updateResult) {
+        return NextResponse.json({
+          success: false,
+          error: updateResult.err,
+        }, { status: 400 });
+      }
+
+      // Mark profile as submitted
+      const markResult = await actor.markProfileAsSubmitted(session.userId);
+
+      if ('err' in markResult) {
+        console.error('Failed to mark profile as submitted:', markResult.err);
+      }
 
       return NextResponse.json({
         success: true,
-        message: 'Profile completed successfully',
-        profile: result
+        message: 'Profile completed and submitted successfully',
+        profileSubmitted: true
       });
 
     } catch (icpError) {

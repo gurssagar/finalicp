@@ -13,9 +13,9 @@ export const TEST_CONFIG = {
   testStageId: 'ST-TEST1234'
 };
 
-// Mock data for testing
-export const MOCK_DATA = {
-  service: {
+// Mock data generators for testing
+export function generateMockService(overrides: Partial<any> = {}) {
+  return {
     title: 'Test UI/UX Design Service',
     main_category: 'Web Design',
     sub_category: 'UI/UX',
@@ -23,29 +23,50 @@ export const MOCK_DATA = {
     whats_included: 'Wireframes, mockups, prototypes, style guide',
     cover_image_url: 'https://example.com/test-image.jpg',
     portfolio_images: ['https://example.com/portfolio1.jpg', 'https://example.com/portfolio2.jpg'],
-    status: 'Active' as const
-  },
-  package: {
+    status: 'Active',
+    ...overrides
+  };
+}
+
+export function generateMockPackage(overrides: Partial<any> = {}) {
+  return {
     service_id: 'SV-TEST1234',
-    tier: 'Basic' as const,
+    tier: 'Basic',
     title: 'Basic Website Design Package',
     description: 'Simple website design with 3 pages',
     price_e8s: '5000000000', // 50 ICP
     delivery_days: 7,
     features: ['3 pages', 'Mobile responsive', 'Basic SEO'],
     revisions_included: 2,
-    status: 'Available' as const
-  },
-  booking: {
+    status: 'Available',
+    ...overrides
+  };
+}
+
+export function generateMockBooking(overrides: Partial<any> = {}) {
+  return {
     clientId: 'TEST_USER_123',
     packageId: 'PK-TEST1234',
-    specialInstructions: 'Please focus on mobile-first design and ensure accessibility compliance'
-  },
-  stage: {
+    specialInstructions: 'Please focus on mobile-first design and ensure accessibility compliance',
+    ...overrides
+  };
+}
+
+export function generateMockStage(overrides: Partial<any> = {}) {
+  return {
     title: 'Wireframes',
     description: 'Create wireframes for all pages',
-    amount_e8s: '2500000000' // 25 ICP
-  }
+    amount_e8s: '2500000000', // 25 ICP
+    ...overrides
+  };
+}
+
+// Mock data for testing (legacy support)
+export const MOCK_DATA = {
+  service: generateMockService(),
+  package: generateMockPackage(),
+  booking: generateMockBooking(),
+  stage: generateMockStage()
 };
 
 // Helper function to create test request
@@ -84,6 +105,39 @@ export interface TestResult {
   response?: any;
   duration: number;
 }
+
+// Test assertion helpers
+export function assertEqual<T>(actual: T, expected: T, message?: string) {
+  if (actual !== expected) {
+    throw new Error(message || `Expected ${expected}, but got ${actual}`);
+  }
+}
+
+export function assertNotNull<T>(value: T | null | undefined, message?: string) {
+  if (value === null || value === undefined) {
+    throw new Error(message || `Expected value to not be null or undefined`);
+  }
+}
+
+export function assertTrue(condition: boolean, message?: string) {
+  if (!condition) {
+    throw new Error(message || 'Expected condition to be true');
+  }
+}
+
+export function assertContains<T>(array: T[], item: T, message?: string) {
+  if (!array.includes(item)) {
+    throw new Error(message || `Expected array to contain ${item}`);
+  }
+}
+
+export function assertHasProperty(obj: any, property: string, message?: string) {
+  if (!(property in obj)) {
+    throw new Error(message || `Expected object to have property ${property}`);
+  }
+}
+
+// Note: Mock data reset functionality removed - using real ICP canister only
 
 // Test runner
 export class TestRunner {

@@ -1,29 +1,41 @@
-'use client';
-import React from 'react';
+'use client'
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
 interface ProjectTabsProps {
   activeTab: string;
-  setActiveTab: (tab: string) => void;
+  onTabChange: (tab: string) => void;
+  className?: string;
 }
-export function ProjectTabs({
-  activeTab,
-  setActiveTab
-}: ProjectTabsProps) {
-  const tabs = [{
-    id: 'overview',
-    label: 'Overview'
-  }, {
-    id: 'hackathon',
-    label: 'Hackathon'
-  }, {
-    id: 'team',
-    label: 'Team'
-  }];
-  return <div className="border-b border-gray-200 overflow-x-auto">
-      <div className="flex min-w-max">
-        {tabs.map(tab => <button key={tab.id} className={`flex items-center py-3 px-4 md:px-6 relative ${activeTab === tab.id ? 'text-blue-500 font-medium' : 'text-gray-500'}`} onClick={() => setActiveTab(tab.id)}>
-            <span>{tab.label}</span>
-            {activeTab === tab.id && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-500"></div>}
-          </button>)}
-      </div>
-    </div>;
+
+export function ProjectTabs({ activeTab, onTabChange, className }: ProjectTabsProps) {
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'details', label: 'Details' },
+    { id: 'team', label: 'Team' },
+    { id: 'progress', label: 'Progress' },
+    { id: 'files', label: 'Files' },
+    { id: 'comments', label: 'Comments' }
+  ];
+
+  return (
+    <div className={cn('border-b border-gray-200', className)}>
+      <nav className="flex space-x-8">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={cn(
+              'py-4 px-1 border-b-2 font-medium text-sm transition-colors',
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
 }

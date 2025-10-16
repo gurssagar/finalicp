@@ -9,6 +9,7 @@ type User =
    otpData: opt OTPData;
    passwordHash: PasswordHash;
    profile: opt ProfileData;
+   profileSubmitted: bool;
  };
 type Result_3 = 
  variant {
@@ -86,10 +87,14 @@ service : {
   getProfile: (userId: UserId) -> (opt ProfileData);
   getUserByEmail: (email: Email) -> (opt User);
   getUserById: (userId: UserId) -> (opt User);
+  isProfileSubmitted: (userId: UserId) -> (bool);
+  markProfileAsSubmitted: (userId: UserId) -> (Result_1);
   updateLastLogin: (userId: UserId) -> (Result_1);
   updatePassword: (userId: UserId, newPasswordHash: PasswordHash) ->
    (Result_1);
   updateProfile: (userId: UserId, profile: ProfileData) -> (Result_1);
+  updateProfileSubmissionStatus: (userId: UserId, isSubmitted: bool) ->
+   (Result_1);
   verifyEmail: (userId: UserId) -> (Result_1);
   verifyOTP: (email: Email, code: text) -> (Result);
 }

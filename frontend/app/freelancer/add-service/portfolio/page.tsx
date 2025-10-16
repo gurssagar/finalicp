@@ -83,6 +83,8 @@ export default function AddServicePortfolio() {
     const pendingFiles = previewFiles.filter(f => f.status === 'pending')
     if (pendingFiles.length === 0) return
 
+    console.log('Starting upload process...', { pendingFilesCount: pendingFiles.length })
+
     // Mark all as uploading
     setPreviewFiles(prev =>
       prev.map(f =>
@@ -94,7 +96,9 @@ export default function AddServicePortfolio() {
 
     try {
       const filesToUpload = pendingFiles.map(f => f.file)
+      console.log('Files to upload:', filesToUpload.map(f => ({ name: f.name, size: f.size, type: f.type })))
       const results = await uploadPortfolioImages(filesToUpload)
+      console.log('Upload results:', results)
 
       // Update status based on upload results
       setPreviewFiles(prev =>

@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
 
       // Get user profile from ICP backend using the correct method
       const userProfile = await actor.getProfile(session.userId);
+      const profileSubmitted = await actor.isProfileSubmitted(session.userId);
 
       if (!userProfile) {
         return NextResponse.json({
           success: true,
           isComplete: false,
+          profileSubmitted,
           profile: null,
           message: 'Profile not found',
         });
@@ -52,6 +54,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         isComplete: isProfileComplete,
+        profileSubmitted,
         profile: transformedProfile,
         message: isProfileComplete ? 'Profile is complete' : 'Profile needs completion'
       });
@@ -83,6 +86,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         isComplete: false,
+        profileSubmitted: false,
         profile: fallbackProfile,
         message: 'Profile needs completion (backend unavailable)',
         fallback: true

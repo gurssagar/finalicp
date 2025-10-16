@@ -1,13 +1,14 @@
+"use client"
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ChevronDown, Clock, Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';  
+import { ChevronDown, Plus, Clock } from 'lucide-react';
 export function ProfileDashboard() {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const handleNavigateToAnalytics = () => {
-    navigate('/analytics');
+    navigate.push('/analytics');
   };
   const handleNavigateToHireTalent = () => {
-    navigate('/hire-talent');
+    navigate.push('/hire-talent');
   };
   return <div className="flex min-h-screen bg-white">
       {/* Sidebar */}

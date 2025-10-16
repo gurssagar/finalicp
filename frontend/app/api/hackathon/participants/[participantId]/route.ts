@@ -4,10 +4,10 @@ import { HackathonCanister } from '@/lib/hackathon-canister';
 // GET /api/hackathon/participants/[participantId] - Get participant by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { participantId: string } }
+  { params }: { params: Promise<{ participantId: string }> }
 ) {
   try {
-    const { participantId } = params;
+    const { participantId } = await params;
 
     if (!participantId) {
       return NextResponse.json({
@@ -34,10 +34,10 @@ export async function GET(
 // PUT /api/hackathon/participants/[participantId] - Update participant
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { participantId: string } }
+  { params }: { params: Promise<{ participantId: string }> }
 ) {
   try {
-    const { participantId } = params;
+    const { participantId } = await params;
     const body = await request.json();
 
     if (!participantId) {
@@ -105,10 +105,10 @@ export async function PUT(
 // DELETE /api/hackathon/participants/[participantId] - Delete participant
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { participantId: string } }
+  { params }: { params: Promise<{ participantId: string }> }
 ) {
   try {
-    const { participantId } = params;
+    const { participantId } = await params;
 
     if (!participantId) {
       return NextResponse.json({

@@ -68,7 +68,7 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
     const secret = new TextEncoder().encode(JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
     
-    return payload as JWTPayload;
+    return payload as unknown as JWTPayload;
   } catch (error) {
     console.error('JWT verification error:', error);
     return null;
@@ -209,3 +209,22 @@ export function isTokenExpired(token: string): boolean {
     return true;
   }
 }
+
+// Auth object for compatibility
+export const auth = {
+  createSession,
+  getSession,
+  clearSession,
+  createJWT,
+  verifyJWT,
+  hashPassword,
+  verifyPassword,
+  createPasswordResetToken,
+  verifyPasswordResetToken,
+  generateOTP,
+  generateUserId,
+  isValidEmail,
+  validatePassword,
+  sanitizeInput,
+  isTokenExpired
+};

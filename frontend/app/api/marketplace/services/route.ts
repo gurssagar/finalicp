@@ -1,41 +1,57 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { mockMarketplaceAgent } from '@/lib/mock-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/services - List services with filters
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    
-    const filter = {
-      category: searchParams.get('category') || undefined,
-      freelancer_id: searchParams.get('freelancer_id') || undefined,
-      search_term: searchParams.get('search_term') || '',
-      limit: parseInt(searchParams.get('limit') || '10'),
-      offset: parseInt(searchParams.get('offset') || '0')
-    };
+    console.log('Using mock response for service listing');
 
-    // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
-    const result = await actor.listServices(filter);
+    // Mock services data with proper timestamp format for testing date handling
+    const mockServices = [
+      {
+        service_id: "service-1",
+        freelancer_id: "test-freelancer-id",
+        title: "Web Development Service",
+        main_category: "Web Development",
+        sub_category: "Frontend Development",
+        description: "Professional web development services",
+        whats_included: "Custom design, responsive layout",
+        cover_image_url: [],
+        portfolio_images: [],
+        status: "Active",
+        rating_avg: 4.5,
+        total_orders: 10,
+        created_at: (Date.now() * 1000000).toString(), // nanoseconds as string
+        updated_at: (Date.now() * 1000000).toString()
+      },
+      {
+        service_id: "service-2",
+        freelancer_id: "test-freelancer-id",
+        title: "UI/UX Design",
+        main_category: "Design",
+        sub_category: "UI Design",
+        description: "Professional design services",
+        whats_included: "User interface, user experience",
+        cover_image_url: ["https://example.com/image.jpg"],
+        portfolio_images: [],
+        status: "Active",
+        rating_avg: 4.8,
+        total_orders: 15,
+        created_at: BigInt(Date.now()) * BigInt(1000000),
+        updated_at: BigInt(Date.now()) * BigInt(1000000)
+      }
+    ];
 
-    if ('ok' in result) {
-      return NextResponse.json({
-        success: true,
-        data: result.ok,
-        count: result.ok.length
-      });
-    } else {
-      return NextResponse.json({
-        success: false,
-        error: result.err
-      }, { status: 400 });
-    }
+    return NextResponse.json({
+      success: true,
+      data: mockServices,
+      count: mockServices.length
+    });
   } catch (error) {
     console.error('Error fetching services:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to fetch services'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }
@@ -60,26 +76,30 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Use mock agent for testing
-    const actor = mockMarketplaceAgent;
-    const result = await actor.createService(userId, serviceData);
+    // Mock service creation since marketplace canister is not deployed
+    console.log('Using mock response for service creation with data:', { userId, serviceData });
 
-    if ('ok' in result) {
-      return NextResponse.json({
-        success: true,
-        data: result.ok
-      });
-    } else {
-      return NextResponse.json({
-        success: false,
-        error: result.err
-      }, { status: 400 });
-    }
+    // Mock successful service creation response
+    const mockCreatedService = {
+      service_id: `service-${Date.now()}`,
+      freelancer_id: userId,
+      title: serviceData.title,
+      status: serviceData.status || 'Active',
+      created_at: (Date.now() * 1000000).toString(),
+      updated_at: (Date.now() * 1000000).toString()
+    };
+
+    console.log('Mock service created successfully:', mockCreatedService);
+
+    return NextResponse.json({
+      success: true,
+      data: mockCreatedService
+    });
   } catch (error) {
     console.error('Error creating service:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to create service'
+      error: handleApiError(error)
     }, { status: 500 });
   }
 }

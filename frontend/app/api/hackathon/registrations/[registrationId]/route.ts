@@ -4,10 +4,10 @@ import { HackathonCanister } from '@/lib/hackathon-canister';
 // GET /api/hackathon/registrations/[registrationId] - Get registration by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { registrationId: string } }
+  { params }: { params: Promise<{ registrationId: string }> }
 ) {
   try {
-    const { registrationId } = params;
+    const { registrationId } = await params;
 
     if (!registrationId) {
       return NextResponse.json({
@@ -34,10 +34,10 @@ export async function GET(
 // DELETE /api/hackathon/registrations/[registrationId] - Delete registration
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { registrationId: string } }
+  { params }: { params: Promise<{ registrationId: string }> }
 ) {
   try {
-    const { registrationId } = params;
+    const { registrationId } = await params;
 
     if (!registrationId) {
       return NextResponse.json({

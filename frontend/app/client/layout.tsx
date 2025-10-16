@@ -2,7 +2,7 @@
 import React from 'react'
 import { ClientSidebar } from '@/components/client/ClientSidebar'
 import { ClientHeader } from '@/components/client/ClientHeader'
-import { Header } from '@/components/Header1'
+import { Header1 } from '@/components/Header1'
 interface ClientLayoutProps {
   children: React.ReactNode
   title?: string
@@ -28,7 +28,7 @@ export default function ClientLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <Header />
+        <Header1 />
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto">

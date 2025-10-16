@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
         email: userData.email,
         isVerified: userData.isVerified,
         profile: userData.profile?.[0],
+        profileSubmitted: userData.profileSubmitted,
       },
     });
 

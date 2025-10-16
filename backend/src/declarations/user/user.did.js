@@ -52,6 +52,7 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : IDL.Int,
     'email' : Email,
     'isVerified' : IDL.Bool,
+    'profileSubmitted' : IDL.Bool,
     'passwordHash' : PasswordHash,
     'profile' : IDL.Opt(ProfileData),
   });
@@ -66,9 +67,16 @@ export const idlFactory = ({ IDL }) => {
     'getProfile' : IDL.Func([UserId], [IDL.Opt(ProfileData)], []),
     'getUserByEmail' : IDL.Func([Email], [IDL.Opt(User)], []),
     'getUserById' : IDL.Func([UserId], [IDL.Opt(User)], []),
+    'isProfileSubmitted' : IDL.Func([UserId], [IDL.Bool], []),
+    'markProfileAsSubmitted' : IDL.Func([UserId], [Result_1], []),
     'updateLastLogin' : IDL.Func([UserId], [Result_1], []),
     'updatePassword' : IDL.Func([UserId, PasswordHash], [Result_1], []),
     'updateProfile' : IDL.Func([UserId, ProfileData], [Result_1], []),
+    'updateProfileSubmissionStatus' : IDL.Func(
+        [UserId, IDL.Bool],
+        [Result_1],
+        [],
+      ),
     'verifyEmail' : IDL.Func([UserId], [Result_1], []),
     'verifyOTP' : IDL.Func([Email, IDL.Text], [Result], []),
   });

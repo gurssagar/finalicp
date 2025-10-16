@@ -10,7 +10,6 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 
 export function ResumeUpload() {
   const navigate = useRouter()
-  const [linkedinProfile, setLinkedinProfile] = useState('')
 
   const {
     resume,
@@ -18,6 +17,7 @@ export function ResumeUpload() {
     skills,
     error,
     updateResume,
+    updateProfile,
     completeOnboarding,
     goToPreviousStep,
     isLoading
@@ -151,8 +151,8 @@ export function ResumeUpload() {
                 <input
                   type="text"
                   placeholder="Add your profile Link Here"
-                  value={linkedinProfile}
-                  onChange={(e) => setLinkedinProfile(e.target.value)}
+                  value={profile.linkedin}
+                  onChange={(e) => updateProfile({ linkedin: e.target.value })}
                   className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#7d7d7d]"
                 />
               </div>
@@ -191,6 +191,7 @@ export function ResumeUpload() {
                   twitter={profile.twitter}
                   skills={skills.length > 0 ? skills : []}
                   hasResume={resume.hasResume}
+                  profileImage={profile.profileImage}
                 />
 
                 {/* Resume Preview */}

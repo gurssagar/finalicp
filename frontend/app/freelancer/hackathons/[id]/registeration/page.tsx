@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import { Header } from '@/components/Header1'
+import { Header1 } from '@/components/Header1'
 import { Sidebar } from '@/components/Sidebar'
 import { ChevronLeft, Users, FileText, Code, Check } from 'lucide-react'
 import { useRouter } from 'next/navigation'

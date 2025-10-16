@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import ProfileStatus from '@/components/ProfileStatus'
 import { 
   Plus, 
   TrendingUp, 
@@ -210,6 +211,11 @@ export default function ClientDashboard() {
             Browse Services
           </Button>
         </div>
+      </div>
+
+      {/* Profile Status Section */}
+      <div className="mb-8">
+        <ProfileStatus />
       </div>
 
       {/* Stats Grid */}

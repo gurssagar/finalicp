@@ -53,11 +53,33 @@ export async function POST(request: NextRequest) {
       }, { status: 429 });
     }
 
-    // Check if user already exists
-    const userActor = await getUserActor();
-    const existingUser = await userActor.getUserByEmail(validatedData.email);
+      // Check if user already exists
+    console.log('Checking if user exists for email:', validatedData.email);
+    let userActor;
+    try {
+      userActor = await getUserActor();
+    } catch (error) {
+      console.error('Failed to get user actor:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to connect to user service. Please try again.',
+      }, { status: 500 });
+    }
 
-    if (existingUser && existingUser.length > 0) {
+    let existingUser;
+    try {
+      existingUser = await userActor.getUserByEmail(validatedData.email);
+      console.log('User lookup result:', existingUser);
+    } catch (error) {
+      console.error('Failed to check existing user:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to check user existence. Please try again.',
+      }, { status: 500 });
+    }
+
+    // Check if user exists (Opt<User> type)
+    if (existingUser && 'id' in existingUser) {
       return NextResponse.json({
         success: false,
         error: 'User with this email already exists',
@@ -65,10 +87,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Hash password
-    const passwordHash = await hashPassword(validatedData.password);
+    let passwordHash;
+    try {
+      passwordHash = await hashPassword(validatedData.password);
+      console.log('Password hashed successfully');
+    } catch (error) {
+      console.error('Failed to hash password:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to process password. Please try again.',
+      }, { status: 500 });
+    }
 
     // Create user
-    const result = await userActor.createUser(validatedData.email, passwordHash);
+    let result;
+    try {
+      console.log('Creating user with email:', validatedData.email);
+      result = await userActor.createUser(validatedData.email, passwordHash);
+      console.log('User creation result:', result);
+    } catch (error) {
+      console.error('Failed to create user:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to create user account. Please try again.',
+      }, { status: 500 });
+    }
 
     if ('err' in result) {
       return NextResponse.json({
@@ -78,9 +121,21 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = result.ok;
+    console.log('User created with ID:', userId);
 
     // Generate and send OTP
-    const otpResult = await userActor.createOTP(validatedData.email);
+    let otpResult;
+    try {
+      console.log('Creating OTP for email:', validatedData.email);
+      otpResult = await userActor.createOTP(validatedData.email);
+      console.log('OTP creation result:', otpResult);
+    } catch (error) {
+      console.error('Failed to create OTP:', error);
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to create verification code. Please try again.',
+      }, { status: 500 });
+    }
 
     if ('err' in otpResult) {
       return NextResponse.json({
@@ -89,12 +144,34 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // Log OTP for development (useful when email service is not configured)
+    console.log('='.repeat(50));
+    console.log('🔔 DEVELOPMENT OTP CODE');
+    console.log('Email:', validatedData.email);
+    console.log('OTP Code:', otpResult.ok);
+    console.log('='.repeat(50));
+
     // Send OTP email
-    const emailSent = await emailService.sendOTPEmail(
-      validatedData.email,
-      otpResult.ok,
-      `${validatedData.firstName} ${validatedData.lastName}`
-    );
+    let emailSent = false;
+    try {
+      emailSent = await emailService.sendOTPEmail(
+        validatedData.email,
+        otpResult.ok,
+        `${validatedData.firstName} ${validatedData.lastName}`
+      );
+      console.log('Email send result:', emailSent);
+    } catch (error) {
+      console.error('Failed to send OTP email:', error);
+      // In development, continue even if email fails
+      if (process.env.NODE_ENV !== 'development') {
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to send verification email. Please try again.',
+        }, { status: 500 });
+      }
+      console.warn('Continuing without email in development mode');
+      emailSent = true; // Allow continuation in development
+    }
 
     if (!emailSent) {
       return NextResponse.json({
@@ -113,15 +190,23 @@ export async function POST(request: NextRequest) {
     console.error('Signup error:', error);
 
     if (error instanceof z.ZodError) {
+      console.log('Validation error:', error.errors);
       return NextResponse.json({
         success: false,
         error: error.errors[0].message,
       }, { status: 400 });
     }
 
+    // Log the full error for debugging
+    console.error('Unexpected error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error
+    });
+
     return NextResponse.json({
       success: false,
-      error: 'An unexpected error occurred. Please try again.',
+      error: `An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`,
     }, { status: 500 });
   }
 }

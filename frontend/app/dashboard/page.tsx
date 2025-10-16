@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { Header } from '@/components/Header1'
+import { Header1 } from '@/components/Header1'
 import { Sidebar } from '@/components/Sidebar'
 import Link from 'next/link';
 import { BarChart2, Check, Clock, Plus } from 'lucide-react'
@@ -75,7 +75,7 @@ export default function DashboardHome() {
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header showSearch={false} />
+        <Header1 showSearch={false} />
         <main className="flex-1 p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div>
