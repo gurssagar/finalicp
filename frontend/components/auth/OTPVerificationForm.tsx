@@ -9,13 +9,16 @@ export default function OTPVerificationForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isResetSuccessful, setIsResetSuccessful] = useState(false);
+  const [countdown, setCountdown] = useState(5);
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
   const [canResend, setCanResend] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
+  const purpose = searchParams.get('purpose'); // 'signup' or 'password-reset'
 
-  // Countdown timer
+  // Countdown timer for OTP expiry
   React.useEffect(() => {
     if (timeLeft > 0) {
       const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
@@ -24,6 +27,16 @@ export default function OTPVerificationForm() {
       setCanResend(true);
     }
   }, [timeLeft]);
+
+  // Countdown timer for redirect after successful password reset
+  React.useEffect(() => {
+    if (isResetSuccessful && countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    } else if (isResetSuccessful && countdown === 0) {
+      router.push('/signup');
+    }
+  }, [isResetSuccessful, countdown, router]);
 
   const handleOtpChange = (index: number, value: string) => {
     if (value.length > 1) return; // Only allow single digit
@@ -101,10 +114,15 @@ export default function OTPVerificationForm() {
       const result = await response.json();
 
       if (result.success) {
-        setSuccess('Email verified successfully!');
-        setTimeout(() => {
-          router.push('/profile/complete');
-        }, 1500);
+        if (purpose === 'password-reset') {
+          setIsResetSuccessful(true);
+          setSuccess('Password reset successful! Redirecting to signup in 5 seconds...');
+        } else {
+          setSuccess('Email verified successfully!');
+          setTimeout(() => {
+            router.push('/profile/complete');
+          }, 1500);
+        }
       } else {
         setError(result.error || 'Invalid OTP code');
       }
@@ -170,10 +188,13 @@ export default function OTPVerificationForm() {
           <Mail size={32} className="text-blue-600" />
         </div>
         <h1 className="text-3xl font-bold text-[#161616] mb-4">
-          Verify Your Email
+          {purpose === 'password-reset' ? 'Reset Your Password' : 'Verify Your Email'}
         </h1>
         <p className="text-gray-600">
-          We've sent a 6-digit verification code to
+          {purpose === 'password-reset'
+            ? "We've sent a 6-digit password reset code to"
+            : "We've sent a 6-digit verification code to"
+          }
         </p>
         <p className="font-semibold text-[#161616]">{email}</p>
       </div>
@@ -181,16 +202,24 @@ export default function OTPVerificationForm() {
       {success && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md text-green-700 text-sm">
           {success}
+          {isResetSuccessful && (
+            <div className="mt-2 text-center">
+              <div className="inline-flex items-center justify-center w-8 h-8 bg-green-200 rounded-full text-green-800 font-bold">
+                {countdown}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {error && (
+      {error && !isResetSuccessful && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
+      {!isResetSuccessful && (
+        <form onSubmit={handleSubmit}>
         <div className="mb-6">
           <div className="flex justify-center gap-2 mb-4">
             {otp.map((digit, index) => (
@@ -217,26 +246,29 @@ export default function OTPVerificationForm() {
           disabled={isLoading || otp.join('').length !== 6}
           className="w-full bg-[#000000] text-white py-3 rounded-full font-bold shadow-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
         >
-          {isLoading ? 'Verifying...' : 'Verify Email'}
+          {isLoading ? 'Verifying...' : (purpose === 'password-reset' ? 'Reset Password' : 'Verify Email')}
         </button>
       </form>
+      )}
 
-      <div className="text-center">
-        {timeLeft > 0 ? (
-          <p className="text-gray-600 text-sm">
-            Resend code in <span className="font-semibold">{formatTime(timeLeft)}</span>
-          </p>
-        ) : (
-          <button
-            onClick={handleResend}
-            disabled={isLoading || !canResend}
-            className="flex items-center justify-center mx-auto text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={16} className="mr-2" />
-            Resend OTP
-          </button>
-        )}
-      </div>
+      {!isResetSuccessful && (
+        <div className="text-center">
+          {timeLeft > 0 ? (
+            <p className="text-gray-600 text-sm">
+              Resend code in <span className="font-semibold">{formatTime(timeLeft)}</span>
+            </p>
+          ) : (
+            <button
+              onClick={handleResend}
+              disabled={isLoading || !canResend}
+              className="flex items-center justify-center mx-auto text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={16} className="mr-2" />
+              Resend OTP
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

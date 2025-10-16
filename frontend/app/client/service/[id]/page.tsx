@@ -1,57 +1,114 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Share2, Check } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Share2, Check, Star, Clock, DollarSign } from 'lucide-react';
+import { useServices } from '@/hooks/useServices';
+import { usePackages, useBookPackage } from '@/hooks/usePackages';
 export default function ServiceDetails() {
   const navigate = useRouter();
-  const {
-    id
-  } = useParams<{
-    id: string;
-  }>();
+  const { id } = useParams<{ id: string }>();
   const [selectedTier, setSelectedTier] = useState('basic');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  // Sample service data
-  const service = {
-    id: parseInt(id || '1'),
-    title: 'I will do website ui, figma website design, website design figma, figma design website',
+  const [service, setService] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [bookingNotes, setBookingNotes] = useState('');
+
+  // Fetch service data
+  useEffect(() => {
+    const fetchService = async () => {
+      try {
+        const response = await fetch(`/api/marketplace/services/${id}`);
+        const data = await response.json();
+        
+        if (data.success) {
+          setService(data.data);
+        } else {
+          console.error('Failed to fetch service:', data.error);
+        }
+      } catch (error) {
+        console.error('Error fetching service:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      fetchService();
+    }
+  }, [id]);
+
+  // Fetch packages for this service
+  const { packages, loading: packagesLoading } = usePackages(id);
+
+  // Book package hook
+  const { bookPackage, loading: bookingLoading } = useBookPackage();
+
+  const handleBookPackage = async (packageId: string) => {
+    if (!packageId) {
+      alert('Please select a package');
+      return;
+    }
+
+    const userId = 'TEST_USER_123'; // TODO: Get from auth context
+    
+    const result = await bookPackage(userId, packageId, bookingNotes);
+    
+    if (result.success) {
+      alert('Package booked successfully!');
+      navigate.push('/client/projects');
+    } else {
+      alert('Failed to book package: ' + result.error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!service) {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Service Not Found</h2>
+        <p className="text-gray-600 mb-4">The service you're looking for doesn't exist.</p>
+        <Link href="/client/browse-services" className="text-blue-600 hover:text-blue-700">
+          Browse other services
+        </Link>
+      </div>
+    );
+  }
+
+  // Mock data for UI components that need it
+  const mockService = {
+    id: service.service_id,
+    title: service.title,
     seller: {
-      name: 'Cyrus Roshan',
-      location: 'India',
+      name: `Freelancer ${service.freelancer_id.slice(-4)}`,
+      location: 'Remote',
       joinedYear: '2023',
       avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=300&auto=format&fit=crop',
-      rating: 4.8,
-      reviews: '1.2K+'
+      rating: service.rating_avg,
+      reviews: `${service.total_orders}+`
     },
-    images: ["/Freelancer_Dashbioard-1.png", "/Organaise_Freelancer_Onboarding_-_24.png", "/Organaise_Freelancer_Onboarding_-_23.png", "/Freelancer_Dashbioard.png"],
-    description: `3000+ Projects completed on Upwork with Client Satisfaction! UI UX/UX Designer-UI Web Design-UX Web Design-Website UI UX Design-UI UX Web Designer-Mobile UI UX Designer-Mobile App UI UX Designer-User Experience-Figma-Adobe XD-PSD Design.`,
-    features: ['Modern', 'Eye-Catching & Elegant Designs', 'Premium & Responsive Designs', 'User-friendly Interface', 'Custom Designs, Professional Fonts-Mockup in Figma, Adobe XD, PSD Designs', 'Layered PSD or AI File-Editable Source file with all the Assets', 'Guaranteed Satisfaction & Lifetime Support'],
-    additionalInfo: ["I have expertise in designing User Interfaces for websites, web apps, and mobile devices. I've worked on designs for both iOS and Android.", 'Designing creative Custom, Modern, and Responsive websites, Blog & Magazine, Education, Non-profit, Real Estate, Wedding.'],
-    tiers: {
-      basic: {
-        name: 'Basic',
-        price: 100,
-        description: 'Website ui, figma website design',
-        deliveryDays: 7,
-        revisions: 'Unlimited'
-      },
-      advanced: {
-        name: 'Advanced',
-        price: 180,
-        description: 'Website ui, figma website design',
-        deliveryDays: 7,
-        revisions: 'Unlimited'
-      },
-      premium: {
-        name: 'Premium',
-        price: 234,
-        description: 'Website ui, figma website design',
-        deliveryDays: 7,
-        revisions: 'Unlimited'
-      }
-    },
+    images: service.portfolio_images.length > 0 ? service.portfolio_images : ["/default-service.jpg"],
+    description: service.description,
+    features: service.whats_included.split(',').map((item: string) => item.trim()),
+    additionalInfo: [service.description],
+    tiers: packages.reduce((acc: any, pkg: any) => {
+      acc[pkg.tier.toLowerCase()] = {
+        name: pkg.tier,
+        price: pkg.price_e8s / 100000000, // Convert from e8s to ICP
+        description: pkg.description,
+        deliveryDays: pkg.delivery_days,
+        revisions: pkg.revisions_included
+      };
+      return acc;
+    }, {}),
     tierComparison: {
       headers: ['Service Tiers', 'Basic', 'Advanced', 'Premium'],
       rows: [['Delivery Days', '7 Days', '7 Days', '7 Days'], ['Source Files', '✓', '✓', '✓'], ['Optional Add-ons', '', '', '✓']]
@@ -121,8 +178,16 @@ export default function ServiceDetails() {
       }]
     }
   };
-  const handleContinue = () => {
-    navigate.push(`/client/checkout/${id}?tier=${selectedTier}`);
+  const handleContinue = async () => {
+    // Find the selected package
+    const selectedPackage = packages.find(pkg => pkg.tier.toLowerCase() === selectedTier);
+    
+    if (!selectedPackage) {
+      alert('Please select a package');
+      return;
+    }
+
+    await handleBookPackage(selectedPackage.package_id);
   };
   const handleBack = () => {
     navigate.push('/client/browse-services');
@@ -138,49 +203,7 @@ export default function ServiceDetails() {
   };
   return <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 py-4 px-4">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center">
-            <svg width="40" height="32" viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
-              <path d="M20.0001 0L0 11.5556V23.1111L20.0001 11.5556L40.0001 23.1111V11.5556L20.0001 0Z" fill="#FF3B30" />
-              <path d="M0 23.1111L20.0001 11.5555V23.1111V34.6667L0 23.1111Z" fill="#34C759" />
-              <path d="M40.0001 23.1111L20.0001 11.5555V23.1111V34.6667L40.0001 23.1111Z" fill="#007AFF" />
-            </svg>
-            <span className="font-bold text-xl">ICPWork</span>
-          </div>
-          <div className="relative max-w-md mx-auto hidden md:block">
-            <input type="text" placeholder="Search your industry here..." className="w-full py-2 pl-4 pr-10 border border-gray-200 rounded-full focus:outline-none" />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2 bg-green-500 rounded-full p-1">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
-            </button>
-          </div>
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center border border-gray-200 rounded-full px-3 py-1">
-              <div className="w-5 h-5 bg-gray-100 rounded-full flex items-center justify-center mr-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="2" y1="12" x2="22" y2="12"></line>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
-                </svg>
-              </div>
-              <span className="text-sm">Client</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="ml-1">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-            <div className="flex items-center space-x-2">
-              <img src={service.seller.avatar} alt="Profile" className="w-8 h-8 rounded-full object-cover" />
-              <span className="hidden md:inline">John Doe</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9"></polyline>
-              </svg>
-            </div>
-          </div>
-        </div>
-      </header>
+     
       <div className="container mx-auto px-4 py-6">
         <button onClick={handleBack} className="flex items-center text-gray-600 mb-4">
           <ChevronLeft size={20} />
@@ -441,10 +464,19 @@ export default function ServiceDetails() {
                   </span>
                 </div>
               </div>
-              <button onClick={handleContinue} className="w-full py-3 bg-purple-600 text-white rounded-lg mt-6 hover:bg-purple-700 transition-colors">
-                Continue ($
-                {service.tiers[selectedTier as keyof typeof service.tiers].price}
-                )
+              <button 
+                onClick={handleContinue} 
+                disabled={bookingLoading || packagesLoading}
+                className="w-full py-3 bg-purple-600 text-white rounded-lg mt-6 hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bookingLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                    Booking...
+                  </>
+                ) : (
+                  `Book Now ($${mockService.tiers[selectedTier as keyof typeof mockService.tiers]?.price || 0})`
+                )}
               </button>
             </div>
           </div>

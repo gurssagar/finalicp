@@ -8,6 +8,18 @@
     "user": {
       "type": "motoko",
       "main": "canisters/user.mo"
+    },
+    "hackathon": {
+      "type": "motoko",
+      "main": "canisters/hackathon_minimal.mo"
+    },
+    "marketplace": {
+      "type": "motoko",
+      "main": "canisters/marketplace.mo"
+    },
+    "chat_storage": {
+      "type": "motoko",
+      "main": "canisters/chat_storage.mo"
     }
   }
 }

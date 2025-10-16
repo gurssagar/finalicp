@@ -1,3 +1,4 @@
+"use client"
 import React, { useEffect } from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
@@ -6,16 +7,15 @@ import { CheckCircle } from 'lucide-react'
 export function VerificationComplete() {
   const navigate = useRouter()
   useEffect(() => {
-    // Redirect to profile page after 3 seconds
+    // Redirect to workspace after 5 seconds
     const timer = setTimeout(() => {
-      // navigate("/profile"); // Uncomment when profile page is created
-      console.log('Redirecting to profile page...')
-    }, 3000)
+      navigate.push("/dashboard");
+    }, 5000)
     return () => clearTimeout(timer)
   }, [navigate])
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
-      <Header />
+      
       <main className="flex-1 flex flex-col justify-center items-center py-8 px-4">
         <div className="max-w-md w-full mx-auto">
           <div className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100 relative overflow-hidden">
@@ -34,7 +34,7 @@ export function VerificationComplete() {
                 – where excellence meets opportunity.
               </p>
               <p className="text-[#2ba24c] font-medium">
-                Redirecting to complete profile...
+                Redirecting to dashboard...
               </p>
             </div>
           </div>
