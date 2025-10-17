@@ -3,7 +3,7 @@
   "canisters": {
     "basic_backend": {
       "type": "motoko",
-      "main": "src/basic_backend.mo"
+      "main": "src/simple_backend.mo"
     },
     "user": {
       "type": "motoko",
