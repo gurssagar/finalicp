@@ -1,11 +1,11 @@
 "use client"
-import React from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
-import { ProfilePreview } from '@/components/profilePreview'
+import { ProfilePreview } from '@/components/ProfilePreview'
 import { ChevronDown } from 'lucide-react'
-import { useOnboarding } from '@/hooks/useOnboarding'
+import { useOnboardingSession as useOnboarding } from '@/hooks/useOnboardingSession'
 export function AddressDetails() {
   const {
     address,
@@ -20,9 +20,132 @@ export function AddressDetails() {
     fullLocation
   } = useOnboarding()
 
+  // Log current onboarding progress when component mounts
+  React.useEffect(() => {
+    console.log('=== ONBOARDING STEP 3: ADDRESS - CURRENT PROGRESS ===');
+    console.log('📊 Progress Summary:');
+    console.log('  • Profile Complete:', !!(profile.firstName && profile.lastName));
+    console.log('  • Address Complete:', !!(address.city && address.state && address.zipCode));
+    console.log('  • Skills Count:', skills.length);
+    console.log('  • Current Data:', { profile, address, skills });
+    console.log('================================================');
+  }, [])
+
+  // State for location data
+  const [countries, setCountries] = useState<any[]>([])
+  const [states, setStates] = useState<any[]>([])
+  const [cities, setCities] = useState<any[]>([])
+  const [loadingCountries, setLoadingCountries] = useState(false)
+  const [loadingStates, setLoadingStates] = useState(false)
+  const [loadingCities, setLoadingCities] = useState(false)
+
+  // Fetch countries on component mount
+  useEffect(() => {
+    fetchCountries()
+  }, [])
+
+  // Fetch states when country changes
+  useEffect(() => {
+    if (address.country) {
+      fetchStates(address.country)
+      // Reset state and city when country changes
+      updateAddress({ state: '', city: '' })
+      setStates([])
+      setCities([])
+    }
+  }, [address.country])
+
+  // Fetch cities when state changes
+  useEffect(() => {
+    if (address.country && address.state) {
+      fetchCities(address.country, address.state)
+      // Reset city when state changes
+      updateAddress({ city: '' })
+      setCities([])
+    }
+  }, [address.country, address.state])
+
+  const fetchCountries = async () => {
+    setLoadingCountries(true)
+    try {
+      const response = await fetch('/api/location/countries')
+      const data = await response.json()
+      if (data.success) {
+        setCountries(data.countries)
+      }
+    } catch (error) {
+      console.error('Error fetching countries:', error)
+    } finally {
+      setLoadingCountries(false)
+    }
+  }
+
+  const fetchStates = async (countryCode: string) => {
+    setLoadingStates(true)
+    try {
+      const response = await fetch(`/api/location/states?countryCode=${countryCode}`)
+      const data = await response.json()
+      if (data.success) {
+        setStates(data.states)
+      }
+    } catch (error) {
+      console.error('Error fetching states:', error)
+    } finally {
+      setLoadingStates(false)
+    }
+  }
+
+  const fetchCities = async (countryCode: string, stateCode: string) => {
+    setLoadingCities(true)
+    try {
+      const response = await fetch(`/api/location/cities?countryCode=${countryCode}&stateCode=${stateCode}`)
+      const data = await response.json()
+      if (data.success) {
+        setCities(data.cities)
+      }
+    } catch (error) {
+      console.error('Error fetching cities:', error)
+    } finally {
+      setLoadingCities(false)
+    }
+  }
+
   const handleFieldChange = (field: string, value: string | boolean) => {
     updateAddress({ [field]: value })
   }
+
+  const getFormattedLocation = useMemo(() => {
+    const locationParts = []
+    
+    // Add street address if available
+    if (address.streetAddress) {
+      locationParts.push(address.streetAddress)
+    }
+    
+    // Add city if available
+    if (address.city) {
+      locationParts.push(address.city)
+    }
+    
+    // Add state if available
+    if (address.state) {
+      const stateName = states.find(s => s.id === address.state)?.name || address.state
+      locationParts.push(stateName)
+    }
+    
+    // Add zip code if available
+    if (address.zipCode) {
+      locationParts.push(address.zipCode)
+    }
+    
+    // Add country if available
+    if (address.country) {
+      const countryName = countries.find(c => c.iso2 === address.country)?.name || address.country
+      locationParts.push(countryName)
+    }
+    
+    return locationParts.length > 0 ? locationParts.join(', ') : ''
+  }, [address.streetAddress, address.city, address.state, address.zipCode, address.country, states, countries])
 
   const handleNext = async () => {
     // Validate required fields
@@ -30,6 +153,18 @@ export function AddressDetails() {
       setError('Please fill in all required fields')
       return
     }
+
+    // Log address step completion
+    console.log('=== ONBOARDING STEP 3: ADDRESS COMPLETED ===');
+    console.log('📍 Address Data:');
+    console.log('  • Country:', address.country);
+    console.log('  • State:', address.state);
+    console.log('  • City:', address.city);
+    console.log('  • ZIP Code:', address.zipCode);
+    console.log('  • Street Address:', address.streetAddress || 'Not provided');
+    console.log('  • Private Profile:', address.isPrivate ? 'Yes' : 'No');
+    console.log('  • Formatted Location:', getFormattedLocation);
+    console.log('==========================================');
 
     await goToNextStep(3)
   }
@@ -89,11 +224,21 @@ export function AddressDetails() {
                     <select
                       value={address.country}
                       onChange={(e) => handleFieldChange('country', e.target.value)}
-                      className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616]"
+                      disabled={loadingCountries}
+                      className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616] disabled:opacity-50"
                     >
-                      <option value="USA">USA</option>
-                      <option value="Canada">Canada</option>
-                      <option value="UK">UK</option>
+                      <option value="">Select Country</option>
+                      {countries.length > 0 ? (
+                        countries.map((country) => (
+                          <option key={country.iso2} value={country.iso2}>
+                            {country.emoji} {country.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          {loadingCountries ? 'Loading countries...' : 'No countries available'}
+                        </option>
+                      )}
                     </select>
                     <ChevronDown
                       className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -109,12 +254,21 @@ export function AddressDetails() {
                     <select
                       value={address.state}
                       onChange={(e) => handleFieldChange('state', e.target.value)}
-                      className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616]"
+                      disabled={!address.country || loadingStates}
+                      className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616] disabled:opacity-50"
                     >
                       <option value="">Select State</option>
-                      <option value="CA">California</option>
-                      <option value="NY">New York</option>
-                      <option value="TX">Texas</option>
+                      {states.length > 0 ? (
+                        states.map((state) => (
+                          <option key={state.id} value={state.id}>
+                            {state.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          {loadingStates ? 'Loading states...' : 'No states available'}
+                        </option>
+                      )}
                     </select>
                     <ChevronDown
                       className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -132,12 +286,21 @@ export function AddressDetails() {
                     <select
                       value={address.city}
                       onChange={(e) => handleFieldChange('city', e.target.value)}
-                      className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616]"
+                      disabled={!address.state || loadingCities}
+                      className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-[#2ba24c] text-[#161616] disabled:opacity-50"
                     >
                       <option value="">Select City</option>
-                      <option value="Los Angeles">Los Angeles</option>
-                      <option value="San Francisco">San Francisco</option>
-                      <option value="San Diego">San Diego</option>
+                      {cities.length > 0 ? (
+                        cities.map((city) => (
+                          <option key={city.id} value={city.name}>
+                            {city.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          {loadingCities ? 'Loading cities...' : 'No cities available'}
+                        </option>
+                      )}
                     </select>
                     <ChevronDown
                       className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400"
@@ -192,7 +355,7 @@ export function AddressDetails() {
                 lastName={profile.lastName}
                 bio={profile.bio}
                 phone={profile.phone}
-                location={fullLocation}
+                location={getFormattedLocation}
                 website={profile.website}
                 linkedin={profile.linkedin}
                 github={profile.github}

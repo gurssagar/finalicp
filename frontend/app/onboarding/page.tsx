@@ -23,7 +23,7 @@ export default function OnboardingWelcome() {
                 pave the path to your success.
               </p>
               <div>
-                <Link href="/onboarding/skills">
+                <Link href="/onboarding/profile">
                 <button
                   
                   className="bg-[#000000] text-white py-3 px-8 rounded-full font-bold shadow-md hover:bg-gray-800 transition-colors"

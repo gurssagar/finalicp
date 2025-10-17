@@ -1,7 +1,7 @@
 'use client';
 import React from 'react'
 import Header from '../../components/auth/Header'
-import SignupForm from '../../components/auth/SignUpForm'
+import SignupForm from '@/components/auth1/SignupForm'
 import { useRouter } from 'next/navigation'
 const SignUp = () => {
   return (

@@ -67,16 +67,24 @@ export async function POST(request: NextRequest) {
         }, { status: 400 });
       }
 
-      // Mark profile as submitted
-      const markResult = await actor.markProfileAsSubmitted(session.userId);
+      // Auto-mark profile as submitted (self-declaration, no review needed)
+      try {
+        console.log('🔄 Auto-marking profile as submitted for user:', session.userId);
+        const markResult = await actor.markProfileAsSubmitted(session.userId);
+        console.log('✅ Profile auto-submitted successfully:', markResult);
 
-      if ('err' in markResult) {
-        console.error('Failed to mark profile as submitted:', markResult.err);
+        if ('err' in markResult) {
+          console.error('Failed to auto-submit profile:', markResult.err);
+          // Continue anyway - profile is updated even if submission marking fails
+        }
+      } catch (submitError) {
+        console.error('Auto-submission failed (profile still saved):', submitError);
+        // Continue anyway - the main profile data is saved
       }
 
       return NextResponse.json({
         success: true,
-        message: 'Profile completed and submitted successfully',
+        message: 'Profile completed successfully! Your profile is now active and ready to use.',
         profileSubmitted: true
       });
 

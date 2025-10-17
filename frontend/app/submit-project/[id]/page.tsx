@@ -2,7 +2,7 @@
 import React, { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { Sidebar } from '@/components/Sidebar'
-import { Header } from '@/components/Header1'
+import { Header1 } from '@/components/Header1'
 import { ChevronLeft, Save, Plus, X, Upload, Link } from 'lucide-react'
 export default function SubmitHackathonProject() {
   const router = useRouter()

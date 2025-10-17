@@ -3,9 +3,9 @@ import React, { useState, useMemo } from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
-import { ProfilePreview } from '@/components/profilePreview'
+import { ProfilePreview } from '@/components/ProfilePreview'
 import { SkillTag } from '@/components/skillTag'
-import { useOnboarding } from '@/hooks/useOnboarding'
+import { useOnboardingSession as useOnboarding } from '@/hooks/useOnboardingSession'
 
 // Predefined skills based on common freelance categories
 const PREDEFINED_SKILLS = [
@@ -31,6 +31,7 @@ export function SkillsSelection() {
   const {
     skills,
     profile,
+    address,
     error,
     setError,
     addSkill,
@@ -39,6 +40,17 @@ export function SkillsSelection() {
     goToPreviousStep,
     isLoading
   } = useOnboarding()
+
+  // Log current onboarding progress when component mounts
+  React.useEffect(() => {
+    console.log('=== ONBOARDING STEP 4: SKILLS - CURRENT PROGRESS ===');
+    console.log('📊 Progress Summary:');
+    console.log('  • Profile Complete:', !!(profile.firstName && profile.lastName));
+    console.log('  • Address Complete:', !!(address.city && address.state && address.zipCode));
+    console.log('  • Skills Count:', skills.length);
+    console.log('  • Current Data:', { profile, address, skills });
+    console.log('================================================');
+  }, [])
 
   // Filter suggestions based on input and existing skills
   const filteredSuggestions = useMemo(() => {
@@ -97,7 +109,15 @@ export function SkillsSelection() {
       return
     }
 
-    await goToNextStep(2)
+    // Log skills step completion
+    console.log('=== ONBOARDING STEP 4: SKILLS COMPLETED ===');
+    console.log('🎯 Skills Data:');
+    console.log('  • Total Skills:', skills.length);
+    console.log('  • Skills List:', skills.join(', '));
+    console.log('  • Skills Array:', skills);
+    console.log('==========================================');
+
+    await goToNextStep(4)
   }
 
   const handleRemoveSkill = (skill: string) => {
@@ -105,7 +125,7 @@ export function SkillsSelection() {
   }
 
   const handleBack = () => {
-    goToPreviousStep(2)
+    goToPreviousStep(4)
   }
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
@@ -115,7 +135,7 @@ export function SkillsSelection() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
               <div className="mb-8">
-                <ProgressStepper currentStep={2} totalSteps={5} />
+                <ProgressStepper currentStep={4} totalSteps={5} />
               </div>
               <h1 className="text-3xl font-bold text-[#161616] mb-8">
                 What are your skills?

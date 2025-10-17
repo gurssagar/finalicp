@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { memo, useMemo } from 'react'
 import { SkillTag } from './skillTag'
 interface ProfilePreviewProps {
   name?: string
@@ -15,7 +15,7 @@ interface ProfilePreviewProps {
   hasResume?: boolean
   profileImage?: string | null
 }
-export function ProfilePreview({
+const ProfilePreview = memo(function ProfilePreview({
   name,
   firstName,
   lastName,
@@ -31,7 +31,20 @@ export function ProfilePreview({
   profileImage,
 }: ProfilePreviewProps) {
   // Generate display name from firstName and lastName if name is not provided
-  const displayName = name || (firstName && lastName ? `${firstName} ${lastName}` : 'Your Name');
+  const displayName = useMemo(() =>
+    name || (firstName && lastName ? `${firstName} ${lastName}` : 'Your Name'),
+    [name, firstName, lastName]
+  );
+
+  // Memoize skills array to prevent unnecessary re-renders
+  const memoizedSkills = useMemo(() => skills, [skills]);
+
+  // Memoize social links object
+  const socialLinks = useMemo(() => ({
+    linkedin,
+    github,
+    twitter
+  }), [linkedin, github, twitter]);
   return (
     <div className="bg-white rounded-3xl shadow-lg border border-gray-100 p-8 relative overflow-hidden">
       {/* Gradient background effect */}
@@ -91,9 +104,9 @@ export function ProfilePreview({
             SKILLS
           </h3>
           <div className="flex flex-wrap gap-2">
-            {skills.map((skill, index) => (
+            {memoizedSkills.map((skill, index) => (
               <SkillTag
-                key={index}
+                key={`${skill}-${index}`}
                 skill={skill}
                 removable={false}
                 className="bg-white"
@@ -190,15 +203,15 @@ export function ProfilePreview({
         )}
 
         {/* Social Links */}
-        {(linkedin || github || twitter) && (
+        {(socialLinks.linkedin || socialLinks.github || socialLinks.twitter) && (
           <div className="mb-6">
             <h3 className="uppercase text-gray-500 text-xs font-medium mb-3">
               SOCIAL
             </h3>
             <div className="flex gap-3">
-              {linkedin && (
+              {socialLinks.linkedin && (
                 <a
-                  href={linkedin}
+                  href={socialLinks.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-700 hover:text-blue-800"
@@ -209,9 +222,9 @@ export function ProfilePreview({
                   </svg>
                 </a>
               )}
-              {github && (
+              {socialLinks.github && (
                 <a
-                  href={github}
+                  href={socialLinks.github}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-700 hover:text-gray-900"
@@ -222,9 +235,9 @@ export function ProfilePreview({
                   </svg>
                 </a>
               )}
-              {twitter && (
+              {socialLinks.twitter && (
                 <a
-                  href={twitter}
+                  href={socialLinks.twitter}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-blue-400 hover:text-blue-500"
@@ -273,4 +286,6 @@ export function ProfilePreview({
       </div>
     </div>
   )
-}
+});
+
+export { ProfilePreview }

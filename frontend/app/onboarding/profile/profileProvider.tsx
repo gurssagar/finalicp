@@ -3,10 +3,10 @@ import React, { useState } from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
-import { ProfilePreview } from '@/components/profilePreview'
+import { ProfilePreview } from '@/components/ProfilePreview'
 import { useRouter } from 'next/navigation'
 import { User, Globe } from 'lucide-react'
-import { useOnboarding } from '@/hooks/useOnboarding'
+import { useOnboardingSession as useOnboarding } from '@/hooks/useOnboardingSession'
 
 export function ProfileSetup() {
   const navigate = useRouter()
@@ -79,14 +79,29 @@ export function ProfileSetup() {
       return;
     }
 
-    const success = await goToNextStep(4);
+    // Log profile step completion
+    console.log('=== ONBOARDING STEP 2: PROFILE COMPLETED ===');
+    console.log('📝 Profile Data:');
+    console.log('  • First Name:', profile.firstName);
+    console.log('  • Last Name:', profile.lastName);
+    console.log('  • Bio:', profile.bio || 'Not provided');
+    console.log('  • Phone:', profile.phone || 'Not provided');
+    console.log('  • Location:', profile.location || 'Not provided');
+    console.log('  • Website:', profile.website || 'Not provided');
+    console.log('  • LinkedIn:', profile.linkedin || 'Not provided');
+    console.log('  • GitHub:', profile.github || 'Not provided');
+    console.log('  • Twitter:', profile.twitter || 'Not provided');
+    console.log('  • Profile Image:', profile.profileImage ? '✓ Uploaded' : 'Not uploaded');
+    console.log('==========================================');
+
+    const success = await goToNextStep(2);
     if (success) {
-      navigate.push('/onboarding/resume');
+      navigate.push('/onboarding/address');
     }
   };
 
   const handleBack = () => {
-    goToPreviousStep(4);
+    goToPreviousStep(2);
   }
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
@@ -96,7 +111,7 @@ export function ProfileSetup() {
           <div className="grid md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
               <div className="mb-8">
-                <ProgressStepper currentStep={4} totalSteps={5} />
+                <ProgressStepper currentStep={2} totalSteps={5} />
               </div>
               <h1 className="text-3xl font-bold text-[#161616] mb-8">
                 Complete Your Profile

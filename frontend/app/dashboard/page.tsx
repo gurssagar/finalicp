@@ -2,6 +2,7 @@
 import React from 'react'
 import { Header1 } from '@/components/Header1'
 import { Sidebar } from '@/components/Sidebar'
+import ProfileStatus from '@/components/ProfileStatus'
 import Link from 'next/link';
 import { BarChart2, Check, Clock, Plus } from 'lucide-react'
 export default function DashboardHome() {
@@ -231,6 +232,12 @@ export default function DashboardHome() {
               </div>
             ))}
           </div>
+
+          {/* Profile Status Section */}
+          <div className="mb-8">
+            <ProfileStatus />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-2">
               <div className="flex justify-between items-center mb-4">

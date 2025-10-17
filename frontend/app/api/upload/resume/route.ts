@@ -1,23 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/actions/auth';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import AWS from 'aws-sdk';
 
-// Tebi.io S3 Configuration
-const s3Client = new S3Client({
-  endpoint: 'https://s3.tebi.io',
-  region: 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.TEBI_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.TEBI_SECRET_ACCESS_KEY || '',
-  },
-  forcePathStyle: true,
-});
+// Tebi S3 Configuration
+const getTebiConfig = () => {
+  return {
+    accessKeyId: process.env.TEBI_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.TEBI_SECRET_ACCESS_KEY!,
+    region: process.env.NEXT_PUBLIC_TEBI_REGION || 'us-east-1',
+    bucket: process.env.NEXT_PUBLIC_TEBI_BUCKET_NAME!,
+    endpoint: process.env.NEXT_PUBLIC_TEBI_ENDPOINT!
+  }
+}
 
-const BUCKET_NAME = process.env.TEBI_BUCKET_NAME;
+// Initialize S3 client for Tebi
+const getS3Client = () => {
+  const tebiConfig = getTebiConfig()
+
+  return new AWS.S3({
+    accessKeyId: tebiConfig.accessKeyId,
+    secretAccessKey: tebiConfig.secretAccessKey,
+    region: tebiConfig.region,
+    endpoint: tebiConfig.endpoint,
+    s3ForcePathStyle: true, // Required for some S3-compatible services
+    signatureVersion: 'v4'
+  })
+}
 
 async function uploadToTebi(file: File, fileName: string): Promise<{ url: string; key: string }> {
-  if (!process.env.TEBI_ACCESS_KEY_ID || !process.env.TEBI_SECRET_ACCESS_KEY || !BUCKET_NAME) {
-    throw new Error('Tebi.io credentials not configured. Please check environment variables.');
+  const tebiConfig = getTebiConfig();
+
+  // Check if Tebi S3 is properly configured
+  if (!tebiConfig.accessKeyId || !tebiConfig.secretAccessKey || !tebiConfig.bucket || !tebiConfig.endpoint) {
+    console.error('Tebi S3 configuration missing:', {
+      accessKeyId: tebiConfig.accessKeyId ? '***configured***' : 'missing',
+      secretAccessKey: tebiConfig.secretAccessKey ? '***configured***' : 'missing',
+      bucket: tebiConfig.bucket,
+      endpoint: tebiConfig.endpoint,
+      region: tebiConfig.region
+    });
+
+    throw new Error('Tebi S3 is not configured. Please check your environment variables.');
   }
 
   // Get file content as Buffer
@@ -25,41 +48,41 @@ async function uploadToTebi(file: File, fileName: string): Promise<{ url: string
   const buffer = Buffer.from(arrayBuffer);
 
   // Create unique file key
+  const fileExtension = file.name.split('.').pop();
   const timestamp = Date.now();
-  const randomString = Math.random().toString(36).substring(2, 15);
-  const fileKey = `resumes/${timestamp}-${randomString}-${fileName}`;
+  const randomString = Math.random().toString(36).substring(2, 8);
+  const key = `resumes/${timestamp}-${randomString}.${fileExtension}`;
 
   try {
-    const putCommand = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: fileKey,
+    // Prepare upload parameters
+    const uploadParams = {
+      Bucket: tebiConfig.bucket,
+      Key: key,
       Body: buffer,
       ContentType: file.type,
-      ACL: 'public-read',
+      ACL: 'public-read' as const, // Make the file publicly accessible
       Metadata: {
-        originalName: fileName,
+        originalName: file.name,
         uploadedAt: new Date().toISOString(),
-      },
-    });
+      }
+    };
 
-    const putResponse = await s3Client.send(putCommand);
-    console.log('S3 upload successful:', { ETag: putResponse.ETag });
+    // Upload to Tebi S3
+    console.log('Uploading resume to Tebi S3:', { bucket: tebiConfig.bucket, key, fileSize: file.size });
+    const s3 = getS3Client();
+    const result = await s3.upload(uploadParams).promise();
+    console.log('Resume upload successful to Tebi S3');
 
     // Return the public URL
-    const publicUrl = `https://${BUCKET_NAME}.s3.tebi.io/${fileKey}`;
+    const publicUrl = `${tebiConfig.endpoint.replace(/\/$/, '')}/${tebiConfig.bucket}/${key}`;
+    console.log('Generated public URL for resume:', publicUrl);
 
     return {
       url: publicUrl,
-      key: fileKey
+      key: key
     };
   } catch (error: any) {
-    console.error('S3 Upload Error:', error);
-    console.error('Error details:', {
-      name: error.name,
-      message: error.message,
-      Code: error.Code,
-      RequestId: error.RequestId,
-    });
+    console.error('Resume upload to Tebi S3 error:', error);
     throw new Error(`Failed to upload file to Tebi.io storage: ${error.message}`);
   }
 }
@@ -111,11 +134,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Resume uploaded successfully',
-      fileUrl: uploadResult.url,
+      url: uploadResult.url, // Changed from fileUrl to url to match other APIs
+      key: uploadResult.key,
       fileName: file.name,
       fileSize: file.size,
-      fileKey: uploadResult.key,
     });
 
   } catch (error) {

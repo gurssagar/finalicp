@@ -23,20 +23,81 @@ export async function POST(request: NextRequest) {
 
     // Update user profile with skills
     try {
-      const actor = getUserActor();
+      const actor = await getUserActor();
+
+      // First get existing user data to preserve other profile fields
+      const existingUser = await actor.getUserByEmail(session.email);
+      if (!existingUser || existingUser.length === 0) {
+        return NextResponse.json({
+          success: false,
+          error: 'User not found',
+        }, { status: 404 });
+      }
+
+      const existingProfile = existingUser[0].profile?.[0] || {};
+
+      // Prepare complete profile data, preserving existing fields and updating skills
+      const profileData = {
+        firstName: existingProfile.firstName || '',
+        lastName: existingProfile.lastName || '',
+        bio: existingProfile.bio || [],
+        phone: existingProfile.phone || [],
+        location: existingProfile.location || [],
+        website: existingProfile.website || [],
+        linkedin: existingProfile.linkedin || [],
+        github: existingProfile.github || [],
+        twitter: existingProfile.twitter || [],
+        skills: validatedData.skills,
+        experience: existingProfile.experience || [],
+        education: existingProfile.education || [],
+        profileImageUrl: existingProfile.profileImageUrl || [],
+        resumeUrl: existingProfile.resumeUrl || [],
+      };
 
       // Update the user's profile with skills
-      const result = await actor.update_user_profile({
-        skills: validatedData.skills
-      });
+      const result = await actor.updateProfile(existingUser[0].id, profileData);
 
       console.log('Profile updated with skills:', result);
+
+      if ('err' in result) {
+        return NextResponse.json({
+          success: false,
+          error: result.err,
+        }, { status: 400 });
+      }
+
+      // Check if profile is now complete and auto-submit
+      const hasBasicInfo = profileData.firstName && profileData.lastName;
+      const hasSkills = validatedData.skills.length > 0;
+
+      if (hasBasicInfo && hasSkills) {
+        try {
+          console.log('🔄 Profile is complete, auto-submitting for user:', existingUser[0].id);
+          const markResult = await actor.markProfileAsSubmitted(existingUser[0].id);
+          console.log('✅ Profile auto-submitted successfully:', markResult);
+
+          if ('err' in markResult) {
+            console.error('Failed to auto-submit profile:', markResult.err);
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: 'Skills saved successfully! Your profile is now complete and active.',
+            skills: validatedData.skills,
+            profileSubmitted: true,
+            profileComplete: true
+          });
+        } catch (submitError) {
+          console.error('Auto-submission failed:', submitError);
+          // Return success anyway - skills are saved
+        }
+      }
 
       return NextResponse.json({
         success: true,
         message: 'Skills saved successfully',
         skills: validatedData.skills,
-        profile: result
+        profileSubmitted: false
       });
 
     } catch (icpError) {

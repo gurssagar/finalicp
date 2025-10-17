@@ -3,10 +3,10 @@ import React, { useState } from 'react'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
-import { ProfilePreview } from '@/components/profilePreview'
+import { ProfilePreview } from '@/components/ProfilePreview'
 import { useRouter } from 'next/navigation'
 import { File } from 'lucide-react'
-import { useOnboarding } from '@/hooks/useOnboarding'
+import { useOnboardingSession as useOnboarding } from '@/hooks/useOnboardingSession'
 
 export function ResumeUpload() {
   const navigate = useRouter()
@@ -15,12 +15,14 @@ export function ResumeUpload() {
     resume,
     profile,
     skills,
+    address,
     error,
     updateResume,
     updateProfile,
     completeOnboarding,
     goToPreviousStep,
-    isLoading
+    isLoading,
+    debugData
   } = useOnboarding()
 
   const [isUploading, setIsUploading] = useState(false)
@@ -59,7 +61,7 @@ export function ResumeUpload() {
           updateResume({
             fileName: file.name,
             file: file,
-            fileUrl: result.fileUrl,
+            fileUrl: result.url, // Changed from result.fileUrl to result.url
             hasResume: true
           })
         } else {
@@ -78,13 +80,42 @@ export function ResumeUpload() {
     goToPreviousStep(5)
   }
 
+  const handleDebugData = () => {
+    console.log('🔍 DEBUG: Current session data state:');
+    debugData();
+    
+    // Check session storage directly
+    const rawData = sessionStorage.getItem('onboarding_session_data');
+    console.log('💾 Raw session storage data:', rawData);
+    if (rawData) {
+      try {
+        const parsed = JSON.parse(rawData);
+        console.log('📥 Parsed session storage data:', parsed);
+      } catch (e) {
+        console.error('❌ Error parsing session storage data:', e);
+      }
+    }
+  }
+
   const handleComplete = async () => {
     try {
+      // Log resume step completion
+      console.log('=== ONBOARDING STEP 5: RESUME COMPLETED ===');
+      console.log('📄 Resume Data:');
+      console.log('  • Has Resume:', resume.hasResume ? 'Yes' : 'No');
+      console.log('  • File Name:', resume.fileName || 'Not provided');
+      console.log('  • File URL:', resume.fileUrl || 'Not provided');
+      console.log('==========================================');
+
+      // Debug data before completing
+      handleDebugData();
+
       // Save complete onboarding data to canister
       await completeOnboarding()
       navigate.push('/onboarding/verification-complete')
     } catch (error) {
-      console.error('Failed to complete onboarding:', error)
+      console.error('❌ Failed to complete onboarding:', error)
+      console.error('❌ Error details:', error instanceof Error ? error.message : 'Unknown error')
     }
   }
 
@@ -164,6 +195,12 @@ export function ResumeUpload() {
                   className="px-12 py-3 border border-[#000000] rounded-full font-bold text-[#161616] hover:bg-gray-100 transition-colors"
                 >
                   Back
+                </button>
+                <button
+                  onClick={handleDebugData}
+                  className="px-6 py-3 border border-orange-500 text-orange-500 rounded-full font-bold hover:bg-orange-50 transition-colors"
+                >
+                  Debug Data
                 </button>
                 <button
                   onClick={handleComplete}
