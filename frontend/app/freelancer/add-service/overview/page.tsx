@@ -230,7 +230,7 @@ export default function AddServiceOverview() {
           <div className="flex justify-center mt-12">
             <button
               onClick={handleContinue}
-              className="px-12 py-3 bg-[#0B1F36] text-white rounded-full font-medium hover:bg-[#1a3a5f] transition-colors"
+              className="px-12 py-3 bg-rainbow-gradient text-white rounded-full font-medium hover:opacity-90 transition-opacity"
             >
               Continue
             </button>

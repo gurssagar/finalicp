@@ -216,7 +216,7 @@ export default function MyServices() {
     navigate.push(`/freelancer/update-service/${serviceId}/overview`)
   }
   const handleViewService = (serviceId: string) => {
-    navigate.push(`/service-preview/${serviceId}`)
+    navigate.push(`/freelancer/service-preview/${serviceId}`)
   }
   const handleDeleteService = async (serviceId: string) => {
     if (
@@ -294,7 +294,7 @@ export default function MyServices() {
                 Manage and update your service offerings
               </p>
             </div>
-            <Button onClick={handleAddService} className="flex items-center">
+            <Button onClick={handleAddService} className="flex items-center bg-[linear-gradient(to_right,_#44B0FF,_#973EEE,_#F12AE6,_#FF7039,_#F3BC3B)] text-white">
               <Plus size={18} className="mr-2" />
               Add New Service
             </Button>

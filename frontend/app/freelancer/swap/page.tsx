@@ -14,37 +14,37 @@ export default function ICPWorkSwap() {
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 mb-8">
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'swap' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'swap' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('swap')}
           >
             Swap
           </button>
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'liquidity' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'liquidity' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('liquidity')}
           >
             Liquidity
           </button>
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium flex items-center ${activeTab === 'earn' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium flex items-center ${activeTab === 'earn' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('earn')}
           >
             Earn <ChevronDown size={16} className="ml-1" />
           </button>
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'ck-bridge' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'ck-bridge' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('ck-bridge')}
           >
             ck-bridge
           </button>
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'info' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium ${activeTab === 'info' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('info')}
           >
             Info
           </button>
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium flex items-center ${activeTab === 'more' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium flex items-center ${activeTab === 'more' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveTab('more')}
           >
             More <ChevronDown size={16} className="ml-1" />
@@ -55,13 +55,13 @@ export default function ICPWorkSwap() {
         {/* Transaction History Tabs */}
         <div className="mt-8 flex gap-2">
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium ${activeHistoryTab === 'pending' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium ${activeHistoryTab === 'pending' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveHistoryTab('pending')}
           >
             Pending
           </button>
           <button
-            className={`px-6 py-2 rounded-full text-sm font-medium ${activeHistoryTab === 'history' ? 'bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+            className={`px-6 py-2 rounded-full text-sm font-medium ${activeHistoryTab === 'history' ? 'bg-rainbow-gradient text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}
             onClick={() => setActiveHistoryTab('history')}
           >
             History

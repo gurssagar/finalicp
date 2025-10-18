@@ -227,7 +227,7 @@ transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       <div className="mt-4 text-center">
         <p>
           Already Have an Account?{' '}
-          <a href="#" className="text-[#2ba24c] hover:underline">
+          <a href="/login" className="text-[#2ba24c] hover:underline">
             LogIn
           </a>
         </p>

@@ -619,7 +619,7 @@ export default function AddServiceOthers() {
           <div className="flex justify-center mt-12">
             <button
               onClick={handleContinue}
-              className="px-12 py-3 bg-[#0B1F36] text-white rounded-full font-medium hover:bg-[#1a3a5f] transition-colors flex items-center gap-2"
+              className="px-12 py-3 bg-rainbow-gradient text-white rounded-full font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               Preview Service Before Publishing
             </button>

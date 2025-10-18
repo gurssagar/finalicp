@@ -196,7 +196,7 @@ export default function AddServicePortfolio() {
             <button
               onClick={handleBrowseClick}
               disabled={uploadingImages}
-              className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-rainbow-gradient text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploadingImages ? 'Uploading...' : 'Browse Files'}
             </button>
@@ -321,7 +321,7 @@ export default function AddServicePortfolio() {
             <button
               onClick={handleContinue}
               disabled={uploadingImages}
-              className="px-12 py-3 bg-[#0B1F36] text-white rounded-full font-medium hover:bg-[#1a3a5f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-12 py-3 bg-rainbow-gradient text-white rounded-full font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploadingImages ? 'Please wait...' : 'Continue'}
             </button>

@@ -53,7 +53,7 @@ export function RevisionModal({
             </div>
           </div>
         </div>
-        <button onClick={handleSubmit} className="w-full py-3 bg-gradient-to-r from-blue-500 to-pink-500 text-white rounded-full font-medium hover:opacity-90 transition-opacity">
+        <button onClick={handleSubmit} className="w-full py-3 bg-rainbow-gradient text-white rounded-full font-medium hover:opacity-90 transition-opacity">
           Send
         </button>
       </div>

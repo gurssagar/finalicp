@@ -294,7 +294,7 @@ export default function PayAndLoans() {
                 <Download size={16} />
                 <span>Export</span>
               </button>
-              <button className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg">
+              <button className="flex items-center gap-2 bg-rainbow-gradient text-white px-4 py-2 rounded-lg">
                 <Plus size={16} />
                 <span>Add Funds</span>
               </button>

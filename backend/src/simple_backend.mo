@@ -1,6 +1,6 @@
 import Debug "mo:base/Debug";
 
-actor {
+persistent actor {
   public query func greet(name : Text) : async Text {
     Debug.print("Hello, " # name # "!");
     return "Hello, " # name # "! This is a simple canister.";

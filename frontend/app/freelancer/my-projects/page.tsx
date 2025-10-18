@@ -30,7 +30,7 @@ export default function MyProjectsPage() {
             </div>
             <div className="flex gap-4">
               <Link href="/freelancer/add-service">
-              <button className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-pink-500 text-white rounded-full font-medium hover:opacity-90 transition-opacity">
+              <button className="flex items-center gap-2 px-6 py-2 bg-rainbow-gradient text-white rounded-full font-medium hover:opacity-90 transition-opacity">
                 <Plus size={18} />
                 Post New Service
               </button>

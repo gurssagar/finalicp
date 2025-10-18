@@ -176,7 +176,7 @@ export function SwapInterface() {
           </button>
         </div>
         {/* Swap Button */}
-        <button className={`w-full py-3 rounded-lg text-white font-medium bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:opacity-90 transition-opacity ${!fromAmount || !toAmount ? 'opacity-70 cursor-not-allowed' : ''}`} disabled={!fromAmount || !toAmount}>
+        <button className={`w-full py-3 rounded-lg text-white font-medium bg-rainbow-gradient hover:opacity-90 transition-opacity ${!fromAmount || !toAmount ? 'opacity-70 cursor-not-allowed' : ''}`} disabled={!fromAmount || !toAmount}>
           Swap
         </button>
       </div>

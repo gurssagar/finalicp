@@ -116,7 +116,7 @@ export default function ServicePreview() {
             <button 
               onClick={handlePublish} 
               disabled={isSubmitting}
-              className="bg-[#0F1E36] text-white px-4 py-2 rounded-lg hover:bg-[#1a3a5f] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="bg-rainbow-gradient text-white px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isSubmitting && (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

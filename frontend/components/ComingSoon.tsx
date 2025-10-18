@@ -33,7 +33,7 @@ export function ComingSoon() {
         </h1>
         <Link
           href="/dashboard"
-          className="inline-block py-3 px-8 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-orange-500 text-white font-medium"
+          className="inline-block py-3 px-8 rounded-full bg-rainbow-gradient text-white font-medium"
         >
           Go Back
         </Link>

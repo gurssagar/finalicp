@@ -1,48 +1,11 @@
-'use client'    
-import React, { useEffect, useState } from 'react'
+'use client'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { ArrowLeft, Save, Eye, X } from 'lucide-react'
 import { ServiceNavigation } from '@/components/ServiceNavigation'
 import { ServiceTierCard } from '@/components/ServiceTierCard'
 import { useServiceForm } from '@/context/ServiceFormContext'
-// Demo service data
-const demoServiceData = {
-  id: '123',
-  serviceTitle: 'I will design modern UI/UX for your website or mobile app',
-  mainCategory: 'Web Designer',
-  subCategory: 'UI/UX Design',
-  description:
-    'Professional UI/UX design services with a focus on user-centered design principles. I create intuitive and visually appealing interfaces that enhance user experience and drive engagement.',
-  whatsIncluded:
-    'Wireframes, mockups, prototypes, and final design files in Figma or Adobe XD.',
-  tierMode: '3tier' as const,
-  basicTitle: 'Basic UI Design',
-  basicDescription:
-    'Get a clean, modern UI design for your website or app with basic interactions and up to 3 screens.',
-  basicDeliveryDays: '3',
-  basicPrice: '99',
-  advancedTitle: 'Standard UI/UX Design',
-  advancedDescription:
-    'Complete UI/UX design with user flows, wireframes, and up to 5 screens with interactive prototypes.',
-  advancedDeliveryDays: '5',
-  advancedPrice: '199',
-  premiumTitle: 'Premium UI/UX Design',
-  premiumDescription:
-    'Comprehensive UI/UX design package with user research, detailed flows, wireframes, and up to 10 screens with advanced interactions.',
-  premiumDeliveryDays: '10',
-  premiumPrice: '349',
-  coverImage:
-    'https://uploadthingy.s3.us-west-1.amazonaws.com/eNyRxVLVobM83YpzCrHjfv/Freelancer_Dashbioard-1.png',
-  portfolioImages: [
-    'https://uploadthingy.s3.us-west-1.amazonaws.com/kZfeCnW7QuCmCVUkX2pPwh/Organaise_Freelancer_Onboarding_-_24.png',
-    'https://uploadthingy.s3.us-west-1.amazonaws.com/qp3tESwnTVaoBnfmEwow3E/Organaise_Freelancer_Onboarding_-_23.png',
-    'https://uploadthingy.s3.us-west-1.amazonaws.com/ss8cKCzaCgwtXzPN1kWDWy/Freelancer_Dashbioard.png',
-  ],
-  clientQuestions: [
-    'What is the primary goal of your website/app?',
-    'Who is your target audience?',
-  ],
-}
+import { UpdateServiceNavigation } from '@/components/updateServiceNavigation'
 export default function UpdateService() {
   const navigate = useRouter()
   const { id, tab = 'overview' } = useParams<{
@@ -57,120 +20,159 @@ export default function UpdateService() {
   const [imageUrl, setImageUrl] = useState('')
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  // Get current user data
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        const data = await response.json()
+  // Memoize API endpoints to prevent unnecessary recreation
+  const serviceApiEndpoint = useMemo(() => `/api/marketplace/services/${id}`, [id])
+  const authApiEndpoint = useMemo(() => '/api/auth/me', [])
 
-        if (data.success && data.session) {
-          setUserId(data.session.userId)
-        } else {
-          setUserId(null)
-          setError('Please log in to update services')
-          setIsLoading(false)
-        }
-      } catch (error) {
-        console.error('Error checking authentication:', error)
+  // Memoize service update payload to prevent unnecessary recreations
+  const serviceUpdatePayload = useMemo(() => ({
+    title: formData.serviceTitle,
+    main_category: formData.mainCategory,
+    sub_category: formData.subCategory,
+    description: formData.description,
+    whats_included: formData.whatsIncluded,
+    cover_image_url: formData.coverImage,
+    portfolio_images: formData.portfolioImages,
+    status: 'Active'
+  }), [
+    formData.serviceTitle,
+    formData.mainCategory,
+    formData.subCategory,
+    formData.description,
+    formData.whatsIncluded,
+    formData.coverImage,
+    formData.portfolioImages
+  ])
+
+  // Memoize authentication check function
+  const checkAuth = useCallback(async () => {
+    try {
+      const response = await fetch(authApiEndpoint)
+      const data = await response.json()
+
+      if (data.success && data.session) {
+        setUserId(data.session.userId)
+      } else {
         setUserId(null)
-        setError('Failed to authenticate')
+        setError('Please log in to update services')
         setIsLoading(false)
       }
+    } catch (error) {
+      console.error('Error checking authentication:', error)
+      setUserId(null)
+      setError('Failed to authenticate')
+      setIsLoading(false)
+    }
+  }, [authApiEndpoint])
+
+  // Get current user data
+  useEffect(() => {
+    let isMounted = true
+
+    const performAuthCheck = async () => {
+      if (!isMounted) return
+      await checkAuth()
     }
 
-    checkAuth()
-  }, [])
+    performAuthCheck()
+
+    return () => {
+      isMounted = false
+    }
+  }, [checkAuth])
+
+  // Memoize service data transformation
+  const transformServiceData = useCallback((service: any) => ({
+    id: service.service_id,
+    serviceTitle: service.title,
+    mainCategory: service.main_category,
+    subCategory: service.sub_category,
+    description: service.description,
+    whatsIncluded: service.whats_included,
+    coverImage: service.cover_image_url || '/default-service.svg',
+    portfolioImages: service.portfolio_images || [],
+    tierMode: '3tier' as const,
+    basicTitle: 'Basic Package',
+    basicDescription: service.whats_included,
+    basicDeliveryDays: '3',
+    basicPrice: '99',
+    advancedTitle: 'Standard Package',
+    advancedDescription: 'Enhanced service with additional features',
+    advancedDeliveryDays: '5',
+    advancedPrice: '199',
+    premiumTitle: 'Premium Package',
+    premiumDescription: 'Complete service with all features and priority support',
+    premiumDeliveryDays: '7',
+    premiumPrice: '349',
+    clientQuestions: [
+      { id: '1', type: 'text', question: 'What is the primary goal of your project?', required: true },
+      { id: '2', type: 'text', question: 'Do you have any specific requirements or preferences?', required: false },
+    ],
+    faqs: []
+  }), [])
+
+  // Memoize service data fetching function
+  const fetchServiceData = useCallback(async () => {
+    if (!userId || !id) return
+
+    try {
+      const response = await fetch(serviceApiEndpoint)
+      const data = await response.json()
+
+      if (data.success && data.data) {
+        const service = data.data
+        const transformedData = transformServiceData(service)
+        updateFormData(transformedData)
+      } else {
+        setError(data.error || 'Failed to load service data')
+      }
+    } catch (error) {
+      console.error('Error fetching service data:', error)
+      setError('Failed to load service data')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [userId, id, serviceApiEndpoint, transformServiceData, updateFormData])
 
   // Fetch service data from API
   useEffect(() => {
-    if (!userId || !id) return
+    let isMounted = true
 
-    const fetchServiceData = async () => {
-      try {
-        const response = await fetch(`/api/marketplace/services/${id}`)
-        const data = await response.json()
-
-        if (data.success && data.data) {
-          const service = data.data
-
-          // Transform API data to form format
-          const transformedData = {
-            id: service.service_id,
-            serviceTitle: service.title,
-            mainCategory: service.main_category,
-            subCategory: service.sub_category,
-            description: service.description,
-            whatsIncluded: service.whats_included,
-            coverImage: service.cover_image_url || '/default-service.svg',
-            portfolioImages: service.portfolio_images || [],
-            tierMode: '3tier' as const,
-            basicTitle: 'Basic Package',
-            basicDescription: service.whats_included,
-            basicDeliveryDays: '3',
-            basicPrice: '99',
-            advancedTitle: 'Standard Package',
-            advancedDescription: 'Enhanced service with additional features',
-            advancedDeliveryDays: '5',
-            advancedPrice: '199',
-            premiumTitle: 'Premium Package',
-            premiumDescription: 'Complete service with all features and priority support',
-            premiumDeliveryDays: '7',
-            premiumPrice: '349',
-            clientQuestions: [
-              { id: '1', type: 'text', question: 'What is the primary goal of your project?', required: true },
-              { id: '2', type: 'text', question: 'Do you have any specific requirements or preferences?', required: false },
-            ],
-            faqs: []
-          }
-
-          updateFormData(transformedData)
-        } else {
-          setError(data.error || 'Failed to load service data')
-        }
-      } catch (error) {
-        console.error('Error fetching service data:', error)
-        setError('Failed to load service data')
-      } finally {
-        setIsLoading(false)
-      }
+    const performFetch = async () => {
+      if (!isMounted) return
+      await fetchServiceData()
     }
 
-    fetchServiceData()
-  }, [id, userId, updateFormData])
-  const handleBack = () => {
+    performFetch()
+
+    return () => {
+      isMounted = false
+    }
+  }, [fetchServiceData])
+  // Memoize navigation handlers
+  const handleBack = useCallback(() => {
     navigate.push('/freelancer/my-services')
-  }
-  const handlePreview = () => {
+  }, [navigate])
+
+  const handlePreview = useCallback(() => {
     navigate.push(`/freelancer/update-service/${id}/service-preview`)
-  }
-  const handleSave = async () => {
+  }, [navigate, id])
+  // Memoize save handler with optimized payload
+  const handleSave = useCallback(async () => {
     if (!userId || !id) {
       setError('User authentication required')
       return
     }
 
     try {
-      // Transform form data to API format
-      const serviceUpdates = {
-        title: formData.serviceTitle,
-        main_category: formData.mainCategory,
-        sub_category: formData.subCategory,
-        description: formData.description,
-        whats_included: formData.whatsIncluded,
-        cover_image_url: formData.coverImage,
-        portfolio_images: formData.portfolioImages,
-        status: 'Active'
-      }
-
-      const response = await fetch(`/api/marketplace/services/${id}`, {
+      const response = await fetch(serviceApiEndpoint, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           userId: userId,
-          updates: serviceUpdates
+          updates: serviceUpdatePayload
         })
       })
 
@@ -186,8 +188,9 @@ export default function UpdateService() {
       console.error('Error saving service:', error)
       setError('Failed to save changes. Please try again.')
     }
-  }
-  const handleInputChange = (
+  }, [userId, id, serviceApiEndpoint, serviceUpdatePayload])
+  // Memoize input change handler
+  const handleInputChange = useCallback((
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
     >,
@@ -197,8 +200,10 @@ export default function UpdateService() {
       [name]: value,
     })
     setSaved(name, true)
-  }
-  const handleAddQuestion = () => {
+  }, [updateFormData, setSaved])
+
+  // Memoize question handlers
+  const handleAddQuestion = useCallback(() => {
     if (newQuestion.trim()) {
       const updatedQuestions = [
         ...(formData.clientQuestions || []),
@@ -215,16 +220,19 @@ export default function UpdateService() {
       setSaved('clientQuestions', true)
       setNewQuestion('')
     }
-  }
-  const handleRemoveQuestion = (index: number) => {
+  }, [newQuestion, formData.clientQuestions, updateFormData, setSaved])
+
+  const handleRemoveQuestion = useCallback((index: number) => {
     const updatedQuestions = [...(formData.clientQuestions || [])]
     updatedQuestions.splice(index, 1)
     updateFormData({
       clientQuestions: updatedQuestions,
     })
     setSaved('clientQuestions', true)
-  }
-  const handleAddImage = () => {
+  }, [formData.clientQuestions, updateFormData, setSaved])
+
+  // Memoize image handlers
+  const handleAddImage = useCallback(() => {
     if (imageUrl.trim()) {
       const updatedImages = [
         ...(formData.portfolioImages || []),
@@ -236,21 +244,23 @@ export default function UpdateService() {
       setSaved('portfolioImages', true)
       setImageUrl('')
     }
-  }
-  const handleRemoveImage = (index: number) => {
+  }, [imageUrl, formData.portfolioImages, updateFormData, setSaved])
+
+  const handleRemoveImage = useCallback((index: number) => {
     const updatedImages = [...(formData.portfolioImages || [])]
     updatedImages.splice(index, 1)
     updateFormData({
       portfolioImages: updatedImages,
     })
     setSaved('portfolioImages', true)
-  }
-  const handleSetCoverImage = (url: string) => {
+  }, [formData.portfolioImages, updateFormData, setSaved])
+
+  const handleSetCoverImage = useCallback((url: string) => {
     updateFormData({
       coverImage: url,
     })
     setSaved('coverImage', true)
-  }
+  }, [updateFormData, setSaved])
   // Render loading state
   if (isLoading) {
     return (
@@ -436,7 +446,7 @@ export default function UpdateService() {
             </button>
           </div>
         )}
-        <ServiceNavigation activeTab={tab as any} />
+        <UpdateServiceNavigation activeTab={tab as any} />
         <div className="mt-6">
           {tab === 'overview' && (
             <div className="space-y-6">

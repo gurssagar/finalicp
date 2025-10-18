@@ -127,7 +127,7 @@ export default function ProjectDetailsPage() {
                     </button>
                   </div>)}
               </div>
-              <button onClick={handleSubmitProject} className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-500 to-pink-500 text-white rounded-full font-medium hover:opacity-90 transition-opacity">
+              <button onClick={handleSubmitProject} className="w-full sm:w-auto px-8 py-3 bg-rainbow-gradient text-white rounded-full font-medium hover:opacity-90 transition-opacity">
                 Submit Project
               </button>
             </div>

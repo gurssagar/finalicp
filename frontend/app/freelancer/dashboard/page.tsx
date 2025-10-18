@@ -89,7 +89,7 @@ export default function DashboardHome() {
                 Available
               </div>
               <Link href="/freelancer/add-service"> 
-              <button className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg">
+              <button className="flex items-center gap-2 bg-rainbow-gradient text-white px-4 py-2 rounded-lg">
                 <Plus size={16} />
                 <span>New Service</span>
               </button>
