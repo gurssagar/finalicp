@@ -30,7 +30,7 @@ const LoginForm = () => {
       const result = await response.json();
 
       if (result.success) {
-        router.push('/freelancer/dashboard');
+        router.push('/clientorfreelancer');
       } else {
         setError(result.error || 'An error occurred');
       }

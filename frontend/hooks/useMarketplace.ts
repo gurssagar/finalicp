@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 // Types
 export interface Service {
   service_id: string;
-  freelancer_id: string;
+  freelancer_email: string;
   title: string;
   main_category: string;
   sub_category: string;
@@ -68,7 +68,7 @@ export interface Stage {
 }
 
 // Service Hooks
-export function useServices(freelancerId?: string, filters?: any) {
+export function useServices(filters?: any) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +76,11 @@ export function useServices(freelancerId?: string, filters?: any) {
   const fetchServices = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
       const queryParams = new URLSearchParams();
       if (filters?.category) queryParams.append('category', filters.category);
-      if (filters?.freelancer_id) queryParams.append('freelancer_id', filters.freelancer_id);
+      if (filters?.freelancer_email) queryParams.append('freelancer_email', filters.freelancer_email);
       if (filters?.search_term) queryParams.append('search_term', filters.search_term);
       if (filters?.limit) queryParams.append('limit', filters.limit.toString());
       if (filters?.offset) queryParams.append('offset', filters.offset.toString());
@@ -111,7 +111,7 @@ export function useCreateService() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createService = useCallback(async (userId: string, serviceData: any) => {
+  const createService = useCallback(async (userEmail: string, serviceData: any) => {
     setLoading(true);
     setError(null);
 
@@ -119,7 +119,7 @@ export function useCreateService() {
       const response = await fetch('/api/marketplace/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, serviceData }),
+        body: JSON.stringify({ userEmail, serviceData }),
       });
 
       const data = await response.json();

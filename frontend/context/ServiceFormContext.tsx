@@ -11,6 +11,7 @@ interface ServiceFormData {
   mainCategory: string;
   subCategory: string;
   description: string;
+  descriptionFormat: 'plain' | 'markdown'; // Track format type
   whatsIncluded: string;
   // Projects
   tierMode: '1tier' | '3tier';
@@ -52,7 +53,7 @@ interface ServiceFormContextType {
     [key: string]: boolean;
   };
   setSaved: (field: string, value: boolean) => void;
-  submitService: (userId: string) => Promise<{ success: boolean; serviceId?: string; error?: string }>;
+  submitService: (userEmail: string) => Promise<{ success: boolean; serviceId?: string; error?: string }>;
   isSubmitting: boolean;
   uploadCoverImage: (file: File) => Promise<UploadResult>;
   uploadPortfolioImages: (files: File[]) => Promise<UploadResult[]>;
@@ -67,6 +68,7 @@ const defaultFormData: ServiceFormData = {
   mainCategory: 'Web Designer',
   subCategory: '',
   description: '',
+  descriptionFormat: 'markdown',
   whatsIncluded: '',
   tierMode: '3tier',
   basicTitle: '',
@@ -280,7 +282,7 @@ export const ServiceFormProvider: React.FC<{
     }
   };
 
-  const submitService = async (userId: string) => {
+  const submitService = async (userEmail: string) => {
     setIsSubmitting(true);
     setSubmissionError(null);
 
@@ -292,27 +294,109 @@ export const ServiceFormProvider: React.FC<{
         return { success: false, error };
       }
 
+      // Validate description
+      if (!formData.description || formData.description.trim().length < 50) {
+        const error = 'Service description must be at least 50 characters long';
+        setSubmissionError(error);
+        return { success: false, error };
+      }
+
       if (!formData.basicTitle || !formData.basicPrice) {
         const error = 'Package title and price are required';
         setSubmissionError(error);
         return { success: false, error };
       }
 
-      // Create service using marketplace canister
+      // Validate user email
+      if (!userEmail) {
+        const error = 'User email is required';
+        setSubmissionError(error);
+        return { success: false, error };
+      }
+
+      // Create packages array for embedding in service data
+      const packages = [];
+
+      if (formData.tierMode === '3tier') {
+        // Create Basic package
+        if (formData.basicTitle && formData.basicPrice) {
+          packages.push({
+            package_id: `package-${Date.now()}-basic`,
+            tier: 'Basic',
+            title: formData.basicTitle,
+            description: formData.basicDescription || 'Basic package service',
+            price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
+            delivery_days: parseInt(formData.basicDeliveryDays) || 1,
+            features: [],
+            revisions_included: 1,
+            status: 'Available'
+          });
+        }
+
+        // Create Advanced package
+        if (formData.advancedTitle && formData.advancedPrice) {
+          packages.push({
+            package_id: `package-${Date.now()}-advanced`,
+            tier: 'Advanced',
+            title: formData.advancedTitle,
+            description: formData.advancedDescription || 'Advanced package service',
+            price_e8s: Math.round(parseFloat(formData.advancedPrice) * 100000000),
+            delivery_days: parseInt(formData.advancedDeliveryDays) || 3,
+            features: [],
+            revisions_included: 2,
+            status: 'Available'
+          });
+        }
+
+        // Create Premium package
+        if (formData.premiumTitle && formData.premiumPrice) {
+          packages.push({
+            package_id: `package-${Date.now()}-premium`,
+            tier: 'Premium',
+            title: formData.premiumTitle,
+            description: formData.premiumDescription || 'Premium package service',
+            price_e8s: Math.round(parseFloat(formData.premiumPrice) * 100000000),
+            delivery_days: parseInt(formData.premiumDeliveryDays) || 7,
+            features: [],
+            revisions_included: 3,
+            status: 'Available'
+          });
+        }
+      } else {
+        // Single tier - create one package
+        if (formData.basicTitle && formData.basicPrice) {
+          packages.push({
+            package_id: `package-${Date.now()}-single`,
+            tier: 'Basic',
+            title: formData.basicTitle || 'Service Package',
+            description: formData.basicDescription || 'Professional service offering',
+            price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
+            delivery_days: parseInt(formData.basicDeliveryDays) || 1,
+            features: [],
+            revisions_included: 1,
+            status: 'Available'
+          });
+        }
+      }
+
+      // Create service using marketplace canister with complete form data
       const serviceData = {
         title: formData.serviceTitle,
         main_category: formData.mainCategory,
         sub_category: formData.subCategory || 'General',
         description: formData.description || 'Professional service offering',
+        description_format: formData.descriptionFormat,
         whats_included: formData.whatsIncluded || 'Quality service delivery',
         cover_image_url: formData.coverImage || '',
         portfolio_images: formData.portfolioImages,
         faqs: formData.faqs,
         client_questions: formData.clientQuestions,
+        tier_mode: formData.tierMode,
+        packages: packages,
         status: 'Active'
       };
 
-      const serviceResult = await createService(userId, serviceData);
+      const serviceResult = await createService(userEmail, serviceData);
 
       if (!serviceResult.success) {
         const error = serviceResult.error || 'Failed to create service';
@@ -327,83 +411,17 @@ export const ServiceFormProvider: React.FC<{
         return { success: false, error };
       }
 
-      // Create packages based on tier mode using marketplace canister
-      const packages = [];
-
-      if (formData.tierMode === '3tier') {
-        // Create Basic package
-        if (formData.basicTitle && formData.basicPrice) {
-          const basicPackage = await createPackage(userId, {
-            service_id: serviceId,
-            tier: 'Basic',
-            title: formData.basicTitle,
-            description: formData.basicDescription || 'Basic package service',
-            price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000), // Convert ICP to e8s
-            delivery_days: parseInt(formData.basicDeliveryDays) || 1,
-            features: [],
-            revisions_included: 1,
-            status: 'Available'
-          });
-          if (basicPackage.success) packages.push(basicPackage.data);
-        }
-
-        // Create Advanced package
-        if (formData.advancedTitle && formData.advancedPrice) {
-          const advancedPackage = await createPackage(userId, {
-            service_id: serviceId,
-            tier: 'Advanced',
-            title: formData.advancedTitle,
-            description: formData.advancedDescription || 'Advanced package service',
-            price_e8s: Math.round(parseFloat(formData.advancedPrice) * 100000000),
-            delivery_days: parseInt(formData.advancedDeliveryDays) || 3,
-            features: [],
-            revisions_included: 2,
-            status: 'Available'
-          });
-          if (advancedPackage.success) packages.push(advancedPackage.data);
-        }
-
-        // Create Premium package
-        if (formData.premiumTitle && formData.premiumPrice) {
-          const premiumPackage = await createPackage(userId, {
-            service_id: serviceId,
-            tier: 'Premium',
-            title: formData.premiumTitle,
-            description: formData.premiumDescription || 'Premium package service',
-            price_e8s: Math.round(parseFloat(formData.premiumPrice) * 100000000),
-            delivery_days: parseInt(formData.premiumDeliveryDays) || 7,
-            features: [],
-            revisions_included: 3,
-            status: 'Available'
-          });
-          if (premiumPackage.success) packages.push(premiumPackage.data);
-        }
-      } else {
-        // Single tier - create one package
-        const singlePackage = await createPackage(userId, {
-          service_id: serviceId,
-          tier: 'Basic',
-          title: formData.basicTitle || 'Service Package',
-          description: formData.basicDescription || 'Professional service offering',
-          price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
-          delivery_days: parseInt(formData.basicDeliveryDays) || 1,
-          features: [],
-          revisions_included: 1,
-          status: 'Available'
-        });
-        if (singlePackage.success) packages.push(singlePackage.data);
-      }
-
       // Store the created service ID
       setCreatedServiceId(serviceId);
 
       // Clear form data after successful submission
       // We'll do this in the UI after navigation to avoid losing the serviceId
-      
+
       return {
         success: true,
         serviceId,
-        packages: packages.length
+        packages: packages.length,
+        serviceData: serviceData
       };
 
     } catch (error) {

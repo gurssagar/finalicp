@@ -156,25 +156,25 @@ export default function AddServiceOthers() {
   }
 
   const handleSubmitService = async () => {
-    // Get user ID from session
-    let userId: string | null = null;
+    // Get user email from session
+    let userEmail: string | null = null;
     try {
       const response = await fetch('/api/auth/me');
       const data = await response.json();
-      
+
       if (data.success && data.session) {
-        userId = data.session.userId;
+        userEmail = data.session.email;
       }
     } catch (error) {
       console.error('Error checking authentication:', error);
     }
 
-    if (!userId) {
+    if (!userEmail) {
       alert('Please log in to submit your service')
       return
     }
 
-    const result = await submitService(userId)
+    const result = await submitService(userEmail)
 
     if (result.success) {
       setSubmittedSuccessfully(true)

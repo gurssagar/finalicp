@@ -25,20 +25,20 @@ export default function ServicePreview() {
     navigate.push('/freelancer/add-service/others');
   };
   const handlePublish = async () => {
-    // Get userId from session
-    let userId: string | null = null;
+    // Get user email from session
+    let userEmail: string | null = null;
     try {
       const response = await fetch('/api/auth/me');
       const data = await response.json();
-      
+
       if (data.success && data.session) {
-        userId = data.session.userId;
+        userEmail = data.session.email;
       }
     } catch (error) {
       console.error('Error checking authentication:', error);
     }
-    
-    if (!userId) {
+
+    if (!userEmail) {
       setNotification({
         type: 'error',
         title: 'Authentication Required',
@@ -48,7 +48,7 @@ export default function ServicePreview() {
     }
 
     // submitService already saves to marketplace canister via createService
-    const result = await submitService(userId);
+    const result = await submitService(userEmail);
     
     if (result.success) {
       // Show success notification

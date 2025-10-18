@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { ServiceNavigation } from '@/components/ServiceNavigation';
 import { useServiceForm } from '@/context/ServiceFormContext';
 import { Plus, Circle, CheckCircle, Square, ChevronDown, File, Check, HelpCircle, X } from 'lucide-react';
+import Image from 'next/image';
 type QuestionType = 'text' | 'file' | 'mcq' | 'checkbox' | 'dropdown';
 interface Question {
   id: number;
@@ -174,14 +175,8 @@ export default function AddServiceOthers() {
   };
   return <div className="flex flex-col min-h-screen bg-white">
       <header className="flex justify-between items-center p-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <svg width="40" height="32" viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20.0001 0L0 11.5556V23.1111L20.0001 11.5556L40.0001 23.1111V11.5556L20.0001 0Z" fill="#FF3B30" />
-            <path d="M0 23.1111L20.0001 11.5555V23.1111V34.6667L0 23.1111Z" fill="#34C759" />
-            <path d="M40.0001 23.1111L20.0001 11.5555V23.1111V34.6667L40.0001 23.1111Z" fill="#007AFF" />
-          </svg>
-          <span className="ml-2 font-bold text-xl text-[#161616]">ICPWork</span>
-        </div>
+                <Image src="https://uploadthingy.s3.us-west-1.amazonaws.com/vjMzkkC8QuLABm1koFUeNQ/Group_1865110117.png" alt="ICPWork Logo" width={100} height={100} />
+
         <button className="px-8 py-2 rounded-full border border-gray-300 text-gray-800 hover:bg-gray-50">
           Exit
         </button>

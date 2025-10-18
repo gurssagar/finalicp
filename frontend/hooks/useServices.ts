@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export interface Service {
   service_id: string;
-  freelancer_id: string;
+  freelancer_email: string;
   title: string;
   main_category: string;
   sub_category: string;
   description: string;
+  description_format?: 'plain' | 'markdown';
   whats_included: string;
   cover_image_url?: string;
   portfolio_images: string[];
@@ -21,7 +22,6 @@ export interface Service {
 
 export interface ServiceFilters {
   category?: string;
-  freelancer_id?: string;
   freelancer_email?: string;
   search_term?: string;
   limit?: number;
@@ -58,7 +58,6 @@ export function useServices(freelancerId?: string, filters?: ServiceFilters) {
   // Memoize filters to prevent infinite re-renders
   const memoizedFilters = useMemo(() => filters, [
     filters?.category,
-    filters?.freelancer_id,
     filters?.freelancer_email,
     filters?.search_term,
     filters?.limit,
@@ -72,13 +71,6 @@ export function useServices(freelancerId?: string, filters?: ServiceFilters) {
     try {
       const queryParams = new URLSearchParams();
       if (memoizedFilters?.category) queryParams.append('category', memoizedFilters.category);
-      
-      // Only use freelancer_id if we don't have an email filter
-      if (!memoizedFilters?.freelancer_email) {
-        if (freelancerId) queryParams.append('freelancer_id', freelancerId);
-        if (memoizedFilters?.freelancer_id) queryParams.append('freelancer_id', memoizedFilters.freelancer_id);
-      }
-      
       if (memoizedFilters?.freelancer_email) queryParams.append('freelancer_email', memoizedFilters.freelancer_email);
       if (memoizedFilters?.search_term) queryParams.append('search_term', memoizedFilters.search_term);
       if (memoizedFilters?.limit) queryParams.append('limit', memoizedFilters.limit.toString());
@@ -97,7 +89,7 @@ export function useServices(freelancerId?: string, filters?: ServiceFilters) {
     } finally {
       setLoading(false);
     }
-  }, [freelancerId, memoizedFilters]);
+  }, [memoizedFilters]);
 
   useEffect(() => {
     fetchServices();
@@ -110,7 +102,7 @@ export function useCreateService() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const createService = useCallback(async (userId: string, serviceData: CreateServiceData) => {
+  const createService = useCallback(async (userEmail: string, serviceData: CreateServiceData) => {
     setLoading(true);
     setError(null);
 
@@ -121,7 +113,7 @@ export function useCreateService() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
+          userEmail,
           serviceData,
         }),
       });
@@ -149,7 +141,7 @@ export function useUpdateService() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateService = useCallback(async (userId: string, serviceId: string, updates: UpdateServiceData) => {
+  const updateService = useCallback(async (userEmail: string, serviceId: string, updates: UpdateServiceData) => {
     setLoading(true);
     setError(null);
 
@@ -160,7 +152,7 @@ export function useUpdateService() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
+          userEmail,
           updates,
         }),
       });
@@ -188,7 +180,7 @@ export function useDeleteService() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const deleteService = useCallback(async (userId: string, serviceId: string) => {
+  const deleteService = useCallback(async (userEmail: string, serviceId: string) => {
     setLoading(true);
     setError(null);
 
@@ -199,7 +191,7 @@ export function useDeleteService() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
+          userEmail,
         }),
       });
 

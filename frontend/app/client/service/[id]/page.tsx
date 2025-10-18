@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Share2, Check, Star, Clock, DollarSign } from 'lucide-react';
 import { useServices } from '@/hooks/useServices';
-import { usePackages, useBookPackage } from '@/hooks/usePackages';
+import { useBookPackage } from '@/hooks/usePackages';
 export default function ServiceDetails() {
   const navigate = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -39,8 +39,7 @@ export default function ServiceDetails() {
     }
   }, [id]);
 
-  // Fetch packages for this service
-  const { packages, loading: packagesLoading } = usePackages(id);
+  // Packages are now embedded in service data, no separate fetch needed
 
   // Book package hook
   const { bookPackage, loading: bookingLoading } = useBookPackage();
@@ -51,9 +50,9 @@ export default function ServiceDetails() {
       return;
     }
 
-    const userId = 'TEST_USER_123'; // TODO: Get from auth context
+    const userEmail = 'test@example.com'; // TODO: Get from auth context
     
-    const result = await bookPackage(userId, packageId, bookingNotes);
+    const result = await bookPackage(userEmail, packageId, bookingNotes);
     
     if (result.success) {
       alert('Package booked successfully!');
@@ -83,105 +82,105 @@ export default function ServiceDetails() {
     );
   }
 
-  // Mock data for UI components that need it
-  const mockService = {
+  // Prepare real service data for display
+  const serviceData = {
     id: service.service_id,
     title: service.title,
     seller: {
-      name: `Freelancer ${service.freelancer_id.slice(-4)}`,
+      name: `Freelancer ${service.freelancer_email ? service.freelancer_email.split('@')[0] : 'Unknown'}`,
       location: 'Remote',
       joinedYear: '2023',
       avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=300&auto=format&fit=crop',
       rating: service.rating_avg,
       reviews: `${service.total_orders}+`
     },
-    images: service.portfolio_images.length > 0 ? service.portfolio_images : ["/default-service.svg"],
+    images: service.portfolio_images.length > 0 ? service.portfolio_images : [service.cover_image_url || "/default-service.svg"],
     description: service.description,
-    features: service.whats_included.split(',').map((item: string) => item.trim()),
-    additionalInfo: [service.description],
-    tiers: packages.reduce((acc: any, pkg: any) => {
+    features: service.whats_included ? service.whats_included.split(',').map((item: string) => item.trim()) : [],
+    additionalInfo: service.description ? [service.description] : [],
+    tiers: service.packages ? service.packages.reduce((acc: any, pkg: any) => {
       acc[pkg.tier.toLowerCase()] = {
         name: pkg.tier,
         price: pkg.price_e8s / 100000000, // Convert from e8s to ICP
         description: pkg.description,
         deliveryDays: pkg.delivery_days,
-        revisions: pkg.revisions_included
+        revisions: pkg.revisions_included,
+        packageId: pkg.package_id
       };
       return acc;
-    }, {}),
-    tierComparison: {
-      headers: ['Service Tiers', 'Basic', 'Advanced', 'Premium'],
-      rows: [['Delivery Days', '7 Days', '7 Days', '7 Days'], ['Source Files', '✓', '✓', '✓'], ['Optional Add-ons', '', '', '✓']]
-    },
-    faqs: [{
-      question: "How do I become a part of Organised's freelance network?",
-      answer: 'Joining our network starts with an application. We meticulously review your expertise, portfolio, and professional background.'
-    }, {
-      question: 'What does the vetting process involve?',
-      answer: 'Our vetting process includes portfolio review, technical assessment, and an interview with our team to ensure you meet our quality standards.'
-    }, {
-      question: 'Are there opportunities for professional growth within Organised?',
-      answer: 'Yes, we offer ongoing training, mentorship programs, and access to a community of professionals to help you grow your skills and career.'
-    }],
-    similarServices: [{
-      id: 101,
-      title: 'It is a long established fact that a reader will be distracted by the readable content',
-      image: "/Freelancer_Dashbioard-1.png",
-      seller: 'Kenneth Allen',
-      rating: 4.8,
-      reviews: '1.2K+',
-      price: 100
-    }, {
-      id: 102,
-      title: 'It is a long established fact that a reader will be distracted by the readable content',
-      image: "/Organaise_Freelancer_Onboarding_-_24.png",
-      seller: 'Kenneth Allen',
-      rating: 4.8,
-      reviews: '1.2K+',
-      price: 100
-    }, {
-      id: 103,
-      title: 'It is a long established fact that a reader will be distracted by the readable content',
-      image: "/Organaise_Freelancer_Onboarding_-_25.png",
-      seller: 'Kenneth Allen',
-      rating: 4.8,
-      reviews: '1.2K+',
-      price: 100
-    }],
-    comments: [{
-      user: 'Jane Doe',
-      rating: 5,
-      comment: "I really appreciate the insights and perspective shared in this article. It's definitely given me something to think about and has helped me see things from a different angle."
-    }, {
-      user: 'Jane Doe',
-      rating: 5,
-      comment: 'I really appreciate the insights and perspective shared in this article.'
-    }],
+    }, {}) : {},
+    tierComparison: generateTierComparison(service.packages || []),
+    faqs: service.faqs || [],
+    similarServices: service.similarServices || [],
+    comments: [], // TODO: Implement real reviews later
     ratings: {
-      average: 4.8,
-      total: 2355,
-      distribution: [{
-        stars: 5,
-        percentage: 70
-      }, {
-        stars: 4,
-        percentage: 20
-      }, {
-        stars: 3,
-        percentage: 10
-      }, {
-        stars: 2,
-        percentage: 0
-      }, {
-        stars: 1,
-        percentage: 0
-      }]
+      average: service.rating_avg || 0,
+      total: service.total_orders || 0,
+      distribution: generateRatingDistribution(service.rating_avg || 0, service.total_orders || 0)
     }
   };
+
+  // Helper function to generate tier comparison from real package data
+  function generateTierComparison(packages: any[]) {
+    const tiers = packages.map(pkg => pkg.tier);
+    const headers = ['Service Tiers', ...tiers];
+
+    const rows = [];
+
+    // Delivery days row
+    rows.push([
+      'Delivery Days',
+      ...packages.map(pkg => `${pkg.delivery_days} Days`)
+    ]);
+
+    // Revisions row
+    rows.push([
+      'Revisions Included',
+      ...packages.map(pkg => `${pkg.revisions_included}`)
+    ]);
+
+    // Features comparison
+    const allFeatures = new Set<string>();
+    packages.forEach(pkg => {
+      pkg.features.forEach((feature: string) => allFeatures.add(feature));
+    });
+
+    allFeatures.forEach(feature => {
+      rows.push([
+        feature,
+        ...packages.map(pkg => pkg.features.includes(feature) ? '✓' : '')
+      ]);
+    });
+
+    return { headers, rows };
+  }
+
+  // Helper function to generate rating distribution
+  function generateRatingDistribution(averageRating: number, totalRatings: number) {
+    if (totalRatings === 0) {
+      return [
+        { stars: 5, percentage: 0 },
+        { stars: 4, percentage: 0 },
+        { stars: 3, percentage: 0 },
+        { stars: 2, percentage: 0 },
+        { stars: 1, percentage: 0 }
+      ];
+    }
+
+    // Simple distribution based on average rating
+    const basePercentage = averageRating * 20;
+    return [
+      { stars: 5, percentage: Math.round(basePercentage) },
+      { stars: 4, percentage: Math.round((100 - basePercentage) * 0.6) },
+      { stars: 3, percentage: Math.round((100 - basePercentage) * 0.3) },
+      { stars: 2, percentage: Math.round((100 - basePercentage) * 0.08) },
+      { stars: 1, percentage: Math.round((100 - basePercentage) * 0.02) }
+    ];
+  }
   const handleContinue = async () => {
-    // Find the selected package
-    const selectedPackage = packages.find(pkg => pkg.tier.toLowerCase() === selectedTier);
-    
+    // Find the selected package from embedded data
+    const selectedPackage = service.packages ? service.packages.find(pkg => pkg.tier.toLowerCase() === selectedTier) : null;
+
     if (!selectedPackage) {
       alert('Please select a package');
       return;
@@ -196,10 +195,10 @@ export default function ServiceDetails() {
     setExpandedFaq(expandedFaq === index ? null : index);
   };
   const goToPreviousImage = () => {
-    setCurrentImageIndex(prev => prev === 0 ? service.images.length - 1 : prev - 1);
+    setCurrentImageIndex(prev => prev === 0 ? serviceData.images.length - 1 : prev - 1);
   };
   const goToNextImage = () => {
-    setCurrentImageIndex(prev => prev === service.images.length - 1 ? 0 : prev + 1);
+    setCurrentImageIndex(prev => prev === serviceData.images.length - 1 ? 0 : prev + 1);
   };
   return <div className="min-h-screen bg-white">
       {/* Header */}
@@ -212,20 +211,20 @@ export default function ServiceDetails() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <h1 className="text-xl md:text-2xl font-semibold mb-4">
-              {service.title}
+              {serviceData.title}
             </h1>
             <div className="flex items-center mb-6">
-              <img src={service.seller.avatar} alt={service.seller.name} className="w-10 h-10 rounded-full mr-3" />
+              <img src={serviceData.seller.avatar} alt={serviceData.seller.name} className="w-10 h-10 rounded-full mr-3" />
               <div>
-                <p className="font-medium">{service.seller.name}</p>
+                <p className="font-medium">{serviceData.seller.name}</p>
                 <div className="flex flex-wrap items-center text-sm text-gray-600">
                   <span>
-                    {service.seller.location} - {service.seller.joinedYear}
+                    {serviceData.seller.location} - {serviceData.seller.joinedYear}
                   </span>
                   <div className="flex items-center ml-2">
                     <span className="text-yellow-500">★</span>
-                    <span className="ml-1">{service.seller.rating}</span>
-                    <span className="ml-1">({service.seller.reviews})</span>
+                    <span className="ml-1">{serviceData.seller.rating}</span>
+                    <span className="ml-1">({serviceData.seller.reviews})</span>
                   </div>
                   <span className="ml-2">1 contract in queue</span>
                 </div>
@@ -234,8 +233,8 @@ export default function ServiceDetails() {
             {/* Image gallery */}
             <div className="mb-8">
               <div className="relative rounded-lg overflow-hidden">
-                <img src={service.images[currentImageIndex]} alt="Service preview" className="w-full h-64 md:h-96 object-cover" />
-                {service.images.length > 1 && <>
+                <img src={serviceData.images[currentImageIndex]} alt="Service preview" className="w-full h-64 md:h-96 object-cover" />
+                {serviceData.images.length > 1 && <>
                     <button onClick={goToPreviousImage} className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-white rounded-full p-2 shadow-md hover:bg-gray-100" aria-label="Previous image">
                       <ChevronLeft size={20} />
                     </button>
@@ -244,12 +243,12 @@ export default function ServiceDetails() {
                     </button>
                     {/* Image pagination dots */}
                     <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
-                      {service.images.map((_: any, index: number) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400/60'}`} aria-label={`Go to image ${index + 1}`} />)}
+                      {serviceData.images.map((_: any, index: number) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`w-2 h-2 rounded-full ${currentImageIndex === index ? 'bg-white' : 'bg-gray-400/60'}`} aria-label={`Go to image ${index + 1}`} />)}
                     </div>
                   </>}
               </div>
               <div className="grid grid-cols-4 gap-2 mt-2">
-                {service.images.map((image: any, index: number) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`rounded-lg overflow-hidden border-2 ${currentImageIndex === index ? 'border-blue-500' : 'border-transparent'}`}>
+                {serviceData.images.map((image: any, index: number) => <button key={index} onClick={() => setCurrentImageIndex(index)} className={`rounded-lg overflow-hidden border-2 ${currentImageIndex === index ? 'border-blue-500' : 'border-transparent'}`}>
                     <img src={image} alt={`Thumbnail ${index + 1}`} className="w-full h-16 object-cover" />
                   </button>)}
               </div>
@@ -257,13 +256,13 @@ export default function ServiceDetails() {
             {/* Description */}
             <div className="mb-8">
               <h2 className="text-xl font-semibold mb-4">Description</h2>
-              <p className="text-gray-700 mb-4">{service.description}</p>
+              <p className="text-gray-700 mb-4">{serviceData.description}</p>
               <ul className="list-disc pl-5 space-y-1 mb-6">
-                {service.features.map((feature: any, index: number) => <li key={index} className="text-gray-700">
+                {serviceData.features.map((feature: any, index: number) => <li key={index} className="text-gray-700">
                     {feature}
                   </li>)}
               </ul>
-              {service.additionalInfo.map((info: any, index: number) => <p key={index} className="text-gray-700 mb-2">
+              {serviceData.additionalInfo.map((info: any, index: number) => <p key={index} className="text-gray-700 mb-2">
                   {info}
                 </p>)}
             </div>
@@ -274,13 +273,13 @@ export default function ServiceDetails() {
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr>
-                      {service.tierComparison.headers.map((header: any, index: number) => <th key={index} className="border border-gray-200 px-4 py-2 text-left bg-gray-50">
+                      {serviceData.tierComparison.headers.map((header: any, index: number) => <th key={index} className="border border-gray-200 px-4 py-2 text-left bg-gray-50">
                           {header}
                         </th>)}
                     </tr>
                   </thead>
                   <tbody>
-                    {service.tierComparison.rows.map((row: any, rowIndex: number) => <tr key={rowIndex}>
+                    {serviceData.tierComparison.rows.map((row: any, rowIndex: number) => <tr key={rowIndex}>
                         {row.map((cell: any, cellIndex: number) => <td key={cellIndex} className="border border-gray-200 px-4 py-2">
                             {cell}
                           </td>)}
@@ -295,17 +294,21 @@ export default function ServiceDetails() {
                 Frequently Asked Questions
               </h2>
               <div className="space-y-4">
-                {service.faqs.map((faq: any, index: number) => <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button className="flex items-center justify-between w-full px-4 py-3 bg-white text-left" onClick={() => toggleFaq(index)}>
-                      <span className={`font-medium ${expandedFaq === index ? 'text-green-600' : 'text-gray-800'}`}>
-                        {faq.question}
-                      </span>
-                      {expandedFaq === index ? <ChevronUp size={20} className="text-green-600" /> : <ChevronDown size={20} />}
-                    </button>
-                    {expandedFaq === index && <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                        <p className="text-gray-700">{faq.answer}</p>
-                      </div>}
-                  </div>)}
+                {serviceData.faqs.length > 0 ? (
+                  serviceData.faqs.map((faq: any, index: number) => <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <button className="flex items-center justify-between w-full px-4 py-3 bg-white text-left" onClick={() => toggleFaq(index)}>
+                        <span className={`font-medium ${expandedFaq === index ? 'text-green-600' : 'text-gray-800'}`}>
+                          {faq.question}
+                        </span>
+                        {expandedFaq === index ? <ChevronUp size={20} className="text-green-600" /> : <ChevronDown size={20} />}
+                      </button>
+                      {expandedFaq === index && <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+                          <p className="text-gray-700">{faq.answer}</p>
+                        </div>}
+                    </div>)
+                ) : (
+                  <p className="text-gray-600">No FAQs available for this service.</p>
+                )}
               </div>
             </div>
             {/* Comments and Rating */}
@@ -315,20 +318,20 @@ export default function ServiceDetails() {
               </h2>
               <div className="flex items-center mb-4">
                 <span className="text-xl font-bold mr-2">
-                  {service.ratings.average}
+                  {serviceData.ratings.average}
                 </span>
                 <div className="flex text-yellow-400">
-                  {'★★★★★'.split('').map((_, i) => <span key={i} className={i < Math.floor(service.ratings.average) ? 'text-yellow-400' : 'text-gray-300'}>
+                  {'★★★★★'.split('').map((_, i) => <span key={i} className={i < Math.floor(serviceData.ratings.average) ? 'text-yellow-400' : 'text-gray-300'}>
                       ★
                     </span>)}
                 </div>
                 <span className="ml-2 text-gray-600">
-                  ({service.ratings.total} ratings)
+                  ({serviceData.ratings.total} ratings)
                 </span>
               </div>
               {/* Rating distribution */}
               <div className="space-y-2 mb-6">
-                {service.ratings.distribution.map((dist: any) => <div key={dist.stars} className="flex items-center">
+                {serviceData.ratings.distribution.map((dist: any) => <div key={dist.stars} className="flex items-center">
                     <span className="w-8">{dist.stars} ★</span>
                     <div className="flex-1 h-2 bg-gray-200 rounded-full mx-2">
                       <div className="h-2 bg-green-500 rounded-full" style={{
@@ -342,7 +345,8 @@ export default function ServiceDetails() {
               </div>
               {/* Comments */}
               <div className="space-y-4">
-                {service.comments.map((comment: any, index: number) => <div key={index} className="border-b border-gray-200 pb-4">
+                {serviceData.comments.length > 0 ? (
+                  serviceData.comments.map((comment: any, index: number) => <div key={index} className="border-b border-gray-200 pb-4">
                     <div className="flex items-center mb-2">
                       <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=100&auto=format&fit=crop" alt={comment.user} className="w-10 h-10 rounded-full mr-3" />
                       <div>
@@ -353,10 +357,10 @@ export default function ServiceDetails() {
                       </div>
                     </div>
                     <p className="text-gray-700">{comment.comment}</p>
-                  </div>)}
-                <button className="text-blue-500 hover:underline">
-                  Load More
-                </button>
+                  </div>)
+                ) : (
+                  <p className="text-gray-600">No reviews yet for this service. Be the first to leave a review!</p>
+                )}
               </div>
             </div>
             {/* Similar Services */}
@@ -365,22 +369,19 @@ export default function ServiceDetails() {
                 Explore Similar Services
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {service.similarServices.map((similar: any) => <div key={similar.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                {serviceData.similarServices.length > 0 ? (
+                  serviceData.similarServices.map((similar: any) => <div key={similar.service_id} className="border border-gray-200 rounded-lg overflow-hidden">
                     <div className="relative h-48">
-                      <img src={similar.image} alt={similar.title} className="w-full h-full object-cover" />
-                      <div className="absolute bottom-2 right-2 flex space-x-1">
-                        <button className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow">
-                          <ChevronLeft size={16} />
-                        </button>
-                        <button className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center shadow">
-                          <ChevronRight size={16} />
-                        </button>
-                      </div>
+                      <img
+                        src={similar.cover_image_url || (similar.portfolio_images && similar.portfolio_images.length > 0 ? similar.portfolio_images[0] : "/default-service.svg")}
+                        alt={similar.title}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="p-4">
                       <div className="flex items-center mb-2">
-                        <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=100&auto=format&fit=crop" alt={similar.seller} className="w-8 h-8 rounded-full mr-2" />
-                        <span>{similar.seller}</span>
+                        <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=100&auto=format&fit=crop" alt={similar.freelancer_email} className="w-8 h-8 rounded-full mr-2" />
+                        <span>{similar.freelancer_email ? similar.freelancer_email.split('@')[0] : 'Unknown'}</span>
                       </div>
                       <p className="text-sm mb-2 line-clamp-2">
                         {similar.title}
@@ -388,14 +389,19 @@ export default function ServiceDetails() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
                           <span className="text-yellow-400">★</span>
-                          <span className="ml-1">{similar.rating}</span>
+                          <span className="ml-1">{similar.rating_avg}</span>
                           <span className="ml-1 text-gray-600">
-                            ({similar.reviews})
+                            ({similar.total_orders})
                           </span>
                         </div>
-                        <div className="font-bold">USD ${similar.price}</div>
+                        <div className="font-bold">
+                          ${similar.packages && similar.packages.length > 0
+                            ? Math.min(...similar.packages.map((p: any) => p.price_e8s / 100000000)).toFixed(2)
+                            : '0.00'
+                          }
+                        </div>
                       </div>
-                      <Link href={`/client/service/${similar.id}`} className="flex items-center text-blue-500 mt-2">
+                      <Link href={`/client/service/${similar.service_id}`} className="flex items-center text-blue-500 mt-2">
                         <span>View</span>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="ml-1">
                           <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -403,7 +409,10 @@ export default function ServiceDetails() {
                         </svg>
                       </Link>
                     </div>
-                  </div>)}
+                  </div>)
+                ) : (
+                  <p className="text-gray-600 col-span-3">No similar services found.</p>
+                )}
               </div>
             </div>
           </div>
@@ -422,51 +431,62 @@ export default function ServiceDetails() {
               </div>
               <h3 className="font-medium mb-4">Select service tier</h3>
               <div className="space-y-3 mb-6">
-                <button className={`w-full py-2 px-4 rounded-full border ${selectedTier === 'basic' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`} onClick={() => setSelectedTier('basic')}>
-                  Basic ($100)
-                </button>
-                <button className={`w-full py-2 px-4 rounded-full border ${selectedTier === 'advanced' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`} onClick={() => setSelectedTier('advanced')}>
-                  Advanced ($180)
-                </button>
-                <button className={`w-full py-2 px-4 rounded-full border ${selectedTier === 'premium' ? 'border-blue-500 bg-blue-50' : 'border-gray-300'}`} onClick={() => setSelectedTier('premium')}>
-                  Premium ($234)
-                </button>
+                {service.packages && service.packages.length > 0 ? (
+                  service.packages.map((pkg: any) => {
+                    const tierName = pkg.tier.toLowerCase();
+                    const price = pkg.price_e8s / 100000000;
+                    return (
+                      <button
+                        key={pkg.package_id}
+                        className={`w-full py-2 px-4 rounded-full border ${
+                          selectedTier === tierName ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+                        }`}
+                        onClick={() => setSelectedTier(tierName)}
+                      >
+                        {pkg.tier} (${price})
+                      </button>
+                    );
+                  })
+                ) : (
+                  <p className="text-gray-600">No packages available for this service.</p>
+                )}
               </div>
               <div className="space-y-4 border-t border-gray-200 pt-4">
                 <div className="flex justify-between">
-                  <span>Title</span>
-                  <span>Website ui, figma website design</span>
+                  <span>Service</span>
+                  <span className="text-right text-sm text-gray-600 max-w-[60%]">
+                    {serviceData.title}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Description</span>
                   <span className="text-right text-sm text-gray-600 max-w-[60%]">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-                    Suspendisse eu pellentesque turpis. Vivamus a diam augue.
+                    {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.description || 'Service package'}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>No Of Days</span>
+                  <span>Delivery Days</span>
                   <span>
-                    {service.tiers[selectedTier as keyof typeof service.tiers].deliveryDays}
+                    {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.deliveryDays || 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Revisions</span>
                   <span>
-                    {service.tiers[selectedTier as keyof typeof service.tiers].revisions}
+                    {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.revisions || 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Amount</span>
                   <span>
                     $
-                    {service.tiers[selectedTier as keyof typeof service.tiers].price}
+                    {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.price || '0.00'}
                   </span>
                 </div>
               </div>
               <button 
                 onClick={handleContinue} 
-                disabled={bookingLoading || packagesLoading}
+                disabled={bookingLoading}
                 className="w-full py-3 bg-purple-600 text-white rounded-lg mt-6 hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bookingLoading ? (
@@ -475,7 +495,7 @@ export default function ServiceDetails() {
                     Booking...
                   </>
                 ) : (
-                  `Book Now ($${mockService.tiers[selectedTier as keyof typeof mockService.tiers]?.price || 0})`
+                  `Book Now ($${serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.price || '0.00'})`
                 )}
               </button>
             </div>

@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { useServiceForm } from '@/context/ServiceFormContext'
 import { AddProjectNav } from '@/components/freelancer/AddProjectNav'
 import { Sparkles } from 'lucide-react'
+import RichTextEditor from '@/components/editor/RichTextEditor'
+import '@/components/editor/markdown-styles.css'
 export default function AddServiceOverview() {
   const router = useRouter()
   const { formData, updateFormData, isSaved, setSaved } = useServiceForm()
@@ -40,6 +42,13 @@ export default function AddServiceOverview() {
       subCategory: subCategory,
     })
     setShowSubCategoryDropdown(false)
+  }
+
+  const handleDescriptionChange = (description: string) => {
+    updateFormData({
+      description: description,
+    })
+    setSaved('description', true)
   }
   const handleContinue = () => {
     router.push('/freelancer/add-service/projects')
@@ -184,6 +193,40 @@ export default function AddServiceOverview() {
               )}
             </div>
           </div>
+
+          {/* Description Section */}
+          <div className="mb-8">
+            <RichTextEditor
+              label="DESCRIPTION"
+              value={formData.description}
+              onChange={handleDescriptionChange}
+              placeholder="Describe your service in detail. Include what you'll deliver, your process, timeline, and what makes your service unique. Use markdown formatting to structure your description."
+              minHeight={300}
+              maxLength={2000}
+              helpText="Write a detailed description to help clients understand your service better. Use formatting to highlight key points."
+              aiAssist={true}
+              showPreview={true}
+            />
+            {isSaved.description && (
+              <div className="mt-2 flex items-center text-green-600 text-sm">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="text-green-500 mr-1"
+                >
+                  <path
+                    d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM8 15L3 10L4.41 8.59L8 12.17L15.59 4.58L17 6L8 15Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                Description saved
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-center mt-12">
             <button
               onClick={handleContinue}

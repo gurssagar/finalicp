@@ -2,6 +2,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
+
 import { LayoutGrid, Users, FolderOpen, Gift, User, MessageSquare, Code, Wallet, BarChart2, RefreshCw, Coffee, CreditCard } from 'lucide-react';
 export function Sidebar() {
   const location = usePathname();
@@ -62,12 +64,7 @@ export function Sidebar() {
   return <div className="w-64 border-r border-gray-200 h-full flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <Link href="/profile/dashboard" className="flex items-center">
-          <svg width="40" height="32" viewBox="0 0 40 32" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0">
-            <path d="M20.0001 0L0 11.5556V23.1111L20.0001 11.5556L40.0001 23.1111V11.5556L20.0001 0Z" fill="#FF3B30" />
-            <path d="M0 23.1111L20.0001 11.5555V23.1111V34.6667L0 23.1111Z" fill="#34C759" />
-            <path d="M40.0001 23.1111L20.0001 11.5555V23.1111V34.6667L40.0001 23.1111Z" fill="#007AFF" />
-          </svg>
-          <span className="ml-2 font-bold text-xl text-[#161616]">ICPWork</span>
+         <Image src="https://uploadthingy.s3.us-west-1.amazonaws.com/vjMzkkC8QuLABm1koFUeNQ/Group_1865110117.png" alt="ICPWork Logo" width={100} height={100} />
         </Link>
       </div>
       <nav className="p-2 flex-1 overflow-y-auto">

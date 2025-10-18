@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
+import { getServiceById, getSimilarServices } from '../../storage';
 
 // GET /api/marketplace/services/[serviceId] - Get service by ID
 export async function GET(
@@ -7,17 +7,6 @@ export async function GET(
   { params }: { params: Promise<{ serviceId: string }> }
 ) {
   try {
-    // Validate configuration
-    try {
-      validateMarketplaceConfig();
-    } catch (configError) {
-      console.warn('Marketplace configuration missing:', configError);
-      return NextResponse.json({
-        success: false,
-        error: 'Marketplace service not configured'
-      }, { status: 503 });
-    }
-
     const { serviceId } = await params;
 
     if (!serviceId) {
@@ -27,25 +16,34 @@ export async function GET(
       }, { status: 400 });
     }
 
-    const actor = await getMarketplaceActor();
-    const result = await actor.getServiceById(serviceId);
+    console.log('Fetching service by ID:', serviceId);
+    const service = getServiceById(serviceId);
 
-    if ('ok' in result) {
-      return NextResponse.json({
-        success: true,
-        data: result.ok
-      });
-    } else {
+    if (!service) {
       return NextResponse.json({
         success: false,
-        error: handleApiError(result.err)
+        error: 'Service not found'
       }, { status: 404 });
     }
+
+    // Get similar services for the sidebar
+    const similarServices = getSimilarServices(service.main_category, 3);
+
+    console.log('Service found:', service.title);
+    console.log('Similar services found:', similarServices.length);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...service,
+        similarServices: similarServices
+      }
+    });
   } catch (error) {
     console.error('Error fetching service:', error);
     return NextResponse.json({
       success: false,
-      error: handleApiError(error)
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     }, { status: 500 });
   }
 }
@@ -69,12 +67,12 @@ export async function PUT(
 
     const { serviceId } = await params;
     const body = await request.json();
-    const { userId, updates } = body;
+    const { userEmail, updates } = body;
 
-    if (!userId) {
+    if (!userEmail) {
       return NextResponse.json({
         success: false,
-        error: 'User ID is required'
+        error: 'User email is required'
       }, { status: 400 });
     }
 
@@ -135,12 +133,12 @@ export async function DELETE(
 
     const { serviceId } = await params;
     const body = await request.json();
-    const { userId } = body;
+    const { userEmail } = body;
 
-    if (!userId) {
+    if (!userEmail) {
       return NextResponse.json({
         success: false,
-        error: 'User ID is required'
+        error: 'User email is required'
       }, { status: 400 });
     }
 

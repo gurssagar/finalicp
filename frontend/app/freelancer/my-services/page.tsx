@@ -15,6 +15,10 @@ export default function MyServices() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
+  // Console logging for debugging
+  console.log('🔍 MY-SERVICES PAGE - Component State Update');
+  console.log('Current state:', { userId, userEmail, isCheckingAuth });
+
   // Get current user data from session
   useEffect(() => {
     const checkAuth = async () => {
@@ -22,10 +26,14 @@ export default function MyServices() {
         const response = await fetch('/api/auth/me')
         const data = await response.json()
         
+        console.log('🔐 Auth Response Received:', data);
+
         if (data.success && data.session) {
+          console.log('✅ Auth successful - Setting user data:', data.session);
           setUserId(data.session.userId)
           setUserEmail(data.session.email)
         } else {
+          console.log('❌ Auth failed - Setting user data to null');
           setUserId(null)
           setUserEmail(null)
         }
@@ -34,6 +42,7 @@ export default function MyServices() {
         setUserId(null)
         setUserEmail(null)
       } finally {
+        console.log('🔍 Auth check completed');
         setIsCheckingAuth(false)
       }
     }
@@ -46,6 +55,9 @@ export default function MyServices() {
     freelancer_email: userEmail || undefined,
     limit: 50
   })
+
+  // Console log services data
+  console.log('📋 Services Hook Data:', { fetchedServices, loading, error, userEmail });
 
   // Delete and update service hooks
   const { deleteService } = useDeleteService()
@@ -85,82 +97,106 @@ export default function MyServices() {
       }
     }
 
+    // Calculate minimum price from embedded packages
+    let minPrice = '0.00';
+    if (service.packages && service.packages.length > 0) {
+      try {
+        const prices = service.packages
+          .filter((pkg: any) => pkg.price_e8s && pkg.status === 'Available')
+          .map((pkg: any) => {
+            const price = typeof pkg.price_e8s === 'string' 
+              ? parseFloat(pkg.price_e8s) / 100000000
+              : Number(pkg.price_e8s) / 100000000;
+            return price;
+          });
+        
+        if (prices.length > 0) {
+          minPrice = Math.min(...prices).toFixed(2);
+        }
+      } catch (error) {
+        console.warn('Error calculating minimum price for service:', service.service_id, error);
+        minPrice = '0.00';
+      }
+    }
+
     return {
       id: service.service_id,
       title: service.title,
       category: service.main_category,
       subCategory: service.sub_category,
-      price: '0.00', // Will be updated when we fetch packages
-      coverImage: service.cover_image_url || '/placeholder-service.jpg',
+      price: minPrice,
+      coverImage: service.cover_image_url ||
+        (service.portfolio_images && service.portfolio_images.length > 0
+          ? service.portfolio_images[0]
+          : '/placeholder-service.jpg'),
       status: service.status?.toLowerCase() || 'active',
       views: 0, // Mock data doesn't include view count
       orders: service.total_orders || 0,
       rating: service.rating_avg || 0,
       createdAt: createdDate,
-      description: service.description
+      description: service.description,
+
+      // NEW FIELDS FOR DISPLAY
+      tierMode: service.tier_mode || '3tier',
+      clientQuestions: service.client_questions || [],
+      faqs: service.faqs || [],
+      packages: service.packages || [],
+      freelancerEmail: service.freelancer_email || ''
     }
   }
 
   const [services, setServices] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Fetch packages for services to get pricing using the optimized API endpoint
-  const fetchServicePackages = async (servicesData: any[]) => {
-    const servicesWithPricing = await Promise.all(
-      servicesData.map(async (service) => {
-        try {
-          const response = await fetch(`/api/marketplace/services/${service.service_id}/packages`)
-          const data = await response.json()
+  // Process services with embedded packages (no separate API calls needed)
+  const processServicesWithEmbeddedData = (servicesData: any[]) => {
+    console.log('💰 Processing services with embedded packages for', servicesData.length, 'services');
 
-          if (data.success && data.data.length > 0) {
-            // Find the minimum price from packages
-            const packages = data.data
-            const minPrice = packages.reduce((min: number, pkg: any) => {
-              const price = typeof pkg.price_e8s === 'string'
-                ? parseFloat(pkg.price_e8s) / 100000000
-                : Number(pkg.price_e8s) / 100000000
-              return min === 0 || price < min ? price : min
-            }, 0)
+    const processedServices = servicesData.map((service) => {
+      const transformedService = transformServiceData(service);
 
-            return {
-              ...transformServiceData(service),
-              price: minPrice.toFixed(2)
-            }
-          } else {
-            return transformServiceData(service)
-          }
-        } catch (error) {
-          console.error(`Error fetching packages for service ${service.service_id}:`, error)
-          return transformServiceData(service)
-        }
-      })
-    )
+      // Log the complete service data including new fields
+      console.log(`📊 Complete service data for ${service.service_id}:`, {
+        title: transformedService.title,
+        price: transformedService.price,
+        tierMode: transformedService.tierMode,
+        packagesCount: transformedService.packages.length,
+        faqsCount: transformedService.faqs.length,
+        clientQuestionsCount: transformedService.clientQuestions.length,
+        freelancerEmail: transformedService.freelancerEmail
+      });
 
-    return servicesWithPricing
+      return transformedService;
+    });
+
+    console.log('✅ All services with embedded data processed:', processedServices);
+    return processedServices
   }
 
   // Update services when fetched data changes
   useEffect(() => {
+    console.log('🔄 Services data changed:', { loading, error, fetchedServicesLength: fetchedServices.length });
+
     if (loading) {
+      console.log('⏳ Services loading...');
       setIsLoading(true)
     } else if (error) {
-      console.error('Error fetching services:', error)
+      console.error('❌ Error fetching services:', error)
       setServices([])
       setIsLoading(false)
     } else {
       if (fetchedServices.length > 0) {
-        const transformedServices = fetchedServices.map(transformServiceData)
-        setServices(transformedServices)
-        setIsLoading(false)
+        console.log('✅ Services loaded successfully:', fetchedServices.length, 'services');
+        console.log('📊 Raw service data:', fetchedServices);
 
-        // Try to fetch packages in the background for pricing (only if not already fetched)
-        fetchServicePackages(fetchedServices).then(servicesWithPricing => {
-          setServices(servicesWithPricing)
-        }).catch(error => {
-          console.error('Error fetching service packages:', error)
-          // Keep using transformed services without package pricing
-        })
+        // Process services with embedded packages and pricing
+        const processedServices = processServicesWithEmbeddedData(fetchedServices)
+        console.log('🔄 Processed services with embedded data:', processedServices);
+
+        setServices(processedServices)
+        setIsLoading(false)
       } else {
+        console.log('ℹ️ No services found');
         setServices([])
         setIsLoading(false)
       }
@@ -198,7 +234,7 @@ export default function MyServices() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            userId: userId
+            userEmail: userEmail
           })
         })
 
@@ -226,7 +262,7 @@ export default function MyServices() {
     const newStatus = currentStatus === 'active' ? 'Paused' : 'Active'
 
     try {
-      const result = await updateService(userId, serviceId, { status: newStatus })
+      const result = await updateService(userEmail, serviceId, { status: newStatus })
       if (result.success) {
         setServices(
           services.map((service) =>

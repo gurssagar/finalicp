@@ -22,7 +22,7 @@ export default function BrowseServices() {
     offset: 0
   });
 
-  const categories = ['Marketing', 'Business', 'Admin', 'Portfolio', 'Technology', 'User Experience'];
+  const categories = ['Marketing', 'Business', 'Admin', 'Portfolio', 'Technology', 'User Experience', 'Web Designer'];
   
   const handleServiceClick = (serviceId: string) => {
     navigate.push(`/client/service/${serviceId}`);
@@ -65,8 +65,11 @@ export default function BrowseServices() {
                 service={{
                   id: service.service_id,
                   title: service.title,
-                  image: service.cover_image_url || "/default-service.svg",
-                  seller: `Freelancer ${service.freelancer_id.slice(-4)}`,
+                  image: service.cover_image_url || 
+                    (service.portfolio_images && service.portfolio_images.length > 0 
+                      ? service.portfolio_images[0] 
+                      : "/default-service.svg"),
+                  seller: `Freelancer ${service.freelancer_email ? service.freelancer_email.split('@')[0] : 'Unknown'}`,
                   rating: service.rating_avg,
                   reviews: `${service.total_orders}+`
                 }}
