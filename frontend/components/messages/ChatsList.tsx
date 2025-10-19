@@ -16,6 +16,19 @@ interface Chat {
   }
 }
 
+interface BookingContact {
+  email: string
+  name: string
+  serviceTitle: string
+  bookingId: string
+  status: string
+  lastMessage?: {
+    text: string
+    timestamp: string
+  }
+  type: 'client' | 'freelancer'
+}
+
 interface ChatsListProps {
   onSelectChat: (chatId: string) => void;
   selectedChatId: string | null;
@@ -29,35 +42,58 @@ export function ChatsList({
   userType
 }: ChatsListProps) {
   const [chats, setChats] = useState<Chat[]>([])
+  const [bookingContacts, setBookingContacts] = useState<BookingContact[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
   // Load recent chats from API
-  useEffect(() => {
-    const loadRecentChats = async () => {
-      try {
-        const response = await fetch(`/api/chat/recent?userEmail=${encodeURIComponent(userEmail)}&limit=20`)
-        const data = await response.json()
+  const loadRecentChats = async () => {
+    try {
+      const response = await fetch(`/api/chat/recent?userEmail=${encodeURIComponent(userEmail)}&limit=20`)
+      const data = await response.json()
 
-        if (data.success) {
-          setChats(data.chats)
-        }
-      } catch (error) {
-        console.error('Error loading recent chats:', error)
-      } finally {
-        setLoading(false)
+      if (data.success) {
+        setChats(data.chats)
       }
+    } catch (error) {
+      console.error('Error loading recent chats:', error)
     }
+  }
 
-    if (userEmail) {
-      loadRecentChats()
+  // Load booking contacts
+  const loadBookingContacts = async () => {
+    try {
+      const response = await fetch(`/api/chat/booking-contacts?userEmail=${encodeURIComponent(userEmail)}&userType=${userType}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setBookingContacts(data.contacts)
+      }
+    } catch (error) {
+      console.error('Error loading booking contacts:', error)
     }
-  }, [userEmail])
+  }
+
+  // Load both chats and booking contacts
+  useEffect(() => {
+    if (userEmail) {
+      setLoading(true)
+      Promise.all([loadRecentChats(), loadBookingContacts()])
+        .finally(() => setLoading(false))
+    }
+  }, [userEmail, userType])
 
   // Filter chats based on search query
   const filteredChats = chats.filter(chat =>
     chat.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
     chat.lastMessage.text.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  // Filter booking contacts based on search query
+  const filteredBookingContacts = bookingContacts.filter(contact =>
+    contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    contact.serviceTitle.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   // Convert chat data to display format
@@ -67,11 +103,41 @@ export function ChatsList({
     avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(chat.contact)}&background=9333ea&color=fff`,
     lastMessage: chat.lastMessage.text,
     time: new Date(chat.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    unread: chat.lastMessage.from !== userEmail && !chat.lastMessage.read ? 1 : 0
+    unread: chat.lastMessage.from !== userEmail && !chat.lastMessage.read ? 1 : 0,
+    type: 'chat' as const
   }))
 
-  // Display only real chats - no more mock data
-  const chatsToDisplay = displayChats
+  // Convert booking contacts to display format
+  const displayBookingContacts = filteredBookingContacts.map(contact => ({
+    id: contact.email,
+    name: contact.name,
+    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=10b981&color=fff`,
+    lastMessage: contact.lastMessage?.text || `Service: ${contact.serviceTitle}`,
+    time: contact.lastMessage ? new Date(contact.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+    unread: 0,
+    type: 'booking' as const,
+    serviceTitle: contact.serviceTitle,
+    bookingId: contact.bookingId,
+    contactType: contact.type
+  }))
+
+  // Combine and deduplicate by email (prioritize chat contacts over booking contacts)
+  const allContacts = [...displayChats]
+  displayBookingContacts.forEach(bookingContact => {
+    const existingChatIndex = allContacts.findIndex(chat => chat.id === bookingContact.id)
+    if (existingChatIndex === -1) {
+      allContacts.push(bookingContact)
+    }
+  })
+
+  // Sort by most recent message
+  allContacts.sort((a, b) => {
+    const timeA = a.time ? new Date(a.time).getTime() : 0
+    const timeB = b.time ? new Date(b.time).getTime() : 0
+    return timeB - timeA
+  })
+
+  const chatsToDisplay = allContacts
   if (loading) {
     return (
       <div className="flex flex-col h-full">
@@ -137,6 +203,11 @@ export function ChatsList({
                   {chat.unread}
                 </div>
               )}
+              {chat.type === 'booking' && (
+                <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
+                  💼
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-center">
@@ -145,9 +216,19 @@ export function ChatsList({
                 </h3>
                 <span className="text-xs text-gray-500">{chat.time}</span>
               </div>
+              {chat.type === 'booking' && chat.serviceTitle && (
+                <p className="text-xs text-green-600 font-medium truncate mb-1">
+                  📋 {chat.serviceTitle}
+                </p>
+              )}
               <p className="text-sm text-gray-500 truncate">
                 {chat.lastMessage}
               </p>
+              {chat.type === 'booking' && (
+                <p className="text-xs text-blue-600 mt-1">
+                  Click to start chat
+                </p>
+              )}
             </div>
           </div>
         ))
