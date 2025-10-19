@@ -79,17 +79,15 @@ export function ServiceCardWithPricing({
         </div>
       </div>
       <CardContent className="p-4">
+      <p className="text-lg font-bold">{service.title}</p>
         <div className="flex items-center mb-2">
-          <Avatar className="w-8 h-8 mr-2">
-            <AvatarImage
-              src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=100&auto=format&fit=crop"
-              alt={service.seller}
-            />
+          <Avatar className="w-8 h-8 ">
+            
             <AvatarFallback>{service.seller[0]}</AvatarFallback>
           </Avatar>
           <span>{service.seller}</span>
         </div>
-        <p className="text-sm mb-2 line-clamp-2">{service.title}</p>
+        
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <span className="text-yellow-400">★</span>

@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CreateHackathonNav } from '../../components/hackathon/CreateHackathonNav';
-import { CreateHackathonOverview } from '../../components/hackathon/CreateHackathonOverview';
+import CreateHackathonNav from '../../components/hackathon/CreateHackathonNav';
+import CreateHackathonOverview from '../../components/hackathon/CreateHackathonOverview';
 import CreateHackathonPrizes from '../../components/hackathon/CreateHackathonPrizes';
 import CreateHackathonJudges from '../../components/hackathon/CreateHackathonJudges';
 import CreateHackathonSchedule from '../../components/hackathon/CreateHackathonSchedule';

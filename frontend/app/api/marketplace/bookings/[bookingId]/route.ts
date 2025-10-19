@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
+// Enhanced booking data storage (mock implementation)
+const enhancedBookingStorage: Record<string, any> = {};
+
 // GET /api/marketplace/bookings/[bookingId] - Get booking by ID
 export async function GET(
   request: NextRequest,
@@ -27,7 +30,30 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Use mock agent for testing
+    // First check if we have enhanced booking data
+    const enhancedBooking = enhancedBookingStorage[bookingId];
+
+    if (enhancedBooking) {
+      // Return enhanced booking data with all payment details
+      const responseData = {
+        ...enhancedBooking,
+        total_amount_usd: enhancedBooking.total_amount_e8s / 100000000,
+        base_amount_usd: enhancedBooking.base_amount_e8s / 100000000,
+        platform_fee_usd: enhancedBooking.platform_fee_e8s / 100000000,
+        upsells_total: enhancedBooking.upsells ? enhancedBooking.upsells.reduce((sum: number, upsell: any) => sum + upsell.price, 0) : 0,
+        delivery_deadline: new Date(enhancedBooking.expires_at).toISOString(),
+        days_remaining: Math.ceil((enhancedBooking.expires_at - Date.now()) / (1000 * 60 * 60 * 24)),
+        created_date: new Date(enhancedBooking.created_at).toISOString(),
+        last_updated: new Date(enhancedBooking.updated_at).toISOString()
+      };
+
+      return NextResponse.json({
+        success: true,
+        data: responseData
+      });
+    }
+
+    // Fallback to basic marketplace actor
     const actor = await getMarketplaceActor();
     const result = await actor.getBookingById(bookingId);
 
@@ -97,4 +123,14 @@ export async function PUT(
       error: handleApiError(error)
     }, { status: 500 });
   }
+}
+
+// Helper function to add enhanced booking data (used by payment confirmation)
+export function addEnhancedBookingData(bookingId: string, bookingData: any): void {
+  enhancedBookingStorage[bookingId] = bookingData;
+}
+
+// Helper function to get enhanced booking data (used by other APIs)
+export function getEnhancedBookingData(bookingId: string): any {
+  return enhancedBookingStorage[bookingId] || null;
 }

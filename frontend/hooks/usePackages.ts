@@ -205,15 +205,23 @@ export function useBookPackage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          userId,
+          clientId: userId,
           packageId,
-          clientNotes,
+          specialInstructions: clientNotes || '',
         }),
       });
 
       const data = await response.json();
 
       if (data.success) {
+        // Enhanced booking response includes chat information
+        console.log('🎉 Booking successful:', data.data);
+
+        // Log chat initiation result if present
+        if (data.data?.chat) {
+          console.log('💬 Chat initiation result:', data.data.chat);
+        }
+
         return { success: true, data: data.data };
       } else {
         setError(data.error || 'Failed to book package');

@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { Search } from 'lucide-react';
+import { Search, MessageSquare } from 'lucide-react';
 
 interface Chat {
   contact: string
@@ -70,33 +70,8 @@ export function ChatsList({
     unread: chat.lastMessage.from !== userEmail && !chat.lastMessage.read ? 1 : 0
   }))
 
-  // Fallback to mock data if no chats available
-  const chatsToDisplay = displayChats.length > 0 ? displayChats : [
-    {
-      id: '1',
-      name: 'Alex Johnson',
-      avatar: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Looking forward to working with you!',
-      time: '9:00 AM',
-      unread: 1
-    },
-    {
-      id: '2',
-      name: 'Sarah Chen',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Project details look great',
-      time: '8:30 AM',
-      unread: 0
-    },
-    {
-      id: '3',
-      name: 'Mike Davis',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'When can we start?',
-      time: 'Yesterday',
-      unread: 2
-    }
-  ]
+  // Display only real chats - no more mock data
+  const chatsToDisplay = displayChats
   if (loading) {
     return (
       <div className="flex flex-col h-full">
@@ -142,7 +117,8 @@ export function ChatsList({
 
       {/* Chats List */}
       <div className="flex-1 overflow-y-auto">
-        {chatsToDisplay.map(chat => (
+        {chatsToDisplay.length > 0 ? (
+          chatsToDisplay.map(chat => (
           <div
             key={chat.id}
             onClick={() => onSelectChat(chat.id)}
@@ -174,7 +150,25 @@ export function ChatsList({
               </p>
             </div>
           </div>
-        ))}
+        ))
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="text-center p-8">
+              <MessageSquare size={48} className="mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No messages yet</h3>
+              <p className="text-sm text-gray-500 mb-4">Clients will appear here after booking your services</p>
+              <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-700">
+                <p className="font-medium mb-1">💬 How clients find you:</p>
+                <ol className="text-left text-xs space-y-1">
+                  <li>1. Clients browse your services</li>
+                  <li>2. They book your service</li>
+                  <li>3. Chat automatically starts</li>
+                  <li>4. Discuss project details here</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

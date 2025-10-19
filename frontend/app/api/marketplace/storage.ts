@@ -167,3 +167,46 @@ export function getPackagesByServiceId(serviceId: string): Package[] {
   const packages = getPackages();
   return packages.filter(pkg => pkg.service_id === serviceId);
 }
+
+export function getPackageById(packageId: string): Package | null {
+  try {
+    // First try standalone packages in packages.json
+    const packages = getPackages();
+    const standalonePackage = packages.find(pkg => pkg.package_id === packageId);
+    if (standalonePackage) {
+      return standalonePackage;
+    }
+
+    // If not found, search embedded packages in all services
+    const services = getServices();
+    for (const service of services) {
+      if (service.packages && service.packages.length > 0) {
+        const embeddedPackage = service.packages.find(pkg => pkg.package_id === packageId);
+        if (embeddedPackage) {
+          // Convert embedded package to Package interface format
+          return {
+            package_id: embeddedPackage.package_id,
+            service_id: service.service_id,
+            tier: embeddedPackage.tier,
+            title: embeddedPackage.title,
+            description: embeddedPackage.description,
+            price_e8s: String(embeddedPackage.price_e8s), // Convert to string to match interface
+            delivery_days: embeddedPackage.delivery_days,
+            features: embeddedPackage.features,
+            revisions_included: embeddedPackage.revisions_included,
+            status: embeddedPackage.status,
+            created_at: service.created_at,
+            updated_at: service.updated_at
+          };
+        }
+      }
+    }
+
+    // Package not found in either location
+    console.warn(`Package not found: ${packageId}. Searched ${packages.length} standalone packages and ${services.length} services.`);
+    return null;
+  } catch (error) {
+    console.error('Error finding package by ID:', error);
+    return null;
+  }
+}

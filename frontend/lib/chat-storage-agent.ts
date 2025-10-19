@@ -24,7 +24,7 @@ let chatStorageActor: any = null;
 
 function getChatStorageActor() {
   if (!chatStorageActor) {
-    const canisterId = process.env.NEXT_PUBLIC_CHAT_STORAGE_CANISTER_ID || 'ulvla-h7777-77774-qaacq-cai';
+    const canisterId = process.env.NEXT_PUBLIC_CHAT_STORAGE_CANISTER_ID || 'u6s2n-gx777-77774-qaaba-cai';
 
     // Create actor using the agent
     const { Actor, HttpAgent } = require('@dfinity/agent');

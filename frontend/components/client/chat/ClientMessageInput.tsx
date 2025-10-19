@@ -1,21 +1,40 @@
 'use client'
 import React, { useState } from 'react'
-import { Paperclip, Image, Mic, Send, Smile } from 'lucide-react'
+import { Paperclip, Image, Mic, Send, Smile, Loader2, Check, X } from 'lucide-react'
 
 interface ClientMessageInputProps {
-  onSendMessage: (message: string) => void
+  onSendMessage: (message: string) => Promise<void>
 }
 
 export function ClientMessageInput({
   onSendMessage
 }: ClientMessageInputProps) {
   const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [deliveryStatus, setDeliveryStatus] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (message.trim()) {
-      onSendMessage(message)
-      setMessage('')
+    if (message.trim() && !sending) {
+      setSending(true)
+      setDeliveryStatus('sending')
+
+      try {
+        await onSendMessage(message)
+        setDeliveryStatus('sent')
+        setMessage('')
+
+        // Reset status after 2 seconds
+        setTimeout(() => setDeliveryStatus('idle'), 2000)
+      } catch (error) {
+        console.error('Failed to send message:', error)
+        setDeliveryStatus('failed')
+
+        // Reset status after 3 seconds
+        setTimeout(() => setDeliveryStatus('idle'), 3000)
+      } finally {
+        setSending(false)
+      }
     }
   }
 
@@ -66,11 +85,37 @@ export function ClientMessageInput({
 
           <button
             type="submit"
-            className="p-3 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-            disabled={!message.trim()}
-            title="Send message"
+            className={`p-3 rounded-full transition-colors disabled:cursor-not-allowed flex items-center justify-center ${
+              deliveryStatus === 'sending'
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : deliveryStatus === 'sent'
+                ? 'bg-green-600 hover:bg-green-700'
+                : deliveryStatus === 'failed'
+                ? 'bg-red-600 hover:bg-red-700'
+                : message.trim() && !sending
+                ? 'bg-purple-600 hover:bg-purple-700'
+                : 'bg-gray-300'
+            } text-white`}
+            disabled={!message.trim() || sending}
+            title={
+              deliveryStatus === 'sending'
+                ? 'Sending...'
+                : deliveryStatus === 'sent'
+                ? 'Message sent!'
+                : deliveryStatus === 'failed'
+                ? 'Failed to send - try again'
+                : 'Send message'
+            }
           >
-            <Send size={20} />
+            {sending ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : deliveryStatus === 'sent' ? (
+              <Check size={20} />
+            ) : deliveryStatus === 'failed' ? (
+              <X size={20} />
+            ) : (
+              <Send size={20} />
+            )}
           </button>
         </div>
       </form>

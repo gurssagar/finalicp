@@ -17,38 +17,59 @@ export default function MessagesPage() {
 
   // Load user information from session/storage
   useEffect(() => {
-    // Check user type and email from session
-    // This would typically come from your authentication system
-    const checkUserSession = async () => {
-      try {
-        const response = await fetch('/api/profile/check-completeness')
-        const data = await response.json()
+    const getUserInfo = () => {
+      // Try to get real user session first
+      const checkUserSession = async () => {
+        try {
+          const response = await fetch('/api/profile/check-completeness')
+          const data = await response.json()
 
-        if (data.success) {
-          setUserEmail(data.email || 'user@example.com')
-          // Determine user type based on available features
-          const hasClientFeatures = data.is_client || false
-          const hasFreelancerFeatures = data.is_freelancer || false
+          if (data.success && data.email) {
+            setUserEmail(data.email)
 
-          if (hasClientFeatures && hasFreelancerFeatures) {
-            setUserType('both')
-          } else if (hasClientFeatures) {
-            setUserType('client')
-          } else if (hasFreelancerFeatures) {
-            setUserType('freelancer')
+            // Determine user type based on available features
+            const hasClientFeatures = data.is_client || false
+            const hasFreelancerFeatures = data.is_freelancer || false
+
+            if (hasClientFeatures && hasFreelancerFeatures) {
+              setUserType('both')
+            } else if (hasClientFeatures) {
+              setUserType('client')
+            } else if (hasFreelancerFeatures) {
+              setUserType('freelancer')
+            }
+            return true
           }
-        } else {
-          // Fallback for demo purposes
-          setUserEmail('demo@example.com')
+        } catch (error) {
+          console.error('Error checking user session:', error)
         }
-      } catch (error) {
-        console.error('Error checking user session:', error)
-        // Fallback for demo purposes
-        setUserEmail('demo@example.com')
+        return false
       }
+
+      // Fallback methods
+      const getFallbackEmail = () => {
+        if (typeof window !== 'undefined') {
+          // Check localStorage/sessionStorage for persisted user data
+          const localEmail = localStorage.getItem('userEmail') ||
+                           sessionStorage.getItem('userEmail')
+          if (localEmail) return localEmail
+        }
+
+        // For development - in production this should come from auth system
+        return 'freelancer@example.com'
+      }
+
+      // Try real session first, then fallback
+      checkUserSession().then(hasRealSession => {
+        if (!hasRealSession) {
+          const fallbackEmail = getFallbackEmail()
+          setUserEmail(fallbackEmail)
+          setUserType('freelancer') // Default to freelancer for this page
+        }
+      })
     }
 
-    checkUserSession()
+    getUserInfo()
 
     // Authenticate with the canister
     const authenticateWithCanister = async () => {
@@ -70,6 +91,7 @@ export default function MessagesPage() {
       }
     }
 
+    // Delay authentication until we have user email
     if (userEmail) {
       authenticateWithCanister()
     }

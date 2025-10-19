@@ -1,10 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chatStorageApi } from '@/lib/chat-storage-agent';
 
+// Helper function to generate detailed booking message
+function generateDetailedBookingMessage(serviceTitle: string, bookingId: string, bookingDetails?: any): string {
+  let message = `🎉 **New Booking Confirmed!**\n\n📋 **Service:** ${serviceTitle}\n🆔 **Booking ID:** ${bookingId}\n`;
+
+  if (bookingDetails) {
+    // Add package information
+    message += `\n📦 **Selected Package:** ${bookingDetails.packageTitle} (${bookingDetails.packageTier})\n`;
+    message += `📅 **Delivery Time:** ${bookingDetails.deliveryDays} day${bookingDetails.deliveryDays !== 1 ? 's' : ''}\n`;
+    message += `🔄 **Revisions:** ${bookingDetails.revisionsIncluded} included\n`;
+
+    // Add features
+    if (bookingDetails.features && bookingDetails.features.length > 0) {
+      message += `\n✨ **What's Included:**\n`;
+      bookingDetails.features.forEach((feature: string, index: number) => {
+        message += `   • ${feature}\n`;
+      });
+    }
+
+    // Add upsells if any
+    if (bookingDetails.upsells && bookingDetails.upsells.length > 0) {
+      message += `\n🚀 **Enhancements Added:**\n`;
+      bookingDetails.upsells.forEach((upsell: any) => {
+        message += `   • ${upsell.name} (+$${upsell.price})\n`;
+      });
+    }
+
+    // Add pricing information
+    message += `\n💰 **Payment Details:**\n`;
+    message += `   • Total Amount: $${bookingDetails.totalAmount.toFixed(2)}\n`;
+    message += `   • Payment Method: ${bookingDetails.paymentMethod.toUpperCase()}\n`;
+    message += `   • Status: ✅ Confirmed (held in escrow)\n`;
+
+    // Add special instructions if provided
+    if (bookingDetails.specialInstructions) {
+      message += `\n📝 **Client Instructions:**\n${bookingDetails.specialInstructions}\n`;
+    }
+
+    // Add delivery deadline
+    if (bookingDetails.deliveryDeadline) {
+      const deadline = new Date(bookingDetails.deliveryDeadline).toLocaleDateString();
+      message += `\n🎯 **Delivery Deadline:** ${deadline}\n`;
+    }
+  }
+
+  message += `\nI'm excited to work with you on this project! Let's discuss any specific requirements and timeline details.`;
+
+  return message;
+}
+
 // POST /api/chat/initiate - Initiate chat between users
 export async function POST(request: NextRequest) {
   try {
-    const { clientEmail, freelancerEmail, serviceTitle, projectId, bookingId } = await request.json();
+    const { clientEmail, freelancerEmail, serviceTitle, projectId, bookingId, bookingDetails } = await request.json();
 
     if (!clientEmail || !freelancerEmail) {
       return NextResponse.json(
@@ -30,7 +79,11 @@ export async function POST(request: NextRequest) {
     let initialMessage = 'Hello! I would like to discuss the project.';
     let messageType = 'text';
 
-    if (serviceTitle) {
+    if (serviceTitle && bookingId) {
+      // Enhanced booking confirmation message with all details
+      initialMessage = generateDetailedBookingMessage(serviceTitle, bookingId, bookingDetails);
+      messageType = 'booking_confirmed';
+    } else if (serviceTitle) {
       initialMessage = `Hello! I'm interested in your service: ${serviceTitle}. Let's discuss the details.`;
       messageType = 'service_inquiry';
     } else if (projectId) {

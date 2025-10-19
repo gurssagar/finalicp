@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { Search } from 'lucide-react'
+import { Search, MessageSquare } from 'lucide-react'
 
 interface Chat {
   contact: string
@@ -95,54 +95,8 @@ export function ClientChatsList({
     )
   }
 
-  // Fallback to mock data if no chats available
-  const chatsToDisplay = displayChats.length > 0 ? displayChats : [
-    {
-      id: '1',
-      name: 'AI Innovation Team',
-      avatar: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Great work on the presentation deck!',
-      time: '9:00 AM',
-      unread: 2,
-      type: 'team'
-    },
-    {
-      id: '2',
-      name: 'Sarah Chen',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Did you check the hackathon guidelines?',
-      time: '8:30 AM',
-      unread: 1,
-      type: 'direct'
-    },
-    {
-      id: '3',
-      name: 'Web3 Challenge Group',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Meeting at 3 PM today',
-      time: 'Yesterday',
-      unread: 0,
-      type: 'team'
-    },
-    {
-      id: '4',
-      name: 'Hackathon Support',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Your registration has been confirmed',
-      time: 'Yesterday',
-      unread: 0,
-      type: 'support'
-    },
-    {
-      id: '5',
-      name: 'Mike Johnson',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=150&auto=format&fit=crop',
-      lastMessage: 'Want to team up for the sustainability hack?',
-      time: '2 days ago',
-      unread: 1,
-      type: 'direct'
-    }
-  ]
+  // Display only real chats - no more mock data
+  const chatsToDisplay = displayChats
 
   return (
     <div className="flex flex-col h-full">
@@ -164,7 +118,8 @@ export function ClientChatsList({
 
       {/* Chats List */}
       <div className="flex-1 overflow-y-auto">
-        {chatsToDisplay.map(chat => (
+        {chatsToDisplay.length > 0 ? (
+          chatsToDisplay.map(chat => (
           <div
             key={chat.id}
             onClick={() => onSelectChat(chat.id)}
@@ -205,7 +160,24 @@ export function ClientChatsList({
               </div>
             </div>
           </div>
-        ))}
+        ))
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-gray-500">
+            <div className="text-center p-8">
+              <MessageSquare size={48} className="mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No chats yet</h3>
+              <p className="text-sm text-gray-500 mb-4">Start a conversation after booking a service</p>
+              <div className="bg-purple-50 rounded-lg p-4 text-sm text-purple-700">
+                <p className="font-medium mb-1">💡 How to start chatting:</p>
+                <ol className="text-left text-xs space-y-1">
+                  <li>1. Browse services</li>
+                  <li>2. Book a service you like</li>
+                  <li>3. Chat will be automatically created</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

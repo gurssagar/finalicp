@@ -10,12 +10,47 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'chats' | 'teams'>('chats')
   const [userEmail, setUserEmail] = useState<string>('')
 
-  // Load user email from session/storage
+  // Load user email from URL params, session storage, or auth context
   useEffect(() => {
-    // For demo purposes, use a mock email
-    // In production, this would come from authentication/session
-    const mockEmail = 'client@example.com'
-    setUserEmail(mockEmail)
+    const getUserEmail = () => {
+      // First check if coming from booking with a freelancer
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search)
+        const withParam = urlParams.get('with')
+
+        if (withParam) {
+          return withParam // This is the freelancer's email for chat
+        }
+
+        // Check session storage for logged-in user
+        const sessionEmail = sessionStorage.getItem('userEmail')
+        if (sessionEmail) {
+          return sessionEmail
+        }
+
+        // Check localStorage for persistence
+        const localEmail = localStorage.getItem('userEmail')
+        if (localEmail) {
+          return localEmail
+        }
+      }
+
+      // Fallback for development - this should be replaced with real auth
+      return 'client@example.com'
+    }
+
+    const userEmail = getUserEmail()
+    setUserEmail(userEmail)
+
+    // Check if we should pre-select a chat from URL params
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const withParam = urlParams.get('with')
+
+      if (withParam) {
+        setSelectedChatId(withParam)
+      }
+    }
 
     // Also authenticate with the canister
     const authenticateWithCanister = async () => {
@@ -24,7 +59,7 @@ export default function ChatPage() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: mockEmail,
+            email: userEmail,
             displayName: 'Client User'
           })
         })
@@ -35,7 +70,7 @@ export default function ChatPage() {
       }
     }
 
-    if (mockEmail) {
+    if (userEmail) {
       authenticateWithCanister()
     }
   }, [])

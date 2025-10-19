@@ -1,17 +1,60 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 
-// Mock IDL factory for testing (will be replaced with actual generated file)
+// Simplified IDL factory matching the actual marketplace canister
 const idlFactory = ({ IDL }: any) => {
   return IDL.Service({
-    // Mock service methods for testing
-    listServices: IDL.Func([IDL.Record({
+    // Service methods
+    createService: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
+    updateService: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
+    deleteService: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
+    getService: IDL.Func([IDL.Text], [IDL.Opt(IDL.Record({
+      service_id: IDL.Text,
+      freelancer_id: IDL.Text,
+      title: IDL.Text,
+      main_category: IDL.Text,
+      sub_category: IDL.Text,
+      description: IDL.Text,
+      whats_included: IDL.Text,
+      cover_image_url: IDL.Opt(IDL.Text),
+      portfolio_images: IDL.Vec(IDL.Text),
+      status: IDL.Variant({ Active: IDL.Null, Paused: IDL.Null, Deleted: IDL.Null }),
+      created_at: IDL.Int,
+      updated_at: IDL.Int,
+      delivery_time_days: IDL.Nat,
+      starting_from_e8s: IDL.Nat64,
+      total_rating: IDL.Float64,
+      review_count: IDL.Nat,
+      tags: IDL.Vec(IDL.Text)
+    }))]),
+    getServicesByFreelancer: IDL.Func([IDL.Text, IDL.Record({ limit: IDL.Nat, offset: IDL.Nat })], [IDL.Vec(IDL.Record({
+      service_id: IDL.Text,
+      freelancer_id: IDL.Text,
+      title: IDL.Text,
+      main_category: IDL.Text,
+      sub_category: IDL.Text,
+      description: IDL.Text,
+      whats_included: IDL.Text,
+      cover_image_url: IDL.Opt(IDL.Text),
+      portfolio_images: IDL.Vec(IDL.Text),
+      status: IDL.Variant({ Active: IDL.Null, Paused: IDL.Null, Deleted: IDL.Null }),
+      created_at: IDL.Int,
+      updated_at: IDL.Int,
+      delivery_time_days: IDL.Nat,
+      starting_from_e8s: IDL.Nat64,
+      total_rating: IDL.Float64,
+      review_count: IDL.Nat,
+      tags: IDL.Vec(IDL.Text)
+    }))]),
+    searchServices: IDL.Func([IDL.Record({
       category: IDL.Opt(IDL.Text),
-      freelancer_id: IDL.Opt(IDL.Text),
-      search_term: IDL.Text,
-      limit: IDL.Nat,
-      offset: IDL.Nat
-    })], [IDL.Variant({ ok: IDL.Vec(IDL.Record({
+      sub_category: IDL.Opt(IDL.Text),
+      price_range: IDL.Opt(IDL.Record({ min_e8s: IDL.Nat64, max_e8s: IDL.Nat64 })),
+      delivery_time: IDL.Opt(IDL.Record({ min_days: IDL.Nat, max_days: IDL.Nat })),
+      rating: IDL.Opt(IDL.Float64),
+      tags: IDL.Vec(IDL.Text),
+      freelancer_id: IDL.Opt(IDL.Text)
+    }), IDL.Record({ field: IDL.Text, direction: IDL.Variant({ Ascending: IDL.Null, Descending: IDL.Null }) }), IDL.Record({ limit: IDL.Nat, offset: IDL.Nat })], [IDL.Vec(IDL.Record({
       service_id: IDL.Text,
       freelancer_id: IDL.Text,
       title: IDL.Text,
@@ -21,107 +64,175 @@ const idlFactory = ({ IDL }: any) => {
       whats_included: IDL.Text,
       cover_image_url: IDL.Opt(IDL.Text),
       portfolio_images: IDL.Vec(IDL.Text),
-      status: IDL.Text,
-      rating_avg: IDL.Float64,
-      total_orders: IDL.Nat,
+      status: IDL.Variant({ Active: IDL.Null, Paused: IDL.Null, Deleted: IDL.Null }),
       created_at: IDL.Int,
-      updated_at: IDL.Int
-    })), err: IDL.Text })]),
-    
-    createService: IDL.Func([IDL.Text, IDL.Record({
-      title: IDL.Text,
-      main_category: IDL.Text,
-      sub_category: IDL.Text,
-      description: IDL.Text,
-      whats_included: IDL.Text,
-      cover_image_url: IDL.Opt(IDL.Text),
-      portfolio_images: IDL.Vec(IDL.Text),
-      status: IDL.Text
-    })], [IDL.Variant({ ok: IDL.Record({
-      service_id: IDL.Text,
-      freelancer_id: IDL.Text,
-      title: IDL.Text,
-      status: IDL.Text,
-      created_at: IDL.Int,
-      updated_at: IDL.Int
-    }), err: IDL.Text })]),
-    
-    getServiceById: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Record({
-      service_id: IDL.Text,
-      freelancer_id: IDL.Text,
-      title: IDL.Text,
-      main_category: IDL.Text,
-      sub_category: IDL.Text,
-      description: IDL.Text,
-      whats_included: IDL.Text,
-      cover_image_url: IDL.Opt(IDL.Text),
-      portfolio_images: IDL.Vec(IDL.Text),
-      status: IDL.Text,
-      rating_avg: IDL.Float64,
-      total_orders: IDL.Nat,
-      created_at: IDL.Int,
-      updated_at: IDL.Int
-    }), err: IDL.Text })]),
-    
-    updateService: IDL.Func([IDL.Text, IDL.Text, IDL.Record({
-      title: IDL.Opt(IDL.Text),
-      description: IDL.Opt(IDL.Text),
-      status: IDL.Opt(IDL.Text)
-    })], [IDL.Variant({ ok: IDL.Record({
-      service_id: IDL.Text,
-      freelancer_id: IDL.Text,
-      title: IDL.Text,
-      status: IDL.Text,
-      created_at: IDL.Int,
-      updated_at: IDL.Int
-    }), err: IDL.Text })]),
-    
-    deleteService: IDL.Func([IDL.Text, IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
+      updated_at: IDL.Int,
+      delivery_time_days: IDL.Nat,
+      starting_from_e8s: IDL.Nat64,
+      total_rating: IDL.Float64,
+      review_count: IDL.Nat,
+      tags: IDL.Vec(IDL.Text)
+    }))]),
 
-    getPackagesByService: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Vec(IDL.Record({
-      package_id: IDL.Text,
-      service_id: IDL.Text,
-      tier: IDL.Text,
-      title: IDL.Text,
-      description: IDL.Text,
-      price_e8s: IDL.Text,
-      delivery_days: IDL.Nat,
-      features: IDL.Vec(IDL.Text),
-      revisions_included: IDL.Nat,
-      status: IDL.Text,
-      created_at: IDL.Int,
-      updated_at: IDL.Int
-    })), err: IDL.Text })]),
+    // Booking methods
+    bookPackage: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Variant({
+      ok: IDL.Record({
+        booking_id: IDL.Text,
+        escrow_account: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        ledger_block: IDL.Opt(IDL.Nat64)
+      }),
+      err: IDL.Variant({
+        NotFound: IDL.Text,
+        AlreadyExists: IDL.Text,
+        InvalidInput: IDL.Text,
+        Unauthorized: IDL.Text,
+        PaymentFailed: IDL.Text,
+        InsufficientFunds: IDL.Null,
+        LedgerError: IDL.Text,
+        StageNotApproved: IDL.Null,
+        BookingNotFunded: IDL.Null,
+        InvalidStatus: IDL.Text
+      })
+    })]),
 
-    createPackage: IDL.Func([IDL.Text, IDL.Record({
-      service_id: IDL.Text,
-      tier: IDL.Text,
-      title: IDL.Text,
-      description: IDL.Text,
-      price_e8s: IDL.Text,
-      delivery_days: IDL.Nat,
-      features: IDL.Vec(IDL.Text),
-      revisions_included: IDL.Nat,
-      status: IDL.Text
-    })], [IDL.Variant({ ok: IDL.Record({
-      package_id: IDL.Text,
-      service_id: IDL.Text,
-      tier: IDL.Text,
-      status: IDL.Text,
-      created_at: IDL.Int,
-      updated_at: IDL.Int
-    }), err: IDL.Text })]),
+    getBookingById: IDL.Func([IDL.Text], [IDL.Variant({
+      ok: IDL.Record({
+        booking_id: IDL.Text,
+        service_id: IDL.Text,
+        package_id: IDL.Text,
+        client_id: IDL.Text,
+        freelancer_id: IDL.Text,
+        title: IDL.Text,
+        description: IDL.Text,
+        requirements: IDL.Vec(IDL.Text),
+        status: IDL.Variant({ Pending: IDL.Null, Active: IDL.Null, InDispute: IDL.Null, Completed: IDL.Null, Cancelled: IDL.Null }),
+        payment_status: IDL.Variant({ Pending: IDL.Null, HeldInEscrow: IDL.Null, Released: IDL.Null, Refunded: IDL.Null, Disputed: IDL.Null }),
+        total_amount_e8s: IDL.Nat64,
+        currency: IDL.Text,
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        deadline: IDL.Int,
+        milestones: IDL.Vec(IDL.Text),
+        current_milestone: IDL.Opt(IDL.Text),
+        client_review: IDL.Opt(IDL.Text),
+        client_rating: IDL.Opt(IDL.Float64),
+        freelancer_review: IDL.Opt(IDL.Text),
+        freelancer_rating: IDL.Opt(IDL.Float64),
+        dispute_id: IDL.Opt(IDL.Text)
+      }),
+      err: IDL.Variant({
+        NotFound: IDL.Text,
+        AlreadyExists: IDL.Text,
+        InvalidInput: IDL.Text,
+        Unauthorized: IDL.Text,
+        PaymentFailed: IDL.Text,
+        InsufficientFunds: IDL.Null,
+        LedgerError: IDL.Text,
+        StageNotApproved: IDL.Null,
+        BookingNotFunded: IDL.Null,
+        InvalidStatus: IDL.Text
+      })
+    })]),
 
-    // Add other methods as needed for testing
+    listBookingsForClient: IDL.Func([IDL.Text, IDL.Opt(IDL.Variant({ Pending: IDL.Null, Active: IDL.Null, InDispute: IDL.Null, Completed: IDL.Null, Cancelled: IDL.Null })), IDL.Nat, IDL.Nat], [IDL.Variant({
+      ok: IDL.Vec(IDL.Record({
+        booking_id: IDL.Text,
+        service_id: IDL.Text,
+        package_id: IDL.Text,
+        client_id: IDL.Text,
+        freelancer_id: IDL.Text,
+        title: IDL.Text,
+        description: IDL.Text,
+        requirements: IDL.Vec(IDL.Text),
+        status: IDL.Variant({ Pending: IDL.Null, Active: IDL.Null, InDispute: IDL.Null, Completed: IDL.Null, Cancelled: IDL.Null }),
+        payment_status: IDL.Variant({ Pending: IDL.Null, HeldInEscrow: IDL.Null, Released: IDL.Null, Refunded: IDL.Null, Disputed: IDL.Null }),
+        total_amount_e8s: IDL.Nat64,
+        currency: IDL.Text,
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        deadline: IDL.Int,
+        milestones: IDL.Vec(IDL.Text),
+        current_milestone: IDL.Opt(IDL.Text),
+        client_review: IDL.Opt(IDL.Text),
+        client_rating: IDL.Opt(IDL.Float64),
+        freelancer_review: IDL.Opt(IDL.Text),
+        freelancer_rating: IDL.Opt(IDL.Float64),
+        dispute_id: IDL.Opt(IDL.Text)
+      })),
+      err: IDL.Variant({
+        NotFound: IDL.Text,
+        AlreadyExists: IDL.Text,
+        InvalidInput: IDL.Text,
+        Unauthorized: IDL.Text,
+        PaymentFailed: IDL.Text,
+        InsufficientFunds: IDL.Null,
+        LedgerError: IDL.Text,
+        StageNotApproved: IDL.Null,
+        BookingNotFunded: IDL.Null,
+        InvalidStatus: IDL.Text
+      })
+    })]),
+
+    listBookingsForFreelancer: IDL.Func([IDL.Text, IDL.Opt(IDL.Variant({ Pending: IDL.Null, Active: IDL.Null, InDispute: IDL.Null, Completed: IDL.Null, Cancelled: IDL.Null })), IDL.Nat, IDL.Nat], [IDL.Variant({
+      ok: IDL.Vec(IDL.Record({
+        booking_id: IDL.Text,
+        service_id: IDL.Text,
+        package_id: IDL.Text,
+        client_id: IDL.Text,
+        freelancer_id: IDL.Text,
+        title: IDL.Text,
+        description: IDL.Text,
+        requirements: IDL.Vec(IDL.Text),
+        status: IDL.Variant({ Pending: IDL.Null, Active: IDL.Null, InDispute: IDL.Null, Completed: IDL.Null, Cancelled: IDL.Null }),
+        payment_status: IDL.Variant({ Pending: IDL.Null, HeldInEscrow: IDL.Null, Released: IDL.Null, Refunded: IDL.Null, Disputed: IDL.Null }),
+        total_amount_e8s: IDL.Nat64,
+        currency: IDL.Text,
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        deadline: IDL.Int,
+        milestones: IDL.Vec(IDL.Text),
+        current_milestone: IDL.Opt(IDL.Text),
+        client_review: IDL.Opt(IDL.Text),
+        client_rating: IDL.Opt(IDL.Float64),
+        freelancer_review: IDL.Opt(IDL.Text),
+        freelancer_rating: IDL.Opt(IDL.Float64),
+        dispute_id: IDL.Opt(IDL.Text)
+      })),
+      err: IDL.Variant({
+        NotFound: IDL.Text,
+        AlreadyExists: IDL.Text,
+        InvalidInput: IDL.Text,
+        Unauthorized: IDL.Text,
+        PaymentFailed: IDL.Text,
+        InsufficientFunds: IDL.Null,
+        LedgerError: IDL.Text,
+        StageNotApproved: IDL.Null,
+        BookingNotFunded: IDL.Null,
+        InvalidStatus: IDL.Text
+      })
+    })]),
+
+    // Review methods
+    submitReview: IDL.Func([IDL.Text, IDL.Float64, IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
+
+    // Admin methods
+    getMarketplaceStats: IDL.Func([], [IDL.Record({
+      total_services: IDL.Nat,
+      active_services: IDL.Nat,
+      total_bookings: IDL.Nat,
+      active_bookings: IDL.Nat,
+      total_revenue_e8s: IDL.Nat64
+    })]),
+
+    // Alias for backward compatibility
     getStats: IDL.Func([], [IDL.Record({
       total_services: IDL.Nat,
-      total_packages: IDL.Nat,
+      active_services: IDL.Nat,
       total_bookings: IDL.Nat,
-      total_stages: IDL.Nat,
-      total_transactions: IDL.Nat
-    })]),
-    
-    getEventLog: IDL.Func([], [IDL.Vec(IDL.Text)])
+      active_bookings: IDL.Nat,
+      total_revenue_e8s: IDL.Nat64
+    })])
   });
 };
 
@@ -142,82 +253,36 @@ export interface Service {
   status: 'Active' | 'Paused' | 'Deleted';
   created_at: number;
   updated_at: number;
-  rating_avg: number;
-  total_orders: number;
-}
-
-export interface Package {
-  package_id: string;
-  service_id: string;
-  tier: 'Basic' | 'Advanced' | 'Premium';
-  title: string;
-  description: string;
-  price_e8s: bigint;
-  delivery_days: number;
-  features: string[];
-  revisions_included: number;
-  status: 'Available' | 'Unavailable';
-  created_at: number;
-  updated_at: number;
+  delivery_time_days: number;
+  starting_from_e8s: bigint;
+  total_rating: number;
+  review_count: number;
+  tags: string[];
 }
 
 export interface Booking {
   booking_id: string;
+  service_id: string;
   package_id: string;
   client_id: string;
   freelancer_id: string;
-  total_price_e8s: bigint;
-  escrow_amount_e8s: bigint;
-  platform_fee_e8s: bigint;
-  payment_status: 'Pending' | 'PaymentInitiated' | 'Funded' | 'Released' | 'Refunded' | 'Failed';
-  booking_status: 'Pending' | 'InProgress' | 'Completed' | 'Cancelled' | 'Disputed';
-  special_instructions: string;
-  deliverables: string[];
-  idempotency_key: string;
-  ledger_deposit_block?: bigint;
-  created_at: number;
-  updated_at: number;
-  funded_at?: number;
-  completed_at?: number;
-}
-
-export interface ProjectStage {
-  stage_id: string;
-  booking_id: string;
-  stage_number: number;
   title: string;
   description: string;
-  amount_e8s: bigint;
-  status: 'Pending' | 'InProgress' | 'Submitted' | 'Approved' | 'Rejected' | 'Released';
-  submission_notes?: string;
-  submission_artifacts: string[];
-  rejection_reason?: string;
-  submitted_at?: number;
-  approved_at?: number;
-  rejected_at?: number;
-  released_at?: number;
-  release_ledger_block?: bigint;
-}
-
-export interface EscrowTransaction {
-  transaction_id: string;
-  booking_id: string;
-  transaction_type: 'Deposit' | 'Release' | 'Refund' | 'PlatformFee';
-  amount_e8s: bigint;
-  from_principal: string;
-  to_principal: string;
-  ledger_block_index: bigint;
-  status: 'Pending' | 'Confirmed' | 'Failed';
+  requirements: string[];
+  status: 'Pending' | 'Active' | 'InDispute' | 'Completed' | 'Cancelled';
+  payment_status: 'Pending' | 'HeldInEscrow' | 'Released' | 'Refunded' | 'Disputed';
+  total_amount_e8s: bigint;
+  currency: string;
   created_at: number;
-  confirmed_at?: number;
-}
-
-export interface ServiceFilter {
-  category?: string;
-  freelancer_id?: string;
-  search_term: string;
-  limit: number;
-  offset: number;
+  updated_at: number;
+  deadline: number;
+  milestones: string[];
+  current_milestone?: string;
+  client_review?: string;
+  client_rating?: number;
+  freelancer_review?: string;
+  freelancer_rating?: number;
+  dispute_id?: string;
 }
 
 export interface BookingResponse {
@@ -240,20 +305,28 @@ export interface ApiError {
   InvalidStatus?: string;
 }
 
+export interface MarketplaceStats {
+  total_services: number;
+  active_services: number;
+  total_bookings: number;
+  active_bookings: number;
+  total_revenue_e8s: bigint;
+}
+
 // IC Agent configuration
-const IC_HOST = process.env.IC_HOST || 'http://localhost:4943';
-const MARKETPLACE_CANISTER_ID = process.env.MARKETPLACE_CANISTER_ID || '';
+const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST || 'http://localhost:4943';
+const MARKETPLACE_CANISTER_ID = process.env.NEXT_PUBLIC_MARKETPLACE_CANISTER_ID || '';
 
 let agent: HttpAgent | null = null;
 let marketplaceActor: _SERVICE | null = null;
 
 export async function getICAgent(): Promise<HttpAgent> {
   if (!agent) {
-    agent = new HttpAgent({ 
+    agent = new HttpAgent({
       host: IC_HOST,
       verifyQuerySignatures: false // Set to true in production
     });
-    
+
     // In development, we don't need to fetch the root key
     if (IC_HOST.includes('localhost')) {
       await agent.fetchRootKey();
@@ -287,8 +360,8 @@ export async function createActorWithIDL<T>(
 
 // Environment variables validation
 export function validateMarketplaceConfig(): void {
-  if (!process.env.MARKETPLACE_CANISTER_ID) {
-    throw new Error('MARKETPLACE_CANISTER_ID environment variable is required');
+  if (!process.env.NEXT_PUBLIC_MARKETPLACE_CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_MARKETPLACE_CANISTER_ID environment variable is required');
   }
 }
 
@@ -334,4 +407,3 @@ export function handleApiError(error: any): string {
   }
   return 'Unknown error occurred';
 }
-

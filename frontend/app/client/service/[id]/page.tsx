@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Share2, Check, Star, Clock, DollarSign } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Share2, Check, Star, Clock, DollarSign, CreditCard } from 'lucide-react';
 import { useServices } from '@/hooks/useServices';
 import { useBookPackage } from '@/hooks/usePackages';
 export default function ServiceDetails() {
@@ -50,15 +50,66 @@ export default function ServiceDetails() {
       return;
     }
 
-    const userEmail = 'test@example.com'; // TODO: Get from auth context
-    
-    const result = await bookPackage(userEmail, packageId, bookingNotes);
-    
+    // TODO: Get from auth context - for now use a placeholder
+    // In production, this would come from authentication context
+    const userEmail = 'client@example.com'; // This should be dynamic based on logged-in user
+
+    const result = await bookPackage(userEmail, packageId, bookingNotes.trim());
+
     if (result.success) {
-      alert('Package booked successfully!');
+      // Check chat initiation status
+      const chatData = result.data?.chat;
+      const chatInitiated = chatData?.success;
+      const freelancerEmail = result.data?.participants?.freelancer;
+      const serviceTitle = result.data?.serviceTitle;
+
+      console.log('📊 Booking result:', {
+        chatInitiated,
+        chatData,
+        freelancerEmail,
+        serviceTitle
+      });
+
+      let message = '🎉 Package booked successfully!';
+
+      if (chatInitiated) {
+        message += ' Chat session has been created with the freelancer.';
+
+        // Show enhanced success dialog with chat option
+        const goToChat = window.confirm(
+          `${message}\n\nService: ${serviceTitle}\n\nWould you like to start chatting with the freelancer now?`
+        );
+
+        if (goToChat && freelancerEmail) {
+          navigate.push(`/client/chat?with=${encodeURIComponent(freelancerEmail)}`);
+          return;
+        }
+      } else {
+        // Handle chat initiation failure gracefully
+        console.warn('⚠️ Chat initiation failed:', chatData);
+
+        if (chatData?.canisterOffline) {
+          // Chat canister is offline - provide helpful guidance
+          const tryChatLater = window.confirm(
+            `🎉 Package booked successfully!\n\nService: ${serviceTitle}\n\n${chatData.details}\n\nWould you like to navigate to the chat page anyway? You can start chatting when the service is back online.`
+          );
+
+          if (tryChatLater && freelancerEmail) {
+            navigate.push(`/client/chat?with=${encodeURIComponent(freelancerEmail)}`);
+            return;
+          }
+        } else if (chatData?.error) {
+          message += ` \n\n⚠️ Chat setup failed: ${chatData.error}`;
+          message += ' \nYou can still contact the freelancer through your projects page.';
+        } else {
+          message += ' \nYou can contact the freelancer through your projects page.';
+        }
+      }
+
+      alert(message);
       navigate.push('/client/projects');
     } else {
-      alert('Failed to book package: ' + result.error);
+      alert('❌ Failed to book package: ' + result.error);
     }
   };
 
@@ -186,7 +237,9 @@ export default function ServiceDetails() {
       return;
     }
 
-    await handleBookPackage(selectedPackage.package_id);
+    // Redirect to payment page with package details
+    const paymentUrl = `/client/payment/${id}?packageId=${selectedPackage.package_id}&tier=${selectedTier}&instructions=${encodeURIComponent(bookingNotes.trim())}`;
+    navigate.push(paymentUrl);
   };
   const handleBack = () => {
     navigate.push('/client/browse-services');
@@ -484,19 +537,33 @@ export default function ServiceDetails() {
                   </span>
                 </div>
               </div>
-              <button 
-                onClick={handleContinue} 
-                disabled={bookingLoading}
-                className="w-full py-3 bg-purple-600 text-white rounded-lg mt-6 hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+
+              {/* Special Instructions */}
+              <div className="space-y-4 border-t border-gray-200 pt-4">
+                <div>
+                  <label htmlFor="specialInstructions" className="block text-sm font-medium text-gray-700 mb-2">
+                    Special Instructions <span className="text-gray-400">(Optional)</span>
+                  </label>
+                  <textarea
+                    id="specialInstructions"
+                    value={bookingNotes}
+                    onChange={(e) => setBookingNotes(e.target.value)}
+                    placeholder="Please provide any special requirements, deadlines, or specific instructions for the freelancer... (Optional)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optional: Help the freelancer understand your specific requirements
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleContinue}
+                className="w-full py-3 bg-purple-600 text-white rounded-lg mt-6 hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2"
               >
-                {bookingLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
-                    Booking...
-                  </>
-                ) : (
-                  `Book Now ($${serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.price || '0.00'})`
-                )}
+                <CreditCard size={18} />
+                <span>Continue to Payment (${serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.price || '0.00'})</span>
               </button>
             </div>
           </div>

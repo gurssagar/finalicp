@@ -2,9 +2,45 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/actions/auth';
 import { getUserActor } from '@/lib/ic-agent';
 
+// Simple in-memory cache for profile data
+const profileCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to get cached data
+function getCachedData(email: string): any | null {
+  const cached = profileCache.get(email);
+  if (cached && Date.now() - cached.timestamp < cached.ttl) {
+    return cached.data;
+  }
+  return null;
+}
+
+// Helper function to set cached data
+function setCachedData(email: string, data: any): void {
+  profileCache.set(email, {
+    data,
+    timestamp: Date.now(),
+    ttl: CACHE_TTL
+  });
+}
+
+// Helper function to clear cache
+function clearCache(email?: string): void {
+  if (email) {
+    profileCache.delete(email);
+  } else {
+    profileCache.clear();
+  }
+}
+
 export async function GET(request: NextRequest) {
+  const startTime = Date.now();
+  console.log('🚀 Profile check started at:', new Date().toISOString());
+
   try {
+    const sessionStart = Date.now();
     const session = await getCurrentSession();
+    console.log('⏱️ Session lookup took:', Date.now() - sessionStart, 'ms');
 
     if (!session) {
       console.log('⚠️ No session found, returning incomplete profile status');
@@ -42,19 +78,46 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Check cache first
+    const cacheStart = Date.now();
+    const cachedData = getCachedData(session.email);
+    if (cachedData) {
+      console.log('📋 Returning cached profile data for:', session.email);
+      console.log('⏱️ Cache lookup took:', Date.now() - cacheStart, 'ms');
+      console.log('⏱️ Total response time:', Date.now() - startTime, 'ms');
+      return NextResponse.json(cachedData);
+    }
+    console.log('⏱️ Cache lookup took:', Date.now() - cacheStart, 'ms');
+
     try {
       console.log('🔍 Environment check:');
       console.log('  • IC_HOST:', process.env.NEXT_PUBLIC_IC_HOST);
       console.log('  • USER_CANISTER_ID:', process.env.NEXT_PUBLIC_USER_CANISTER_ID);
-      
+
+      const actorStart = Date.now();
       const actor = await getUserActor();
       console.log('✅ User actor created successfully');
+      console.log('⏱️ Actor creation took:', Date.now() - actorStart, 'ms');
 
-      // Get user profile from ICP backend using email
+      // Get user profile from ICP backend using email with timeout
       console.log('🔍 Checking profile completeness for user:', session.email);
-      const userResult = await actor.getUserByEmail(session.email);
 
-      console.log('📊 Retrieved user result:', userResult);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('ICP request timeout')), 15000) // Increased to 15 seconds
+      );
+
+      const userResultPromise = actor.getUserByEmail(session.email);
+
+      let userResult;
+      try {
+        const icpStart = Date.now();
+        userResult = await Promise.race([userResultPromise, timeoutPromise]);
+        console.log('📊 Retrieved user result:', userResult);
+        console.log('⏱️ ICP call took:', Date.now() - icpStart, 'ms');
+      } catch (timeoutError) {
+        console.log('⏰ ICP request timed out after 15 seconds, returning fallback response');
+        throw timeoutError;
+      }
 
       if (!userResult || userResult.length === 0) {
         return NextResponse.json({
@@ -147,7 +210,8 @@ export async function GET(request: NextRequest) {
         userEmail: session.email
       });
 
-      return NextResponse.json({
+      const processingStart = Date.now();
+      const responseData = {
         success: true,
         isComplete: isProfileComplete,
         profileSubmitted,
@@ -164,7 +228,17 @@ export async function GET(request: NextRequest) {
           hasResume,
           hasBio
         }
-      });
+      };
+
+      console.log('⏱️ Profile processing took:', Date.now() - processingStart, 'ms');
+
+      // Cache the response for future requests
+      setCachedData(session.email, responseData);
+
+      const totalTime = Date.now() - startTime;
+      console.log('⏱️ Total response time:', totalTime, 'ms');
+
+      return NextResponse.json(responseData);
 
     } catch (icpError) {
       console.error('ICP profile fetch error:', icpError);

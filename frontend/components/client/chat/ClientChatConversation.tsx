@@ -1,6 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { ClientMessageInput } from './ClientMessageInput'
+import socketService, { SocketMessage } from '@/lib/socket-service'
+import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
 
 interface Message {
   id: string
@@ -24,9 +26,28 @@ export function ClientChatConversation({
 }: ClientChatConversationProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
+  const [socketConnected, setSocketConnected] = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
 
-  // Load chat history when chatId changes
+  // Initialize Socket.IO and load chat history when chatId changes
   useEffect(() => {
+    if (!chatId || !userEmail) return
+
+    // Initialize Socket.IO connection
+    const initializeSocket = async () => {
+      try {
+        const connected = await socketService.connect(userEmail)
+        if (connected) {
+          console.log('[ClientChat] Socket connected')
+        } else {
+          console.warn('[ClientChat] Socket connection failed')
+        }
+      } catch (error) {
+        console.error('[ClientChat] Socket initialization error:', error)
+      }
+    }
+
+    // Load chat history from storage canister
     const loadChatHistory = async () => {
       try {
         const response = await fetch(
@@ -35,7 +56,7 @@ export function ClientChatConversation({
         const data = await response.json()
 
         if (data.success) {
-          setMessages(data.messages)
+          setMessages(data.messages || [])
         }
       } catch (error) {
         console.error('Error loading chat history:', error)
@@ -44,10 +65,140 @@ export function ClientChatConversation({
       }
     }
 
-    if (chatId && userEmail) {
-      loadChatHistory()
+    initializeSocket()
+    loadChatHistory()
+
+    // Cleanup on unmount
+    return () => {
+      // Don't disconnect here as it might be used by other components
     }
   }, [chatId, userEmail])
+
+  // Setup Socket.IO event listeners
+  useEffect(() => {
+    if (!chatId || !userEmail) return
+
+    // Listen for connection status changes
+    const handleConnectionStatus = (status: any) => {
+      setSocketConnected(status.connected)
+      setConnectionError(status.error || null)
+    }
+
+    // Listen for new private messages
+    const handlePrivateMessage = (message: SocketMessage) => {
+      // Only add messages that are relevant to this chat
+      if ((message.from === chatId && message.to === userEmail) ||
+          (message.to === chatId && message.from === userEmail)) {
+
+        const newMessage: Message = {
+          id: `socket-${Date.now()}`,
+          from: message.from,
+          to: message.to,
+          text: message.text,
+          timestamp: message.timestamp || new Date().toISOString(),
+          delivered: true,
+          read: false,
+          messageType: 'text'
+        }
+
+        setMessages(prev => {
+          // Avoid duplicates
+          const exists = prev.some(m =>
+            m.text === newMessage.text &&
+            Math.abs(new Date(m.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000
+          )
+          return exists ? prev : [...prev, newMessage]
+        })
+      }
+    }
+
+    // Register event listeners
+    socketService.on('connectionStatus', handleConnectionStatus)
+    socketService.on('privateMessage', handlePrivateMessage)
+
+    // Initial connection status
+    setSocketConnected(socketService.isConnected())
+
+    // Cleanup
+    return () => {
+      socketService.off('connectionStatus', handleConnectionStatus)
+      socketService.off('privateMessage', handlePrivateMessage)
+    }
+  }, [chatId, userEmail])
+
+  // Send message via Socket.IO or fallback to storage canister
+  const sendMessage = async (text: string) => {
+    if (!text.trim() || !chatId || !userEmail) {
+      throw new Error('Missing required information to send message')
+    }
+
+    const messageData = {
+      to: chatId,
+      text: text.trim(),
+      timestamp: new Date().toISOString()
+    }
+
+    // Try Socket.IO first if connected
+    if (socketConnected) {
+      try {
+        const result = await socketService.sendPrivateMessage(messageData)
+        if (result.success) {
+          // Add message to local state immediately for better UX
+          const optimisticMessage: Message = {
+            id: `socket-${Date.now()}`,
+            from: userEmail,
+            to: chatId,
+            text: text.trim(),
+            timestamp: result.timestamp || messageData.timestamp,
+            delivered: true,
+            read: false,
+            messageType: 'text'
+          }
+          setMessages(prev => [...prev, optimisticMessage])
+          return // Success, no need to try storage
+        }
+        console.warn('[ClientChat] Socket send failed, falling back to storage')
+      } catch (error) {
+        console.warn('[ClientChat] Socket send error, falling back to storage:', error)
+      }
+    }
+
+    // Fallback to storage canister
+    try {
+      const response = await fetch('/api/chat/messages/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: userEmail,
+          to: chatId,
+          text: text.trim(),
+          messageType: 'text',
+          timestamp: messageData.timestamp
+        })
+      })
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        const storedMessage: Message = {
+          id: data.messageId || `storage-${Date.now()}`,
+          from: userEmail,
+          to: chatId,
+          text: text.trim(),
+          timestamp: messageData.timestamp,
+          delivered: true,
+          read: false,
+          messageType: 'text'
+        }
+        setMessages(prev => [...prev, storedMessage])
+        return // Success
+      } else {
+        throw new Error(data.error || 'Failed to send message')
+      }
+    } catch (error) {
+      console.error('[ClientChat] Failed to send message via storage:', error)
+      throw new Error('Failed to send message. Please try again.')
+    }
+  }
 
   // Convert messages to display format
   const displayMessages = messages.map(msg => ({
@@ -95,102 +246,25 @@ export function ClientChatConversation({
     )
   }
 
-  // Fallback to mock data if no messages available
-  const finalMessages = displayMessages.length > 0 ? displayMessages : [
-    {
-      id: '1',
-      sender: 'other',
-      senderName: 'Alex Chen',
-      senderAvatar: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=150&auto=format&fit=crop',
-      text: 'Hey! Are you ready for the AI Innovation Hackathon this weekend? I\'ve been reviewing the guidelines and it looks like we need to focus on practical implementations.',
-      time: '10:30 AM',
-      date: 'Today'
-    },
-    {
-      id: '2',
-      sender: 'me',
-      text: 'Absolutely! I\'ve been working on the machine learning model. The data preprocessing is almost complete. Should we sync up tonight to discuss our presentation strategy?',
-      time: '10:45 AM',
-      date: 'Today'
-    },
-    {
-      id: '3',
-      sender: 'other',
-      senderName: 'Alex Chen',
-      senderAvatar: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?q=80&w=150&auto=format&fit=crop',
-      text: 'Perfect idea! I can handle the frontend demo while you finalize the backend API. Also, don\'t forget about the judging criteria - innovation and technical implementation weigh heavily.',
-      time: '11:00 AM',
-      date: 'Today'
-    },
-    {
-      id: '4',
-      sender: 'other',
-      senderName: 'Sarah Kim',
-      senderAvatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=150&auto=format&fit=crop',
-      text: 'Count me in for the sync up! I\'ve prepared the design mockups and user flow diagrams. The judges love good UX!',
-      time: '11:15 AM',
-      date: 'Today'
-    },
-    {
-      id: '5',
-      sender: 'me',
-      text: 'Great! Let\'s meet at 7 PM in the co-working space. I\'ll bring my laptop and we can do a final run-through of our presentation.',
-      time: '11:30 AM',
-      date: 'Today'
-    }
-  ]
+  // Use real messages only - no more mock data
+  const finalMessages = displayMessages
 
-  const handleSendMessage = async (message: string) => {
-    if (message.trim() && chatId && userEmail) {
-      try {
-        // Save message to canister
-        const response = await fetch('/api/chat/messages/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: userEmail,
-            to: chatId,
-            text: message,
-            messageType: 'text',
-            timestamp: new Date().toISOString()
-          })
-        })
-
-        const data = await response.json()
-
-        if (data.success) {
-          // Add message to local state
-          const newMessage = {
-            id: data.messageId || Date.now().toString(),
-            from: userEmail,
-            to: chatId,
-            text: message,
-            timestamp: new Date().toISOString(),
-            delivered: true,
-            read: false,
-            messageType: 'text'
-          }
-          setMessages([...messages, newMessage])
-        } else {
-          console.error('Failed to send message:', data.error)
-        }
-      } catch (error) {
-        console.error('Error sending message:', error)
-      }
-    }
-  }
+  const handleSendMessage = sendMessage
 
   // Get chat info based on chatId
   const getChatInfo = () => {
     if (chatId.includes('@')) {
       // Direct chat with email
+      const displayName = chatId.split('@')[0];
+      const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+
       return {
-        name: chatId,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(chatId)}&background=9333ea&color=fff`,
+        name: formattedName,
+        fullName: chatId, // Show full email for clarity
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=9333ea&color=fff`,
         status: 'Online',
-        type: 'direct'
+        type: 'direct',
+        email: chatId // Store email for display
       }
     }
 
@@ -238,13 +312,42 @@ export function ClientChatConversation({
           )}
         </div>
         <div className="flex-1">
-          <h3 className="font-medium text-gray-900">{chatInfo.name}</h3>
-          <p className="text-sm text-green-600">
-            {chatInfo.status}
-            {chatInfo.type === 'team' && ` • ${chatInfo.members} members`}
-          </p>
+          <div className="flex items-center space-x-2">
+            <h3 className="font-medium text-gray-900">{chatInfo.name}</h3>
+            {chatInfo.type === 'direct' && (
+              <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded-full">
+                Freelancer
+              </span>
+            )}
+          </div>
+          <div className="flex items-center space-x-2 text-sm">
+            <p className="text-green-600">
+              {chatInfo.status}
+            </p>
+            {chatInfo.type === 'team' && (
+              <span className="text-gray-600">• {chatInfo.members} members</span>
+            )}
+            {chatInfo.email && (
+              <span className="text-gray-500 text-xs">• {chatInfo.email}</span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Connection Status Indicator */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full text-xs">
+            {socketConnected ? (
+              <>
+                <Wifi size={12} className="text-green-500" />
+                <span className="text-green-600">Connected</span>
+              </>
+            ) : (
+              <>
+                <WifiOff size={12} className="text-red-500" />
+                <span className="text-red-600">Offline</span>
+              </>
+            )}
+          </div>
+
           <button
             className="p-2 text-gray-500 hover:text-purple-600 rounded-full hover:bg-purple-50 transition-colors"
             title="Video call"
