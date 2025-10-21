@@ -11,18 +11,18 @@ import {
   forgotPasswordSchema, 
   resetPasswordSchema 
 } from '../validations';
-import { 
-  hashPassword, 
-  verifyPassword, 
-  createSession, 
-  getSession, 
+import {
+  hashPassword,
+  verifyPassword,
+  createSession,
+  getSession,
   clearSession,
   createPasswordResetToken,
   verifyPasswordResetToken,
   generateOTP,
   generateUserId,
   isValidEmail
-} from '../auth';
+} from '../auth-server';
 import { getUserActor } from '../ic-agent';
 import emailService from '../email';
 import { 
@@ -165,7 +165,7 @@ export async function loginAction(formData: FormData) {
     const validatedData = loginSchema.parse(rawData);
 
     // Check rate limiting
-    const ip = getClientIP();
+    const ip = await getClientIP();
     const rateLimit = checkLoginRateLimit(ip);
     if (!rateLimit.allowed) {
       return {

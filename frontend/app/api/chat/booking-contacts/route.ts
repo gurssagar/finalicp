@@ -33,6 +33,24 @@ const mockBookings = [
     status: 'Active',
     created_at: Date.now() - 172800000, // 2 days ago
     package_id: 'pkg002'
+  },
+  {
+    booking_id: 'BK_test003',
+    client_id: 'client@example.com',
+    freelancer_id: 'freelancer2@example.com',
+    service_id: 'service003',
+    status: 'Completed',
+    created_at: Date.now() - 604800000, // 1 week ago
+    package_id: 'pkg003'
+  },
+  {
+    booking_id: 'BK_test004',
+    client_id: 'client3@example.com',
+    freelancer_id: 'freelancer@example.com',
+    service_id: 'service004',
+    status: 'Completed',
+    created_at: Date.now() - 1209600000, // 2 weeks ago
+    package_id: 'pkg004'
   }
 ];
 
@@ -50,12 +68,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter bookings where the user is either client or freelancer
+    // Include both Active and Completed bookings for chat access
     const userBookings = mockBookings.filter(booking => {
-      if (userType === 'client') {
-        return booking.client_id === userEmail;
-      } else {
-        return booking.freelancer_id === userEmail;
-      }
+      const isUserInvolved = userType === 'client'
+        ? booking.client_id === userEmail
+        : booking.freelancer_id === userEmail;
+
+      // Allow chat for Active and Completed bookings
+      const validStatus = ['Active', 'Completed'].includes(booking.status);
+
+      return isUserInvolved && validStatus;
     });
 
     // Transform bookings into contact list

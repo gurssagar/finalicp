@@ -1,8 +1,12 @@
-import { SignJWT, jwtVerify } from 'jose';
-import argon2 from 'argon2';
-import { cookies } from 'next/headers';
+/**
+ * Client-side Authentication Utilities
+ * For use in client components and browser environment
+ * Uses localStorage/sessionStorage instead of cookies
+ */
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+import { SignJWT, jwtVerify } from 'jose';
+
+const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
 const JWT_ALGORITHM = 'HS256';
 const JWT_EXPIRES_IN = '7d';
 
@@ -20,35 +24,15 @@ export interface SessionData {
   isVerified: boolean;
 }
 
-// Password hashing
-export async function hashPassword(password: string): Promise<string> {
-  try {
-    return await argon2.hash(password, {
-      type: argon2.argon2id,
-      memoryCost: 2 ** 16, // 64 MB
-      timeCost: 3,
-      parallelism: 1,
-    });
-  } catch (error) {
-    console.error('Password hashing error:', error);
-    throw new Error('Failed to hash password');
-  }
-}
+// Password hashing functions are removed from client-side auth
+// Password hashing should only be done on the server for security reasons
+// Use the API endpoints for password operations
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  try {
-    return await argon2.verify(hash, password);
-  } catch (error) {
-    console.error('Password verification error:', error);
-    return false;
-  }
-}
-
-// JWT token creation
+// JWT token creation (for client-side validation)
 export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string> {
   try {
     const secret = new TextEncoder().encode(JWT_SECRET);
-    
+
     const jwt = await new SignJWT(payload)
       .setProtectedHeader({ alg: JWT_ALGORITHM })
       .setIssuedAt()
@@ -62,12 +46,12 @@ export async function createJWT(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promi
   }
 }
 
-// JWT token verification
+// JWT token verification (client-side)
 export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   try {
     const secret = new TextEncoder().encode(JWT_SECRET);
     const { payload } = await jwtVerify(token, secret);
-    
+
     return payload as unknown as JWTPayload;
   } catch (error) {
     console.error('JWT verification error:', error);
@@ -75,21 +59,36 @@ export async function verifyJWT(token: string): Promise<JWTPayload | null> {
   }
 }
 
-// Session management
+// Session management (client-side using localStorage)
 export async function createSession(sessionData: SessionData): Promise<string> {
-  const payload: Omit<JWTPayload, 'iat' | 'exp'> = {
-    userId: sessionData.userId,
-    email: sessionData.email,
-    isVerified: sessionData.isVerified,
-  };
+  try {
+    const payload: Omit<JWTPayload, 'iat' | 'exp'> = {
+      userId: sessionData.userId,
+      email: sessionData.email,
+      isVerified: sessionData.isVerified,
+    };
 
-  return createJWT(payload);
+    const token = await createJWT(payload);
+
+    // Store in localStorage for persistence
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sid', token);
+    }
+
+    return token;
+  } catch (error) {
+    console.error('Session creation error:', error);
+    throw new Error('Failed to create session');
+  }
 }
 
 export async function getSession(): Promise<SessionData | null> {
   try {
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('sid')?.value;
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const sessionToken = localStorage.getItem('sid');
 
     if (!sessionToken) {
       return null;
@@ -97,6 +96,8 @@ export async function getSession(): Promise<SessionData | null> {
 
     const payload = await verifyJWT(sessionToken);
     if (!payload) {
+      // Remove invalid token
+      localStorage.removeItem('sid');
       return null;
     }
 
@@ -107,20 +108,38 @@ export async function getSession(): Promise<SessionData | null> {
     };
   } catch (error) {
     console.error('Session retrieval error:', error);
+    // Clear potentially corrupted session
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sid');
+    }
     return null;
   }
 }
 
-export async function clearSession(): Promise<void> {
+export function clearSession(): void {
   try {
-    const cookieStore = await cookies();
-    cookieStore.delete('sid');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('sid');
+      // Also clear session storage
+      sessionStorage.removeItem('sid');
+    }
   } catch (error) {
     console.error('Session clear error:', error);
   }
 }
 
-// Password reset token
+// Check if user is authenticated
+export async function isAuthenticated(): Promise<boolean> {
+  const session = await getSession();
+  return session !== null && session.isVerified;
+}
+
+// Get current user info
+export async function getCurrentUser(): Promise<SessionData | null> {
+  return await getSession();
+}
+
+// Password reset token (client-side)
 export async function createPasswordResetToken(userId: string): Promise<string> {
   const payload = {
     userId,
@@ -168,27 +187,27 @@ export function isValidEmail(email: string): boolean {
 // Validate password strength
 export function validatePassword(password: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
-  
+
   if (password.length < 8) {
     errors.push('Password must be at least 8 characters long');
   }
-  
+
   if (!/[A-Z]/.test(password)) {
     errors.push('Password must contain at least one uppercase letter');
   }
-  
+
   if (!/[a-z]/.test(password)) {
     errors.push('Password must contain at least one lowercase letter');
   }
-  
+
   if (!/\d/.test(password)) {
     errors.push('Password must contain at least one number');
   }
-  
+
   if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
     errors.push('Password must contain at least one special character');
   }
-  
+
   return {
     valid: errors.length === 0,
     errors,
@@ -210,15 +229,13 @@ export function isTokenExpired(token: string): boolean {
   }
 }
 
-// Auth object for compatibility
-export const auth = {
+// Client-side auth object for compatibility
+export const authClient = {
   createSession,
   getSession,
   clearSession,
   createJWT,
   verifyJWT,
-  hashPassword,
-  verifyPassword,
   createPasswordResetToken,
   verifyPasswordResetToken,
   generateOTP,
@@ -226,5 +243,9 @@ export const auth = {
   isValidEmail,
   validatePassword,
   sanitizeInput,
-  isTokenExpired
+  isTokenExpired,
+  isAuthenticated,
+  getCurrentUser
 };
+
+export default authClient;

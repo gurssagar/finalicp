@@ -77,6 +77,58 @@ export async function GET(
   }
 }
 
+// PATCH /api/marketplace/bookings/[bookingId] - Update booking status
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ bookingId: string }> }
+) {
+  try {
+    const { bookingId } = await params;
+    const body = await request.json();
+    const { status, specialInstructions } = body;
+
+    if (!status) {
+      return NextResponse.json({
+        success: false,
+        error: 'Status is required'
+      }, { status: 400 });
+    }
+
+    console.log(`📝 Updating booking ${bookingId} status to: ${status}`);
+
+    // Update enhanced booking data if exists
+    if (enhancedBookingStorage[bookingId]) {
+      enhancedBookingStorage[bookingId] = {
+        ...enhancedBookingStorage[bookingId],
+        status: status,
+        last_updated: Date.now(),
+        ...(specialInstructions && { special_instructions: specialInstructions })
+      };
+    }
+
+    // TODO: Connect to real marketplace canister and update booking status
+    // For now, return success response
+    const updatedBooking = {
+      booking_id: bookingId,
+      status: status,
+      special_instructions: specialInstructions,
+      last_updated: Date.now()
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: updatedBooking,
+      message: 'Booking updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating booking:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to update booking'
+    }, { status: 500 });
+  }
+}
+
 // PUT /api/marketplace/bookings/[bookingId] - Cancel booking
 export async function PUT(
   request: NextRequest,

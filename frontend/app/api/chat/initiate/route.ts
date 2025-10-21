@@ -75,6 +75,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Create chat relationship if bookingId is provided
+    let relationshipCreated = false;
+    if (bookingId && serviceTitle) {
+      relationshipCreated = await chatStorageApi.createChatRelationship(
+        clientEmail,
+        freelancerEmail,
+        bookingId,
+        serviceTitle,
+        'Active'
+      );
+
+      if (!relationshipCreated) {
+        console.warn('Warning: Failed to create chat relationship, but will attempt to send message anyway');
+      } else {
+        console.log('Chat relationship created successfully for booking:', bookingId);
+      }
+    }
+
     // Create initial message based on context
     let initialMessage = 'Hello! I would like to discuss the project.';
     let messageType = 'text';
@@ -118,7 +136,9 @@ export async function POST(request: NextRequest) {
         client: clientEmail,
         freelancer: freelancerEmail
       },
-      initialMessage
+      initialMessage,
+      relationshipCreated: relationshipCreated || false,
+      bookingId: bookingId || null
     });
   } catch (error) {
     console.error('Chat initiation error:', error);

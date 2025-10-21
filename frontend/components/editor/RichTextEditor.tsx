@@ -189,7 +189,7 @@ export default function RichTextEditor({
             onChange={handleChange}
             preview={isPreviewMode ? 'preview' : 'edit'}
             hideToolbar={false}
-            visibleDragBar={false}
+            visibleDragbar={false}
             height={minHeight}
             textareaProps={{
               placeholder,

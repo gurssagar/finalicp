@@ -12,7 +12,7 @@ if (!existsSync(PAYMENT_SESSIONS_FILE)) {
 
 function savePaymentSession(paymentId: string, session: any): void {
   try {
-    let sessions = {};
+    let sessions: Record<string, any> = {};
     try {
       const data = readFileSync(PAYMENT_SESSIONS_FILE, 'utf8');
       sessions = JSON.parse(data);

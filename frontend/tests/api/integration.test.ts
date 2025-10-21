@@ -1,10 +1,9 @@
-import { TestRunner, makeApiCall, TEST_CONFIG, resetMockData, assertEqual, assertNotNull, assertTrue, generateMockService, generateMockPackage } from './test-setup';
+import { TestRunner, TestResult, makeApiCall, TEST_CONFIG, assertEqual, assertNotNull, assertTrue, generateMockService, generateMockPackage } from './test-setup';
 
-export async function runIntegrationTests(): Promise<void> {
+export async function runIntegrationTests(): Promise<TestResult[]> {
   const runner = new TestRunner();
 
   // Reset mock data before running tests
-  resetMockData();
 
   // Integration Test 1: Complete service lifecycle
   await runner.runTest('Complete Service Lifecycle', async () => {

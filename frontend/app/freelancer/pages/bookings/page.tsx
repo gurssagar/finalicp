@@ -55,14 +55,17 @@ export default function FreelancerBookings() {
     setUserId(mockUserId);
     
     if (mockUserId) {
-      fetchBookings(statusFilter || undefined);
+      fetchBookings();
     }
   }, [fetchBookings, statusFilter]);
 
   const handleCreateStages = async (stageDefinitions: any[]) => {
     if (!userId || !selectedBooking) return;
     
-    const result = await createStages(userId, selectedBooking, stageDefinitions);
+    const result = await createStages({
+      booking_id: selectedBooking,
+      stages: stageDefinitions
+    });
     if (result) {
       setShowStageForm(false);
     }
@@ -175,11 +178,11 @@ export default function FreelancerBookings() {
                     <div>
                       <CardTitle className="text-lg">Booking #{booking.booking_id.slice(-8)}</CardTitle>
                       <div className="flex items-center gap-2 mt-1">
-                        {getStatusIcon(booking.booking_status)}
+                        {getStatusIcon(booking.status)}
                         <Badge 
-                          variant={booking.booking_status === 'Completed' ? 'default' : 'secondary'}
+                          variant={booking.status === 'Completed' ? 'default' : 'secondary'}
                         >
-                          {booking.booking_status}
+                          {booking.status}
                         </Badge>
                         <Badge 
                           variant={booking.payment_status === 'Funded' ? 'default' : 'outline'}
@@ -190,7 +193,7 @@ export default function FreelancerBookings() {
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-semibold text-[#0B1F36]">
-                        {formatICP(booking.escrow_amount_e8s)}
+                        {formatICP(BigInt(booking.escrow_amount_e8s))}
                       </div>
                       <div className="text-sm text-gray-500">
                         {new Date(booking.created_at / 1000000).toLocaleDateString()}
@@ -256,7 +259,7 @@ export default function FreelancerBookings() {
                             </p>
                             <div className="flex items-center justify-between mt-3">
                               <div className="text-sm font-semibold text-[#0B1F36]">
-                                {formatICP(stage.amount_e8s)}
+                                {formatICP(BigInt(stage.amount_e8s))}
                               </div>
                               <div className="flex gap-2">
                                 {stage.status === 'Pending' && (
@@ -296,7 +299,7 @@ export default function FreelancerBookings() {
                                 <strong>Submission Notes:</strong> {stage.submission_notes}
                               </div>
                             )}
-                            {stage.submission_artifacts.length > 0 && (
+                            {stage.submission_artifacts && stage.submission_artifacts.length > 0 && (
                               <div className="mt-2">
                                 <div className="text-sm font-medium">Artifacts:</div>
                                 <div className="flex flex-wrap gap-1 mt-1">

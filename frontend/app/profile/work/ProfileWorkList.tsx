@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FreelancerProfileLayout } from '../../components/FreelancerProfileLayout';
+import { useRouter } from 'next/navigation';
+import { FreelancerProfileLayout } from '@/components/FreelancerProfileLayout';
 import { Plus, Edit2 } from 'lucide-react';
 export function ProfileWorkList() {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const [workExperiences, setWorkExperiences] = useState([{
     id: '1',
     role: 'Frontend Web Developer',
@@ -13,13 +13,13 @@ export function ProfileWorkList() {
     description: 'Developed responsive web applications using React and TypeScript.'
   }]);
   const handleAddMoreExperience = () => {
-    navigate('/profile/work');
+    navigate.push('/profile/work');
   };
   const handleEditExperience = (id: string) => {
-    navigate(`/profile/work?id=${id}`);
+    navigate.push(`/profile/work?id=${id}`);
   };
   const handleContinue = () => {
-    navigate('/profile/others');
+    navigate.push('/profile/others');
   };
   return <FreelancerProfileLayout activeTab="work" progress="1/3" detailsType="Work">
       <div>

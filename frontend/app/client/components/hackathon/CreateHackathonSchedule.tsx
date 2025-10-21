@@ -28,7 +28,7 @@ const CreateHackathonSchedule: React.FC<CreateHackathonScheduleProps> = ({ hacka
   };
 
   const removeEvent = (index: number) => {
-    const updatedSchedule = schedule.filter((_, i) => i !== index);
+    const updatedSchedule = schedule.filter((_: any, i: number) => i !== index);
     updateHackathonData({ schedule: updatedSchedule });
   };
 
@@ -63,7 +63,7 @@ const CreateHackathonSchedule: React.FC<CreateHackathonScheduleProps> = ({ hacka
       <h2 className="text-2xl font-bold mb-6">Set Schedule</h2>
 
       <div className="space-y-6">
-        {schedule.map((event, index) => (
+        {schedule.map((event: any, index: number) => (
           <div key={event.id} className="border border-gray-200 rounded-lg p-6 bg-gray-50">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-medium">Event {index + 1}</h3>

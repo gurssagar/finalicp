@@ -33,6 +33,7 @@ export interface Package {
   status: string;
   created_at: number;
   updated_at: number;
+  id?: string;
 }
 
 export interface Booking {
@@ -47,6 +48,8 @@ export interface Booking {
   client_notes?: string;
   created_at: number;
   updated_at: number;
+  special_instructions?: string;
+  ledger_deposit_block?: bigint;
 }
 
 export interface Stage {
@@ -65,6 +68,7 @@ export interface Stage {
   submission_notes?: string;
   submission_artifacts?: string[];
   rejection_reason?: string;
+  stage_number?: number;
 }
 
 // Service Hooks

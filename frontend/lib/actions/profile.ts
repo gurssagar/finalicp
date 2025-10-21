@@ -7,11 +7,11 @@ import {
   profileImageSchema, 
   resumeSchema 
 } from '../validations';
-import { 
-  getSession, 
-  hashPassword, 
-  verifyPassword 
-} from '../auth';
+import {
+  getSession,
+  hashPassword,
+  verifyPassword
+} from '../auth-server';
 import { getUserActor } from '../ic-agent';
 import s3Service from '../s3';
 

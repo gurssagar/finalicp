@@ -4,7 +4,7 @@ import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '
 // GET /api/marketplace/job-posts/[jobId] - Get specific job post
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
     // Validate configuration
@@ -18,7 +18,7 @@ export async function GET(
       }, { status: 503 });
     }
 
-    const { jobId } = params;
+    const { jobId } = await params;
 
     // Use mock agent for testing
     const actor = await getMarketplaceActor();
@@ -47,10 +47,10 @@ export async function GET(
 // PUT /api/marketplace/job-posts/[jobId] - Update job post
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = params;
+    const { jobId } = await params;
     const body = await request.json();
     const { userId, updates } = body;
 
@@ -88,10 +88,10 @@ export async function PUT(
 // DELETE /api/marketplace/job-posts/[jobId] - Delete job post
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: { params: Promise<{ jobId: string }> }
 ) {
   try {
-    const { jobId } = params;
+    const { jobId } = await params;
     const body = await request.json();
     const { userId } = body;
 

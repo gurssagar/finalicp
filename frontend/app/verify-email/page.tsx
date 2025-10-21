@@ -1,9 +1,10 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import OTPVerification from '@/components/auth1/OTPVerification';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
 
@@ -31,4 +32,12 @@ export default function VerifyEmailPage() {
   }
 
   return <OTPVerification email={email} />;
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
 }

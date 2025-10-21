@@ -87,15 +87,15 @@ export function BookingDetails({ booking }: BookingDetailsProps) {
   const getUpsellIcon = (category: string) => {
     switch (category) {
       case 'delivery':
-        return <Zap size={16} />;
+        return Zap;
       case 'revisions':
-        return <RefreshCw size={16} />;
+        return RefreshCw;
       case 'support':
-        return <Headphones size={16} />;
+        return Headphones;
       case 'features':
-        return <FileText size={16} />;
+        return FileText;
       default:
-        return <Package size={16} />;
+        return Package;
     }
   };
 

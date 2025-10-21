@@ -126,7 +126,7 @@ export function ChatsList({
   displayBookingContacts.forEach(bookingContact => {
     const existingChatIndex = allContacts.findIndex(chat => chat.id === bookingContact.id)
     if (existingChatIndex === -1) {
-      allContacts.push(bookingContact)
+      allContacts.push({...bookingContact, type: 'chat' as const})
     }
   })
 
@@ -203,7 +203,7 @@ export function ChatsList({
                   {chat.unread}
                 </div>
               )}
-              {chat.type === 'booking' && (
+              {(chat as any).bookingId && (
                 <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
                   💼
                 </div>
@@ -216,15 +216,15 @@ export function ChatsList({
                 </h3>
                 <span className="text-xs text-gray-500">{chat.time}</span>
               </div>
-              {chat.type === 'booking' && chat.serviceTitle && (
+              {(chat as any).serviceTitle && (
                 <p className="text-xs text-green-600 font-medium truncate mb-1">
-                  📋 {chat.serviceTitle}
+                  📋 {(chat as any).serviceTitle}
                 </p>
               )}
               <p className="text-sm text-gray-500 truncate">
                 {chat.lastMessage}
               </p>
-              {chat.type === 'booking' && (
+              {(chat as any).bookingId && (
                 <p className="text-xs text-blue-600 mt-1">
                   Click to start chat
                 </p>

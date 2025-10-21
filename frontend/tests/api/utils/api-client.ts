@@ -111,7 +111,7 @@ export class ApiClient {
       endpoint: string;
       method?: string;
       body?: any;
-      options?: Parameters<typeof this.makeRequest>[2];
+      options?: any;
     }>
   ): Promise<ApiResponse<T>[]> {
     const promises = requests.map(request =>
@@ -131,7 +131,7 @@ export class ApiClient {
       endpoint: string;
       method?: string;
       body?: any;
-      options?: Parameters<typeof this.makeRequest>[2];
+      options?: any;
     }>
   ): Promise<ApiResponse<T>[]> {
     const results: ApiResponse<T>[] = [];
@@ -189,8 +189,7 @@ export class ApiClient {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        body: formData,
-        timeout: 60000 // 60 seconds for file uploads
+        body: formData
       });
 
       TestHelpers.endTimer(timer);

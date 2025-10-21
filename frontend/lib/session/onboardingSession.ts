@@ -1,3 +1,5 @@
+import { safeSessionStorage, safeJsonSessionStorage } from '../browser-storage';
+
 interface ProfileData {
   firstName: string;
   lastName: string;
@@ -79,7 +81,7 @@ export const onboardingSession = {
   load: (): OnboardingSessionData => {
     try {
       console.log('🔄 Loading onboarding session data...');
-      const sessionData = sessionStorage.getItem(SESSION_KEY);
+      const sessionData = safeSessionStorage.getItem(SESSION_KEY);
       if (sessionData) {
         const parsed = JSON.parse(sessionData);
         console.log('📥 Loaded session data:', parsed);
@@ -100,7 +102,7 @@ export const onboardingSession = {
       const currentData = onboardingSession.load();
       const newData = { ...currentData, ...data };
       console.log('💾 Saving session data:', newData);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(newData));
+      safeSessionStorage.setItem(SESSION_KEY, JSON.stringify(newData));
       console.log('✅ Session data saved successfully');
     } catch (error) {
       console.error('❌ Error saving session data:', error);
@@ -184,7 +186,7 @@ export const onboardingSession = {
   // Clear all session data
   clear: (): void => {
     console.log('🗑️ Clearing onboarding session data');
-    sessionStorage.removeItem(SESSION_KEY);
+    safeSessionStorage.removeItem(SESSION_KEY);
   },
 
   // Get formatted location

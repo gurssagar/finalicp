@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
-import { Footer } from '@/components/footer'
+import { Footer } from '@/components/Footer'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -257,7 +257,7 @@ export default function MyServices() {
   }
 
   const handleToggleStatus = async (serviceId: string, currentStatus: string) => {
-    if (!userId) return
+    if (!userId || !userEmail) return
 
     const newStatus = currentStatus === 'active' ? 'Paused' : 'Active'
 

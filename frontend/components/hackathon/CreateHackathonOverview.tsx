@@ -2,17 +2,25 @@
 import React, { useState } from 'react';
 import { Calendar, MapPin, Clock, Users, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { HackathonImageUpload } from './HackathonImageUpload';
 
 interface HackathonOverviewData {
   title: string;
-  description: string;
+  shortDescription: string;
+  fullDescription: string;
+  bannerImage: string | null;
+  bannerImageFile: File | null;
   startDate: string;
   endDate: string;
   location: string;
   isVirtual: boolean;
   maxParticipants: number;
   registrationFee: number;
-  tags: string[];
+  techStack: string;
+  experienceLevel: string;
+  theme: string;
+  tagline: string;
+  rules: string;
 }
 
 interface CreateHackathonOverviewProps {
@@ -26,25 +34,29 @@ export function CreateHackathonOverview({
   onDataChange,
   className
 }: CreateHackathonOverviewProps) {
-  const updateField = (field: keyof HackathonOverviewData, value: string | number | boolean | string[]) => {
+  const updateField = (field: keyof HackathonOverviewData, value: string | number | boolean | File | null) => {
     onDataChange({ ...data, [field]: value });
   };
 
-  const addTag = (tag: string) => {
-    if (tag.trim() && !data.tags.includes(tag)) {
-      updateField('tags', [...data.tags, tag.trim()]);
-    }
-  };
-
-  const removeTag = (tag: string) => {
-    updateField('tags', data.tags.filter(t => t !== tag));
+  const handleImageSelect = (file: File | null, url?: string) => {
+    onDataChange({
+      ...data,
+      bannerImageFile: file,
+      bannerImage: url || null
+    });
   };
 
   return (
     <div className={cn('space-y-6', className)}>
       <h3 className="text-lg font-semibold text-gray-900">Hackathon Overview</h3>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
+        {/* Banner Image */}
+        <HackathonImageUpload
+          onImageSelect={handleImageSelect}
+          currentImage={data.bannerImage}
+        />
+
         {/* Title */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -59,18 +71,57 @@ export function CreateHackathonOverview({
           />
         </div>
 
-        {/* Description */}
+        {/* Tagline */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Description *
+            Tagline
+            <span className="text-gray-400 font-normal ml-1">(Optional)</span>
           </label>
-          <textarea
-            value={data.description}
-            onChange={(e) => updateField('description', e.target.value)}
-            placeholder="Describe your hackathon, its goals, and what participants can expect"
-            rows={4}
+          <input
+            type="text"
+            value={data.tagline}
+            onChange={(e) => updateField('tagline', e.target.value)}
+            placeholder="A catchy phrase to attract participants (e.g., 'Code the Future')"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+          <p className="text-xs text-gray-500 mt-1">
+            Keep it short and memorable - max 100 characters
+          </p>
+        </div>
+
+        {/* Short Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Short Description *
+          </label>
+          <textarea
+            value={data.shortDescription}
+            onChange={(e) => updateField('shortDescription', e.target.value)}
+            placeholder="Brief description of your hackathon (1-2 sentences)"
+            rows={2}
+            maxLength={200}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            This will be shown in hackathon listings and search results
+          </p>
+        </div>
+
+        {/* Full Description */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Full Description *
+          </label>
+          <textarea
+            value={data.fullDescription}
+            onChange={(e) => updateField('fullDescription', e.target.value)}
+            placeholder="Detailed description of your hackathon, including goals, target audience, challenges, and what participants will learn..."
+            rows={8}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Be comprehensive - include hackathon goals, expected outcomes, and any specific requirements
+          </p>
         </div>
 
         {/* Date and Time */}
@@ -164,50 +215,75 @@ export function CreateHackathonOverview({
           </div>
         </div>
 
-        {/* Tags */}
+        {/* Tech Stack */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tags
+            Tech Stack *
           </label>
-          <div className="flex flex-wrap gap-2 mb-2">
-            {data.tags.map((tag, index) => (
-              <span
-                key={index}
-                className="px-2 py-1 bg-blue-100 text-blue-800 text-sm rounded-md flex items-center space-x-1"
-              >
-                <span>{tag}</span>
-                <button
-                  onClick={() => removeTag(tag)}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              placeholder="Add tag (e.g., AI, Web3, Mobile)"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  addTag(e.currentTarget.value);
-                  e.currentTarget.value = '';
-                }
-              }}
-            />
-            <button
-              onClick={(e) => {
-                const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                addTag(input.value);
-                input.value = '';
-              }}
-              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-            >
-              Add
-            </button>
-          </div>
+          <input
+            type="text"
+            value={data.techStack}
+            onChange={(e) => updateField('techStack', e.target.value)}
+            placeholder="e.g., React, Node.js, Web3, AI/ML"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Specify the main technologies participants should know or will work with
+          </p>
+        </div>
+
+        {/* Experience Level */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Experience Level
+          </label>
+          <select
+            value={data.experienceLevel}
+            onChange={(e) => updateField('experienceLevel', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Select experience level</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option>
+            <option value="All Levels">All Levels</option>
+          </select>
+        </div>
+
+        {/* Theme */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Theme
+            <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+          </label>
+          <input
+            type="text"
+            value={data.theme}
+            onChange={(e) => updateField('theme', e.target.value)}
+            placeholder="e.g., AI/ML, Web3, Sustainability, Healthcare"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            The main theme or focus area of your hackathon
+          </p>
+        </div>
+
+        {/* Rules */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Rules & Guidelines
+            <span className="text-gray-400 font-normal ml-1">(Optional)</span>
+          </label>
+          <textarea
+            value={data.rules}
+            onChange={(e) => updateField('rules', e.target.value)}
+            placeholder="Outline the rules, judging criteria, submission requirements, and any important guidelines..."
+            rows={6}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Include participation rules, submission guidelines, judging criteria, and important deadlines
+          </p>
         </div>
       </div>
     </div>

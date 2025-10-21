@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { forgotPasswordSchema } from '@/lib/validations';
 import { getUserActor } from '@/lib/ic-agent';
-import { createPasswordResetToken } from '@/lib/auth';
+import { createPasswordResetToken } from '@/lib/auth-server';
 import emailService from '@/lib/email';
 import { checkPasswordResetRateLimit } from '@/lib/rate-limit';
 

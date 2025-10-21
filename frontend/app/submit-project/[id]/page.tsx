@@ -19,7 +19,7 @@ export default function SubmitHackathonProject() {
     demoLink: '',
     demoVideo: '',
     pitchVideo: '',
-    projectImage: '',
+    projectImage: null as File | null,
     techStack: [''],
     tags: [''],
     teamMembers: [
@@ -47,7 +47,7 @@ export default function SubmitHackathonProject() {
     if (e.target.files && e.target.files[0]) {
       setFormData({
         ...formData,
-        projectImage: e.target.files[0].name,
+        projectImage: e.target.files[0],
       })
     }
   }
@@ -649,7 +649,7 @@ export default function SubmitHackathonProject() {
       </div>
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header />
+        <Header1 />
         <main className="flex-1 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Back button */}

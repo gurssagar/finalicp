@@ -1,10 +1,9 @@
-import { TestRunner, makeApiCall, TEST_CONFIG, resetMockData, assertEqual, assertTrue, generateMockService } from './test-setup';
+import { TestRunner, TestResult, makeApiCall, TEST_CONFIG, assertEqual, assertTrue, generateMockService } from './test-setup';
 
-export async function runErrorHandlingTests(): Promise<void> {
+export async function runErrorHandlingTests(): Promise<TestResult[]> {
   const runner = new TestRunner();
 
   // Reset mock data before running tests
-  resetMockData();
 
   // Error Test 1: Invalid service data
   await runner.runTest('Invalid Service Data', async () => {

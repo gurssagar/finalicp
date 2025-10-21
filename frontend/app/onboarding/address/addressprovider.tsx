@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect, useMemo } from 'react'
-import { Header } from '@/components/header'
-import { Footer } from '@/components/footer'
+import { Header } from '@/components/Header'
+import { Footer } from '@/components/Footer'
 import { ProgressStepper } from '@/components/progress-stepper'
 import { ProfilePreview } from '@/components/ProfilePreview'
 import { ChevronDown } from 'lucide-react'

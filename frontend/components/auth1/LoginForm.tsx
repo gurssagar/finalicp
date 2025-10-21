@@ -32,7 +32,7 @@ export default function LoginForm() {
       const result = await response.json();
 
       if (result.success) {
-        router.push('/dashboard');
+        router.push('/clientorfreelancer');
       } else {
         setError(result.error || 'An error occurred');
       }

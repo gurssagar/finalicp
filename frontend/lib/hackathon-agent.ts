@@ -11,11 +11,7 @@ export interface Hackathon {
   tagline: string;
   description: string;
   theme: string;
-  mode: {
-    #Online: null;
-    #Offline: null;
-    #Hybrid: null;
-  };
+  mode: 'Online' | 'Offline' | 'Hybrid';
   location: string;
   start_date: string;
   end_date: string;
@@ -25,12 +21,7 @@ export interface Hackathon {
   max_team_size: number;
   prize_pool: string;
   rules: string;
-  status: {
-    #Upcoming: null;
-    #Ongoing: null;
-    #Completed: null;
-    #Cancelled: null;
-  };
+  status: 'Upcoming' | 'Ongoing' | 'Completed' | 'Cancelled';
   created_at: string;
   updated_at: string;
 }
@@ -62,18 +53,8 @@ export interface Registration {
   hackathon_id: string;
   participant_id: [string] | [];
   team_id: [string] | [];
-  status: {
-    #Pending: null;
-    #Approved: null;
-    #Rejected: null;
-    #Cancelled: null;
-  };
-  payment_status: {
-    #Free: null;
-    #Paid: null;
-    #Pending: null;
-    #Failed: null;
-  };
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
+  payment_status: 'Free' | 'Paid' | 'Pending' | 'Failed';
   transaction_id: string;
   registration_date: string;
 }
@@ -83,11 +64,7 @@ export interface CreateHackathonRequest {
   tagline: string;
   description: string;
   theme: string;
-  mode: {
-    #Online: null;
-    #Offline: null;
-    #Hybrid: null;
-  };
+  mode: 'Online' | 'Offline' | 'Hybrid';
   location: string;
   start_date: string;
   end_date: string;
@@ -123,8 +100,8 @@ export interface CreateRegistrationRequest {
 }
 
 // IC Agent configuration
-const IC_HOST = process.env.IC_HOST || 'http://localhost:4943';
-const HACKATHON_CANISTER_ID = process.env.HACKATHON_CANISTER_ID || '';
+const IC_HOST = process.env.IC_HOST || process.env.NEXT_PUBLIC_IC_HOST || 'http://localhost:40713';
+const HACKATHON_CANISTER_ID = process.env.NEXT_PUBLIC_HACKATHON_CANISTER_ID || 'uzt4z-lp777-77774-qaabq-cai';
 
 let agent: HttpAgent | null = null;
 let hackathonActor: _SERVICE | null = null;
@@ -165,8 +142,8 @@ export async function createHackathonActor<T>(
 
 // Environment variables validation
 export function validateHackathonConfig(): void {
-  if (!process.env.HACKATHON_CANISTER_ID) {
-    throw new Error('HACKATHON_CANISTER_ID environment variable is required');
+  if (!process.env.NEXT_PUBLIC_HACKATHON_CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_HACKATHON_CANISTER_ID environment variable is required');
   }
 }
 

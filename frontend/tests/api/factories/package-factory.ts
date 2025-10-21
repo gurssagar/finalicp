@@ -71,7 +71,7 @@ export class PackageFactory {
     const packages = [];
     for (let i = 0; i < count; i++) {
       packages.push(this.create({
-        service_id,
+        service_id: serviceId,
         title: `Package ${i + 1}`,
         ...overrides
       }));
@@ -81,7 +81,7 @@ export class PackageFactory {
 
   static createPackageSet(serviceId: string, overrides: Partial<PackageData> = {}): PackageData[] {
     return this.tiers.map(tier => this.create({
-      service_id,
+      service_id: serviceId,
       tier,
       ...overrides
     }));

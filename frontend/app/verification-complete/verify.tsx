@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect } from 'react'
-import { Header } from '@/components/header'
-import { Footer } from '@/components/footer'
+import { Header1 } from '@/components/Header1'
+import { Footer } from '@/components/Footer'
 import {useParams} from 'next/navigation'
 import { CheckCircle } from 'lucide-react'
 export function VerificationComplete() {
@@ -16,7 +16,7 @@ export function VerificationComplete() {
   }, [navigate])
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
-      <Header />
+      <Header1 />
       <main className="flex-1 flex flex-col justify-center items-center py-8 px-4">
         <div className="max-w-md w-full mx-auto">
           <div className="bg-white rounded-3xl p-8 shadow-lg border border-gray-100 relative overflow-hidden">

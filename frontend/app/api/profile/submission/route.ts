@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserActor } from '@/lib/ic-agent';
-import { auth } from '@/lib/auth';
+import { auth } from '@/lib/auth-server';
 
 export async function POST(request: NextRequest) {
   try {
     // Get authenticated user
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await auth.getSession();
+    if (!session?.userId) {
       return NextResponse.json({
         success: false,
         error: 'Unauthorized',
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // Get user actor and update profile submission status
     const userActor = await getUserActor();
-    const result = await userActor.updateProfileSubmissionStatus(session.user.id, isSubmitted);
+    const result = await userActor.updateProfileSubmissionStatus(session.userId, isSubmitted);
 
     if ('err' in result) {
       return NextResponse.json({
@@ -51,8 +51,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Get authenticated user
-    const session = await auth();
-    if (!session?.user?.id) {
+    const session = await auth.getSession();
+    if (!session?.userId) {
       return NextResponse.json({
         success: false,
         error: 'Unauthorized',
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     // Get user actor and check profile submission status
     const userActor = await getUserActor();
-    const isSubmitted = await userActor.isProfileSubmitted(session.user.id);
+    const isSubmitted = await userActor.isProfileSubmitted(session.userId);
 
     return NextResponse.json({
       success: true,

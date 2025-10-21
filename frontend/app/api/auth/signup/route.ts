@@ -8,7 +8,7 @@ import {
   generateOTP,
   generateUserId,
   isValidEmail
-} from '@/lib/auth';
+} from '@/lib/auth-server';
 import { getUserActor } from '@/lib/ic-agent';
 import emailService from '@/lib/email';
 import {

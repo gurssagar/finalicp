@@ -59,7 +59,7 @@ export default function AddServiceOverview() {
     const result = await submitService(userEmail);
     
     if (result.success) {
-      alert(`Service created successfully! Created ${result.packages} packages.`);
+      alert(`Service created successfully! Service ID: ${result.serviceId || 'unknown'}`);
       navigate.push('/freelancer/my-services');
     } else {
       alert('Failed to create service: ' + result.error);
