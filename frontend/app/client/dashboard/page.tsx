@@ -43,18 +43,11 @@ interface RecentBooking {
   deadline: string
 }
 
-interface RecentActivity {
-  id: string
-  type: 'booking' | 'payment' | 'review' | 'message' | 'job_post'
-  title: string
-  description: string
-  timestamp: string
-  amount?: number
-}
 
 export default function ClientDashboard() {
   const router = useRouter()
-  const [userId] = useState('TEST_USER_123') // TODO: Get from auth context
+  const [session, setSession] = useState<any>(null)
+  const [userId, setUserId] = useState<string>('')
   const [stats, setStats] = useState<DashboardStats>({
     totalSpent: 0,
     activeProjects: 0,
@@ -66,89 +59,132 @@ export default function ClientDashboard() {
     totalReviews: 0
   })
   const [recentBookings, setRecentBookings] = useState<RecentBooking[]>([])
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Fetch current session on component mount
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session')
+        const data = await response.json()
+
+        if (data.success && data.session) {
+          setSession(data.session)
+          setUserId(data.session.email) // Use email as user ID for now
+        } else {
+          // Redirect to login if no session
+          router.push('/login')
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error)
+        router.push('/login')
+      }
+    }
+
+    fetchSession()
+  }, [router])
+
   // Fetch bookings
-  const { bookings, loading: bookingsLoading } = useBookings(userId, 'client')
+  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings(userId, 'client')
   
   // Fetch marketplace stats
   const { stats: marketplaceStats, loading: statsLoading } = useMarketplaceStats()
 
-  // Mock data for now - replace with API calls
+  // Helper function to map booking status
+  const mapBookingStatus = (status: string): 'In Progress' | 'Pending' | 'Completed' => {
+    const statusMap: Record<string, 'In Progress' | 'Pending' | 'Completed'> = {
+      'InProgress': 'In Progress',
+      'Pending': 'Pending',
+      'Completed': 'Completed',
+      'Cancelled': 'Pending'
+    }
+    return statusMap[status] || 'Pending'
+  }
+
+  // Calculate statistics from real booking data
   useEffect(() => {
-    const mockStats: DashboardStats = {
-      totalSpent: 8750,
-      activeProjects: 2,
-      completedProjects: 8,
-      jobPostsCount: 3,
-      thisMonthSpent: 1200,
-      pendingPayments: 0,
-      averageRating: 4.7,
-      totalReviews: 12
+    if (!bookings || bookings.length === 0) {
+      setStats({
+        totalSpent: 0,
+        activeProjects: 0,
+        completedProjects: 0,
+        jobPostsCount: 0,
+        thisMonthSpent: 0,
+        pendingPayments: 0,
+        averageRating: 0,
+        totalReviews: 0
+      })
+      setRecentBookings([])
+      setLoading(false)
+      return
     }
 
-    const mockBookings: RecentBooking[] = [
-      {
-        id: 'BK-001',
-        freelancer_name: 'John Developer',
-        service_title: 'React E-commerce Development',
-        amount: 2500,
-        status: 'In Progress',
-        created_at: '2024-01-15',
-        deadline: '2024-02-15'
-      },
-      {
-        id: 'BK-002',
-        freelancer_name: 'Sarah Designer',
-        service_title: 'UI/UX Design',
-        amount: 1200,
-        status: 'Pending',
-        created_at: '2024-01-20',
-        deadline: '2024-02-05'
-      }
-    ]
+    // Calculate statistics from bookings
+    const now = new Date()
+    const thisMonth = now.getMonth()
+    const thisYear = now.getFullYear()
 
-    const mockActivity: RecentActivity[] = [
-      {
-        id: 'ACT-001',
-        type: 'booking',
-        title: 'New Project Started',
-        description: 'Started working with John Developer on React E-commerce Development',
-        timestamp: '2024-01-22',
-        amount: 2500
-      },
-      {
-        id: 'ACT-002',
-        type: 'job_post',
-        title: 'Job Posted',
-        description: 'Posted a new job for Mobile App Development',
-        timestamp: '2024-01-21'
-      },
-      {
-        id: 'ACT-003',
-        type: 'payment',
-        title: 'Payment Made',
-        description: 'Payment of $1,200 made to Sarah Designer for UI/UX Design',
-        timestamp: '2024-01-20',
-        amount: 1200
-      },
-      {
-        id: 'ACT-004',
-        type: 'message',
-        title: 'New Message',
-        description: 'Message from John Developer about project progress',
-        timestamp: '2024-01-19'
-      }
-    ]
+    let totalSpent = 0
+    let activeProjects = 0
+    let completedProjects = 0
+    let thisMonthSpent = 0
+    let pendingPayments = 0
 
-    setTimeout(() => {
-      setStats(mockStats)
-      setRecentBookings(mockBookings)
-      setRecentActivity(mockActivity)
-      setLoading(false)
-    }, 1000)
-  }, [])
+    bookings.forEach(booking => {
+      const amount = Number(booking.total_amount_e8s) / 100000000 // Convert e8s to ICP
+      const createdDate = new Date(Number(booking.created_at) / 1000000)
+      
+      // Total spent (completed bookings only)
+      if (booking.status === 'Completed') {
+        totalSpent += amount
+      }
+
+      // Active projects
+      if (booking.status === 'InProgress' || booking.status === 'Pending') {
+        activeProjects++
+      }
+
+      // Completed projects
+      if (booking.status === 'Completed') {
+        completedProjects++
+      }
+
+      // This month spent
+      if (createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear) {
+        thisMonthSpent += amount
+      }
+
+      // Pending payments
+      if (booking.payment_status === 'Pending') {
+        pendingPayments += amount
+      }
+    })
+
+    // Transform bookings for display
+    const transformedBookings: RecentBooking[] = bookings.map(booking => ({
+      id: booking.booking_id,
+      freelancer_name: booking.freelancer_name || booking.freelancer_id.split('@')[0],
+      service_title: booking.service_title || 'Service',
+      amount: Number(booking.total_amount_e8s) / 100000000, // Convert e8s to ICP
+      status: mapBookingStatus(booking.status),
+      created_at: new Date(Number(booking.created_at) / 1000000).toISOString(),
+      deadline: new Date(Number(booking.delivery_deadline) / 1000000).toISOString()
+    }))
+
+    setStats({
+      totalSpent,
+      activeProjects,
+      completedProjects,
+      jobPostsCount: 0, // No job posts API yet
+      thisMonthSpent,
+      pendingPayments,
+      averageRating: 0, // No reviews API yet
+      totalReviews: 0 // No reviews API yet
+    })
+
+    setRecentBookings(transformedBookings)
+    setLoading(false)
+  }, [bookings])
 
   const handleBrowseServices = () => {
     router.push('/client/browse-services')
@@ -175,21 +211,22 @@ export default function ClientDashboard() {
     }
   }
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'booking': return <Briefcase className="w-4 h-4 text-blue-600" />
-      case 'payment': return <DollarSign className="w-4 h-4 text-green-600" />
-      case 'review': return <Star className="w-4 h-4 text-yellow-600" />
-      case 'message': return <MessageSquare className="w-4 h-4 text-purple-600" />
-      case 'job_post': return <Plus className="w-4 h-4 text-orange-600" />
-      default: return <Clock className="w-4 h-4 text-gray-600" />
-    }
-  }
 
-  if (loading) {
+  if (loading || bookingsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (bookingsError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading dashboard data</p>
+          <p className="text-gray-600">{bookingsError}</p>
+        </div>
       </div>
     )
   }
@@ -298,92 +335,51 @@ export default function ClientDashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Projects */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Projects</CardTitle>
-            <Button variant="link" onClick={handleViewProjects} className="p-0 h-auto">
-              View All
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {recentBookings.length === 0 ? (
-              <div className="text-center py-8">
-                <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No recent projects</p>
-                <Button onClick={handleBrowseServices} className="mt-4 bg-blue-600 hover:bg-blue-700">
-                  Browse Services
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentBookings.map((booking) => (
-                  <div key={booking.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900">{booking.service_title}</h4>
-                      <p className="text-sm text-gray-600">{booking.freelancer_name}</p>
-                      <div className="flex items-center mt-2">
-                        <Badge className={getStatusColor(booking.status)}>
-                          {booking.status}
-                        </Badge>
-                        <span className="text-sm text-gray-500 ml-2">
-                          Due {new Date(booking.deadline).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">${booking.amount.toLocaleString()}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(booking.created_at).toLocaleDateString()}
-                      </p>
+      {/* Recent Projects */}
+      <Card className="mb-8">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Recent Projects</CardTitle>
+          <Button variant="link" onClick={handleViewProjects} className="p-0 h-auto">
+            View All
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {recentBookings.length === 0 ? (
+            <div className="text-center py-8">
+              <Briefcase className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No recent projects</p>
+              <Button onClick={handleBrowseServices} className="mt-4 bg-blue-600 hover:bg-blue-700">
+                Browse Services
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {recentBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-900">{booking.service_title}</h4>
+                    <p className="text-sm text-gray-600">{booking.freelancer_name}</p>
+                    <div className="flex items-center mt-2">
+                      <Badge className={getStatusColor(booking.status)}>
+                        {booking.status}
+                      </Badge>
+                      <span className="text-sm text-gray-500 ml-2">
+                        Due {new Date(booking.deadline).toLocaleDateString()}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.length === 0 ? (
-              <div className="text-center py-8">
-                <Clock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No recent activity</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    <div className="flex-shrink-0 mt-1">
-                      {getActivityIcon(activity.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-gray-900">{activity.title}</h4>
-                      <p className="text-sm text-gray-600">{activity.description}</p>
-                      <div className="flex items-center justify-between mt-1">
-                        <p className="text-xs text-gray-500">
-                          {new Date(activity.timestamp).toLocaleDateString()}
-                        </p>
-                        {activity.amount && (
-                          <span className="text-xs font-medium text-green-600">
-                            ${activity.amount.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">${booking.amount.toLocaleString()}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(booking.created_at).toLocaleDateString()}
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card className="mt-8">

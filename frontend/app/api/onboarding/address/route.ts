@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     // Update user profile with address
     try {
-      const actor = getUserActor();
+      const actor = await getUserActor();
 
       // Prepare address data for ICP backend
       const addressData = {

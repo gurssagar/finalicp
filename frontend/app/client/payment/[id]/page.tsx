@@ -223,6 +223,27 @@ export default function PaymentPage() {
     }
   };
 
+  // Timeout utility for API calls
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Request timed out. Please check your connection and try again.');
+      }
+      throw error;
+    }
+  };
+
   const handlePayment = async () => {
     if (!selectedPackage || !service) {
       setBookingError('Please select a package');
@@ -233,8 +254,8 @@ export default function PaymentPage() {
     setBookingError(null);
 
     try {
-      // Step 1: Create payment session
-      const paymentResponse = await fetch('/api/payment/create', {
+      // Step 1: Create payment session with timeout
+      const paymentResponse = await fetchWithTimeout('/api/payment/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -289,8 +310,8 @@ export default function PaymentPage() {
         throw new Error('Payment was not confirmed');
       }
 
-      // Step 3: Confirm payment and create booking
-      const confirmationResponse = await fetch('/api/payment/confirm', {
+      // Step 3: Confirm payment and create booking with timeout
+      const confirmationResponse = await fetchWithTimeout('/api/payment/confirm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -348,12 +369,22 @@ export default function PaymentPage() {
   }
 
   if (paymentStep === 'success') {
+    const currentTime = Date.now();
+    const bookingData = {
+      createdAt: currentTime,
+      deliveryDeadline: currentTime + (selectedPackage.delivery_days * 24 * 60 * 60 * 1000),
+      deliveryDays: selectedPackage.delivery_days,
+      paymentCompletedAt: currentTime,
+      bookingConfirmedAt: currentTime
+    };
+
     return (
       <PaymentSuccess
         serviceTitle={service.title}
         freelancerEmail={service.freelancer_email}
         bookingId={`BK_${Date.now()}`}
         totalAmount={calculateTotal()}
+        bookingData={bookingData}
       />
     );
   }

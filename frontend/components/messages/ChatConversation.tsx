@@ -1,6 +1,8 @@
 'use client'
-import React, { useState, useEffect } from 'react';
-import { MessageInput } from './MessageInput';
+import React, { useState, useEffect } from 'react'
+import socketService, { SocketMessage } from '@/lib/socket-service'
+import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
+import { MessageInput } from './MessageInput'
 
 interface Message {
   id: string
@@ -11,12 +13,16 @@ interface Message {
   delivered: boolean
   read: boolean
   messageType: string
+  fileUrl?: string
+  fileName?: string
+  fileSize?: number
+  replyTo?: string
 }
 
 interface ChatConversationProps {
-  chatId: string;
-  userEmail: string;
-  userType: 'client' | 'freelancer' | 'both';
+  chatId: string
+  userEmail: string
+  userType: 'client' | 'freelancer' | 'both'
 }
 export function ChatConversation({
   chatId,
@@ -25,18 +31,68 @@ export function ChatConversation({
 }: ChatConversationProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(true)
+  const [socketConnected, setSocketConnected] = useState(false)
+  const [connectionError, setConnectionError] = useState<string | null>(null)
+  const [isTyping, setIsTyping] = useState(false)
 
-  // Load chat history when chatId changes
+  // Initialize Socket.IO and load chat history when chatId changes
   useEffect(() => {
+    if (!chatId || !userEmail) return
+
+    // Initialize Socket.IO connection
+    const initializeSocket = async () => {
+      try {
+        const connected = await socketService.connect(userEmail)
+        if (connected) {
+          console.log('[FreelancerChat] Socket connected')
+
+          // Join chat room
+          socketService.joinRoom(chatId)
+        } else {
+          console.warn('[FreelancerChat] Socket connection failed')
+        }
+      } catch (error) {
+        console.error('[FreelancerChat] Socket initialization error:', error)
+      }
+    }
+
+    // Load chat history from canister
     const loadChatHistory = async () => {
       try {
+        setLoading(true)
+
+        // Try Socket.IO first for real-time history
+        if (socketService.isConnected()) {
+          const socketHistory = await socketService.getChatHistory(chatId, 50, 0)
+          if (socketHistory && socketHistory.length > 0) {
+            const formattedMessages = socketHistory.map(msg => ({
+              id: msg.id,
+              from: msg.from,
+              to: msg.to,
+              text: msg.text,
+              timestamp: msg.timestamp,
+              delivered: msg.delivered,
+              read: msg.read,
+              messageType: msg.messageType || 'text',
+              fileUrl: msg.fileUrl,
+              fileName: msg.fileName,
+              fileSize: msg.fileSize,
+              replyTo: msg.replyTo
+            }))
+            setMessages(formattedMessages)
+            setLoading(false)
+            return
+          }
+        }
+
+        // Fallback to API if Socket.IO doesn't have history
         const response = await fetch(
           `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
         )
         const data = await response.json()
 
         if (data.success) {
-          setMessages(data.messages)
+          setMessages(data.messages || [])
         }
       } catch (error) {
         console.error('Error loading chat history:', error)
@@ -45,8 +101,107 @@ export function ChatConversation({
       }
     }
 
-    if (chatId && userEmail) {
-      loadChatHistory()
+    initializeSocket()
+    loadChatHistory()
+
+    // Cleanup on unmount
+    return () => {
+      // Leave chat room
+      if (socketService.isConnected()) {
+        socketService.leaveRoom(chatId)
+      }
+      // Don't disconnect here as it might be used by other components
+    }
+  }, [chatId, userEmail])
+
+  // Setup Socket.IO event listeners
+  useEffect(() => {
+    if (!chatId || !userEmail) return
+
+    // Listen for connection status changes
+    const handleConnectionStatus = (status: any) => {
+      setSocketConnected(status.connected)
+      setConnectionError(status.error || null)
+    }
+
+    // Listen for new private messages
+    const handlePrivateMessage = (message: SocketMessage) => {
+      // Only add messages that are relevant to this chat
+      if ((message.from === chatId && message.to === userEmail) ||
+          (message.to === chatId && message.from === userEmail)) {
+
+        const newMessage: Message = {
+          id: message.id || `socket-${Date.now()}`,
+          from: message.from,
+          to: message.to,
+          text: message.text,
+          timestamp: message.timestamp || new Date().toISOString(),
+          delivered: true,
+          read: false,
+          messageType: message.messageType || 'text'
+        }
+
+        setMessages(prev => {
+          // Avoid duplicates
+          const exists = prev.some(m =>
+            m.text === newMessage.text &&
+            Math.abs(new Date(m.timestamp).getTime() - new Date(newMessage.timestamp).getTime()) < 1000
+          )
+          return exists ? prev : [...prev, newMessage]
+        })
+
+        // Mark as read if it's a message sent to us
+        if (message.to === userEmail) {
+          setTimeout(() => {
+            markMessageAsRead(newMessage.id)
+          }, 1000) // Mark as read after 1 second
+        }
+      }
+    }
+
+    // Listen for typing indicators
+    const handleTypingIndicator = (data: { from: string; isTyping: boolean; timestamp: string }) => {
+      if (data.from === chatId) {
+        setIsTyping(data.isTyping)
+      }
+    }
+
+    // Listen for read receipts
+    const handleMessageRead = (data: { messageId: string; readBy: string; timestamp: string }) => {
+      if (data.readBy === chatId) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === data.messageId ? { ...msg, read: true } : msg
+        ))
+      }
+    }
+
+    // Register event listeners
+    socketService.on('connectionStatus', handleConnectionStatus)
+    socketService.on('privateMessage', handlePrivateMessage)
+    socketService.on('typingIndicator', handleTypingIndicator)
+    socketService.on('messageRead', handleMessageRead)
+
+    // Initial connection status
+    setSocketConnected(socketService.isConnected())
+
+    // Mark message as read
+    const markMessageAsRead = async (messageId: string) => {
+      try {
+        await socketService.markAsRead(messageId)
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId ? { ...msg, read: true } : msg
+        ))
+      } catch (error) {
+        console.error('[FreelancerChat] Failed to mark message as read:', error)
+      }
+    }
+
+    // Cleanup
+    return () => {
+      socketService.off('connectionStatus', handleConnectionStatus)
+      socketService.off('privateMessage', handlePrivateMessage)
+      socketService.off('typingIndicator', handleTypingIndicator)
+      socketService.off('messageRead', handleMessageRead)
     }
   }, [chatId, userEmail])
 
@@ -89,47 +244,105 @@ export function ChatConversation({
       date: 'Today'
     }
   ]
-  const handleSendMessage = async (message: string) => {
-    if (message.trim() && chatId && userEmail) {
+  // Send message via Socket.IO with enhanced features
+  const sendMessage = async (text: string, options?: {
+    messageType?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+    replyTo?: string;
+  }) => {
+    if (!text.trim() && !options?.fileUrl || !chatId || !userEmail) {
+      throw new Error('Missing required information to send message')
+    }
+
+    const messageData = {
+      to: chatId,
+      text: text.trim(),
+      timestamp: new Date().toISOString(),
+      messageType: options?.messageType || 'text',
+      fileUrl: options?.fileUrl,
+      fileName: options?.fileName,
+      fileSize: options?.fileSize,
+      replyTo: options?.replyTo
+    }
+
+    // Try Socket.IO first if connected
+    if (socketConnected) {
       try {
-        // Save message to canister
-        const response = await fetch('/api/chat/messages/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        const result = await socketService.sendPrivateMessage(messageData)
+        if (result.success) {
+          // Add message to local state immediately for better UX
+          const optimisticMessage: Message = {
+            id: `socket-${Date.now()}`,
             from: userEmail,
             to: chatId,
-            text: message,
-            messageType: 'text',
-            timestamp: new Date().toISOString()
-          })
-        })
-
-        const data = await response.json()
-
-        if (data.success) {
-          // Add message to local state
-          const newMessage: Message = {
-            id: data.messageId || Date.now().toString(),
-            from: userEmail,
-            to: chatId,
-            text: message,
-            timestamp: new Date().toISOString(),
+            text: text.trim(),
+            timestamp: result.timestamp || messageData.timestamp,
             delivered: true,
             read: false,
-            messageType: 'text'
+            messageType: options?.messageType || 'text'
           }
-          setMessages([...messages, newMessage])
-        } else {
-          console.error('Failed to send message:', data.error)
+          setMessages(prev => [...prev, optimisticMessage])
+          return // Success, no need to try storage
         }
+        console.warn('[FreelancerChat] Socket send failed, falling back to storage')
       } catch (error) {
-        console.error('Error sending message:', error)
+        console.warn('[FreelancerChat] Socket send error, falling back to storage:', error)
       }
     }
-  };
+
+    // Fallback to storage canister
+    try {
+      const response = await fetch('/api/chat/messages/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: userEmail,
+          to: chatId,
+          text: text.trim(),
+          messageType: options?.messageType || 'text',
+          timestamp: messageData.timestamp,
+          fileUrl: options?.fileUrl,
+          fileName: options?.fileName,
+          fileSize: options?.fileSize,
+          replyTo: options?.replyTo
+        })
+      })
+
+      const data = await response.json()
+      if (response.ok && data.success) {
+        const storedMessage: Message = {
+          id: data.messageId || `storage-${Date.now()}`,
+          from: userEmail,
+          to: chatId,
+          text: text.trim(),
+          timestamp: messageData.timestamp,
+          delivered: true,
+          read: false,
+          messageType: options?.messageType || 'text'
+        }
+        setMessages(prev => [...prev, storedMessage])
+        return // Success
+      } else {
+        throw new Error(data.error || 'Failed to send message')
+      }
+    } catch (error) {
+      console.error('[FreelancerChat] Failed to send message via storage:', error)
+      throw new Error('Failed to send message. Please try again.')
+    }
+  }
+
+  // Typing indicator function
+  const sendTypingIndicator = (isTyping: boolean) => {
+    if (socketConnected && chatId) {
+      socketService.sendTypingIndicator(chatId, isTyping)
+    }
+  }
+
+  const handleSendMessage = async (message: string) => {
+    await sendMessage(message)
+  }
 
   if (loading) {
     return (
@@ -260,7 +473,7 @@ export function ChatConversation({
       </div>
 
       {/* Message Input */}
-      <MessageInput onSendMessage={handleSendMessage} />
+      <MessageInput onSendMessage={handleSendMessage} onTypingIndicator={sendTypingIndicator} />
     </div>
   )
 }

@@ -1,0 +1,177 @@
+{
+  "services": [
+    {
+      "service_id": "SVC_56789ABCDEFGHIJK",
+      "freelancer_email": "test@example.com",
+      "cover_image_url": "",
+      "portfolio_images": [],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "client_questions": [],
+      "faqs": [],
+      "created_at": 1761123469365000000,
+      "updated_at": 1761123469365000000,
+      "packages": []
+    },
+    {
+      "service_id": "SVC_9ABCDEFGHIJKLMNO",
+      "freelancer_email": "t3chnobromo@gmail.com",
+      "cover_image_url": "",
+      "portfolio_images": [
+        "https://s3.tebi.io/icp-work/portfolio/1761123635741-m1op6m.png"
+      ],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "client_questions": [
+        {
+          "id": "q1",
+          "type": "text",
+          "question": "What is your company name and what does it represent?",
+          "required": true
+        },
+        {
+          "id": "q2",
+          "type": "mcq",
+          "question": "Which design style do you prefer?",
+          "required": true,
+          "options": [
+            "Minimalist",
+            "Modern",
+            "Classic",
+            "Playful",
+            "Luxury"
+          ]
+        },
+        {
+          "id": "q3",
+          "type": "text",
+          "question": "Who is your target audience?",
+          "required": true
+        },
+        {
+          "id": "q4",
+          "type": "checkbox",
+          "question": "Which design materials do you need? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Logo",
+            "Brand Guidelines",
+            "Business Cards",
+            "Social Media",
+            "Email Signature"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "id": "faq1",
+          "question": "How many initial concepts will I receive?",
+          "answer": "You will receive 2-3 unique initial design concepts within 2-3 business days. Each concept will explore different creative directions based on your requirements."
+        },
+        {
+          "id": "faq2",
+          "question": "What file formats will I receive?",
+          "answer": "You will receive all essential file formats including: Vector files (AI, EPS, SVG) for scalability, High-resolution raster files (PNG, JPG) for web and print, and PDF guidelines."
+        },
+        {
+          "id": "faq3",
+          "question": "Can you help with brand strategy?",
+          "answer": "While my focus is on visual design, I can certainly provide feedback on your brand strategy. For comprehensive strategy services, I recommend working with a brand strategist."
+        }
+      ],
+      "created_at": 1761123648114000000,
+      "updated_at": 1761136932134000000,
+      "packages": [
+        {
+          "package_id": "package_001_basic",
+          "tier": "Basic",
+          "title": "Basic Design Package",
+          "description": "Professional design service with essential features",
+          "price_e8s": 500000000,
+          "delivery_days": 3,
+          "delivery_timeline": "3 days",
+          "features": [
+            "Professional design",
+            "2 initial concepts",
+            "Unlimited revisions",
+            "Final files in all formats"
+          ],
+          "revisions_included": 999,
+          "status": "Available"
+        },
+        {
+          "package_id": "package_002_standard",
+          "tier": "Standard",
+          "title": "Standard Design Package",
+          "description": "Comprehensive design service with additional features",
+          "price_e8s": 1500000000,
+          "delivery_days": 5,
+          "delivery_timeline": "5 days",
+          "features": [
+            "Everything in Basic",
+            "Comprehensive brand guidelines",
+            "Priority support",
+            "Source files included"
+          ],
+          "revisions_included": 999,
+          "status": "Available"
+        },
+        {
+          "package_id": "package_003_premium",
+          "tier": "Premium",
+          "title": "Premium Design Package",
+          "description": "Complete design solution with all extras",
+          "price_e8s": 3000000000,
+          "delivery_days": 7,
+          "delivery_timeline": "1 week",
+          "features": [
+            "Everything in Standard",
+            "Business card design",
+            "Social media templates",
+            "1 hour consultation",
+            "VIP support"
+          ],
+          "revisions_included": 999,
+          "status": "Available"
+        }
+      ]
+    },
+    {
+      "service_id": "SVC_PQRSTUVWXYZ01234",
+      "freelancer_email": "t3chnobromo@gmail.com",
+      "cover_image_url": "",
+      "portfolio_images": [
+        "https://s3.tebi.io/icp-work/portfolio/1761128906286-34fa6i.png",
+        "https://s3.tebi.io/icp-work/portfolio/1761128906271-027thl.png"
+      ],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "client_questions": [],
+      "faqs": [],
+      "created_at": 1761128954200000000,
+      "updated_at": 1761128954200000000,
+      "packages": []
+    },
+    {
+      "service_id": "SVC_Z0123456789ABCDE",
+      "freelancer_email": "t3chnobromo@gmail.com",
+      "cover_image_url": "",
+      "portfolio_images": [
+        "https://s3.tebi.io/icp-work/portfolio/1761129295472-wdwr5p.png"
+      ],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "client_questions": [],
+      "faqs": [
+        {
+          "id": "9w7756r",
+          "question": "asdjkasdjsanmdas d as",
+          "answer": "sad as da d asd as das d as"
+        }
+      ],
+      "created_at": 1761129320161000000,
+      "updated_at": 1761129320161000000,
+      "packages": []
+    }
+  ]
+}

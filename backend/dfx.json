@@ -33,7 +33,7 @@
     },
     "chat_storage": {
       "type": "motoko",
-      "main": "canisters/chat_storage.mo"
+      "main": "canisters/simple_chat.mo"
     }
   }
 }

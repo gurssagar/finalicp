@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPackageById, getServiceById } from '@/app/api/marketplace/storage';
 
 interface BookingContact {
   email: string;
@@ -64,19 +63,8 @@ export async function GET(request: NextRequest) {
       const contactEmail = isClient ? booking.freelancer_id : booking.client_id;
       const contactType = isClient ? 'freelancer' : 'client';
 
-      // Get service title from storage
-      let serviceTitle = 'Unknown Service';
-      try {
-        const packageData = getPackageById(booking.package_id);
-        if (packageData) {
-          const serviceData = getServiceById(packageData.service_id);
-          if (serviceData) {
-            serviceTitle = serviceData.title;
-          }
-        }
-      } catch (error) {
-        console.error('Error getting service title:', error);
-      }
+      // Use default service title
+      const serviceTitle = 'Service Package';
 
       return {
         email: contactEmail,

@@ -125,12 +125,3 @@ export async function PUT(
   }
 }
 
-// Helper function to add enhanced booking data (used by payment confirmation)
-export function addEnhancedBookingData(bookingId: string, bookingData: any): void {
-  enhancedBookingStorage[bookingId] = bookingData;
-}
-
-// Helper function to get enhanced booking data (used by other APIs)
-export function getEnhancedBookingData(bookingId: string): any {
-  return enhancedBookingStorage[bookingId] || null;
-}

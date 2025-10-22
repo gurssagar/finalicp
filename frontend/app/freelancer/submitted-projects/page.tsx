@@ -2,75 +2,88 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sidebar } from '../../components/Sidebar';
-import { Header1 } from '../../components/Header1';
-import { ProjectCard } from '../../components/project/ProjectCard';
+import { Sidebar } from '@/components/Sidebar';
+import { Header1 } from '@/components/Header1';
+import { ProjectCard } from '@/components/project/ProjectCard';
 import { ChevronLeft, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // TypeScript interfaces
 interface Project {
-  id: number;
-  name: string;
+  id: string;
+  title: string;
   description: string;
-  image: string;
-  hackathon: string;
-  tags: string[];
-  status: 'Live' | 'Voting' | 'Completed' | 'Draft';
-  daysLeft: string;
-  teamLeader: string;
+  budget: string;
+  deadline: string;
+  teamSize: number;
+  status: 'active' | 'completed' | 'pending' | 'cancelled';
+  rating?: number;
+  tags?: string[];
+  client?: {
+    name: string;
+    avatar?: string;
+  };
 }
 
-interface SubmittedProjectsPageProps {
-  className?: string;
-}
 
 // Static data moved outside component for better performance
 const mockProjects: Project[] = [
   {
-    id: 1,
-    name: 'Openwave',
+    id: '1',
+    title: 'Openwave',
     description: 'Openwave is a decentralized platform rewarding GitHub contributions with crypto, enabling bounties, transparent tracking.',
-    image: "/screencapture-hackquest-io-projects-VietBUIDL-Hackathon-Openwave-2025-10-15-15_06_33.png",
-    hackathon: 'VietBUIDL Hackathon',
+    budget: '$5,000',
+    deadline: '2024-02-15',
+    teamSize: 3,
+    status: 'active',
+    rating: 4.8,
     tags: ['DeFi', 'SocialFi', 'AI'],
-    status: 'Live',
-    daysLeft: '3 days left',
-    teamLeader: 'Lovepreet Singh'
+    client: {
+      name: 'TechCorp',
+      avatar: '/avatar1.jpg'
+    }
   },
   {
-    id: 2,
-    name: 'Dunk Verse',
+    id: '2',
+    title: 'Dunk Verse',
     description: 'A Mobile Dapp which offers AI-Driven Quizzes, NFT-Powered Social Media, and Blockchain Gaming.',
-    image: "/screencapture-hackquest-io-projects-VietBUIDL-Hackathon-Openwave-2025-10-15-15_06_53.png",
-    hackathon: 'VietBUIDL Hackathon',
+    budget: '$3,500',
+    deadline: '2024-02-20',
+    teamSize: 4,
+    status: 'pending',
+    rating: 4.5,
     tags: ['GameFi', 'NFT', 'SocialFi', 'AI'],
-    status: 'Voting',
-    daysLeft: '5 days left',
-    teamLeader: 'Amaan Sayyad'
+    client: {
+      name: 'GameStudio',
+      avatar: '/avatar2.jpg'
+    }
   },
   {
-    id: 3,
-    name: 'SafeSend',
+    id: '3',
+    title: 'SafeSend',
     description: 'Secure and authenticated transfers of Ether, Erc20 NFTs, and SCROM tokens, relief from phishing scams.',
-    image: "/screencapture-hackquest-io-projects-VietBUIDL-Hackathon-Openwave-2025-10-15-15_07_08.png",
-    hackathon: 'VietBUIDL Hackathon',
+    budget: '$4,200',
+    deadline: '2024-02-25',
+    teamSize: 3,
+    status: 'active',
+    rating: 4.7,
     tags: ['DeFi', 'Other'],
-    status: 'Live',
-    daysLeft: '3 days left',
-    teamLeader: 'andreou00'
+    client: {
+      name: 'SecurityCorp',
+      avatar: '/avatar3.jpg'
+    }
   }
 ];
 
-export default function SubmittedProjectsPage({ className }: SubmittedProjectsPageProps) {
+export default function SubmittedProjectsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
 
   // Filter projects based on search query
   const filteredProjects = mockProjects.filter(project => 
-    project.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    project.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     project.description.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    project.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+    project.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Navigation handlers
@@ -78,7 +91,7 @@ export default function SubmittedProjectsPage({ className }: SubmittedProjectsPa
     router.push('/hackathons');
   };
 
-  const handleProjectClick = (id: number) => {
+  const handleProjectClick = (id: string) => {
     router.push(`/project-detail/${id}`);
   };
 
@@ -87,7 +100,7 @@ export default function SubmittedProjectsPage({ className }: SubmittedProjectsPa
   };
 
   return (
-    <div className={cn("flex min-h-screen bg-white", className)}>
+    <div className="flex min-h-screen bg-white">
       {/* Sidebar */}
       
 

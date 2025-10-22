@@ -1,6 +1,6 @@
 "use client"
 import React, { useEffect } from 'react'
-import { Header } from '@/components/header'
+import { Header } from '@/components/Header'
 import { Footer } from '@/components/footer'
 import {useParams} from 'next/navigation'
 import { CheckCircle } from 'lucide-react'

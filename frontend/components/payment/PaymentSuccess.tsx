@@ -2,20 +2,40 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, MessageCircle, ExternalLink, Calendar, User, Shield } from 'lucide-react';
 import Link from 'next/link';
+import { BookingTimeline } from './BookingTimeline';
+import { formatBookingDate, formatRelativeTime } from '@/lib/booking-transformer';
 
 interface PaymentSuccessProps {
   serviceTitle: string;
   freelancerEmail: string;
   bookingId: string;
   totalAmount: number;
+  bookingData?: {
+    createdAt: number;
+    deliveryDeadline: number;
+    deliveryDays: number;
+    paymentCompletedAt: number;
+    bookingConfirmedAt: number;
+  };
 }
 
 export function PaymentSuccess({
   serviceTitle,
   freelancerEmail,
   bookingId,
-  totalAmount
+  totalAmount,
+  bookingData
 }: PaymentSuccessProps) {
+  const currentTime = Date.now();
+  const defaultBookingData = {
+    createdAt: currentTime,
+    deliveryDeadline: currentTime + (7 * 24 * 60 * 60 * 1000), // 7 days from now
+    deliveryDays: 7,
+    paymentCompletedAt: currentTime,
+    bookingConfirmedAt: currentTime
+  };
+
+  const bookingInfo = bookingData || defaultBookingData;
   const [countdown, setCountdown] = useState(10);
   const [autoRedirect, setAutoRedirect] = useState(true);
 
@@ -87,7 +107,36 @@ export function PaymentSuccess({
               <span className="text-sm text-gray-600">Freelancer</span>
               <span className="text-sm font-medium text-gray-900">{freelancerEmail}</span>
             </div>
+
+            <div className="flex items-start justify-between">
+              <span className="text-sm text-gray-600">Booked On</span>
+              <div className="text-right">
+                <span className="text-sm font-medium text-gray-900">{formatRelativeTime(bookingInfo.createdAt)}</span>
+                <div className="text-xs text-gray-400">{formatBookingDate(bookingInfo.createdAt)}</div>
+              </div>
+            </div>
+
+            <div className="flex items-start justify-between">
+              <span className="text-sm text-gray-600">Delivery Due</span>
+              <div className="text-right">
+                <span className="text-sm font-medium text-blue-600">{formatRelativeTime(bookingInfo.deliveryDeadline)}</span>
+                <div className="text-xs text-gray-400">{formatBookingDate(bookingInfo.deliveryDeadline)}</div>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Booking Timeline */}
+        <div className="mb-6">
+          <BookingTimeline
+            bookingId={bookingId}
+            createdAt={bookingInfo.createdAt}
+            deliveryDeadline={bookingInfo.deliveryDeadline}
+            status="active"
+            deliveryDays={bookingInfo.deliveryDays}
+            paymentCompletedAt={bookingInfo.paymentCompletedAt}
+            bookingConfirmedAt={bookingInfo.bookingConfirmedAt}
+          />
         </div>
 
         {/* Chat Access */}

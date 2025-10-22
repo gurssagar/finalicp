@@ -1,7 +1,8 @@
 'use client'
 import React, { useState, useCallback, useMemo } from 'react';
-import { Header } from '@/components/Header1';
+import { Header1 } from '@/components/Header1';
 import { Sidebar } from '@/components/Sidebar';
+import { cn } from '@/lib/utils';
 import { 
   ArrowUpRight, 
   Check, 
@@ -67,6 +68,10 @@ interface PaymentSettings {
   emailNotifications: boolean;
   smsNotifications: boolean;
   withdrawalAddress: string;
+  defaultPaymentMethod?: string;
+  currency?: string;
+  autoRelease?: boolean;
+  sessionTimeout?: number;
 }
 
 interface FilterOptions {
@@ -609,7 +614,7 @@ export default function PayAndLoans() {
                       </label>
                       <select
                         value={paymentSettings.defaultPaymentMethod}
-                        onChange={(e) => handleSettingsUpdate('defaultPaymentMethod', e.target.value)}
+                        onChange={(e) => handleSettingsUpdate({ defaultPaymentMethod: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="credit_card">Credit Card</option>
@@ -625,7 +630,7 @@ export default function PayAndLoans() {
                       </label>
                       <select
                         value={paymentSettings.currency}
-                        onChange={(e) => handleSettingsUpdate('currency', e.target.value)}
+                        onChange={(e) => handleSettingsUpdate({ currency: e.target.value })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="USD">USD - US Dollar</option>
@@ -641,7 +646,7 @@ export default function PayAndLoans() {
                         <p className="text-xs text-gray-600">Automatically release milestone payments after completion</p>
                       </div>
                       <button
-                        onClick={() => handleSettingsUpdate('autoRelease', !paymentSettings.autoRelease)}
+                        onClick={() => handleSettingsUpdate({ autoRelease: !paymentSettings.autoRelease })}
                         className={cn(
                           "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                           paymentSettings.autoRelease ? "bg-blue-600" : "bg-gray-200"
@@ -662,7 +667,7 @@ export default function PayAndLoans() {
                         <p className="text-xs text-gray-600">Receive email alerts for payment activities</p>
                       </div>
                       <button
-                        onClick={() => handleSettingsUpdate('emailNotifications', !paymentSettings.emailNotifications)}
+                        onClick={() => handleSettingsUpdate({ emailNotifications: !paymentSettings.emailNotifications })}
                         className={cn(
                           "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                           paymentSettings.emailNotifications ? "bg-blue-600" : "bg-gray-200"
@@ -693,7 +698,7 @@ export default function PayAndLoans() {
                         <p className="text-xs text-gray-600">Add an extra layer of security to your account</p>
                       </div>
                       <button
-                        onClick={() => handleSettingsUpdate('twoFactorAuth', !paymentSettings.twoFactorAuth)}
+                        onClick={() => handleSettingsUpdate({ twoFactorAuth: !paymentSettings.twoFactorAuth })}
                         className={cn(
                           "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                           paymentSettings.twoFactorAuth ? "bg-blue-600" : "bg-gray-200"
@@ -731,7 +736,7 @@ export default function PayAndLoans() {
                       </label>
                       <select
                         value={paymentSettings.sessionTimeout}
-                        onChange={(e) => handleSettingsUpdate('sessionTimeout', parseInt(e.target.value))}
+                        onChange={(e) => handleSettingsUpdate({ sessionTimeout: parseInt(e.target.value) })}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value={15}>15 minutes</option>

@@ -23,9 +23,26 @@ export default function AddServiceProjects() {
       [`${tier}Description`]: value,
     })
   }
+
+  const handleTimelineChange = (tier: string, value: string) => {
+    updateFormData({
+      [`${tier}DeliveryDays`]: value,
+    })
+  }
   const handleContinue = () => {
     router.push('/freelancer/add-service/pricing')
   }
+
+  // Timeline options
+  const timelineOptions = [
+    { value: '1', label: 'Same day (24 hours)' },
+    { value: '3', label: '1-3 days' },
+    { value: '7', label: '1 week' },
+    { value: '14', label: '2 weeks' },
+    { value: '21', label: '3 weeks' },
+    { value: '30', label: '1 month' },
+    { value: 'custom', label: 'Custom timeline' }
+  ]
   return (
     <div className="flex flex-col min-h-screen bg-white">
      
@@ -99,6 +116,39 @@ export default function AddServiceProjects() {
                       {formData.basicDescription.length}/1000
                     </div>
                   </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delivery Timeline
+                    </label>
+                    <div className="space-y-2">
+                      <select
+                        value={formData.basicDeliveryDays && !timelineOptions.find(opt => opt.value === formData.basicDeliveryDays) ? 'custom' : (formData.basicDeliveryDays || '')}
+                        onChange={(e) => handleTimelineChange('basic', e.target.value)}
+                        className="w-full p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                      >
+                        <option value="">Select delivery timeline</option>
+                        {timelineOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {(formData.basicDeliveryDays === 'custom' || !timelineOptions.find(opt => opt.value === formData.basicDeliveryDays)) && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={formData.basicDeliveryDays === 'custom' ? '' : (formData.basicDeliveryDays || '')}
+                            onChange={(e) => handleTimelineChange('basic', e.target.value)}
+                            placeholder="Enter number of days"
+                            className="flex-1 p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                            min="1"
+                          />
+                          <span className="text-xs text-gray-500 whitespace-nowrap">days</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -143,6 +193,39 @@ export default function AddServiceProjects() {
                       <div className="text-xs text-gray-500">
                         {formData.basicDescription.length}/1000
                       </div>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delivery Timeline
+                    </label>
+                    <div className="space-y-2">
+                      <select
+                        value={formData.basicDeliveryDays && !timelineOptions.find(opt => opt.value === formData.basicDeliveryDays) ? 'custom' : (formData.basicDeliveryDays || '')}
+                        onChange={(e) => handleTimelineChange('basic', e.target.value)}
+                        className="w-full p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                      >
+                        <option value="">Select delivery timeline</option>
+                        {timelineOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {(formData.basicDeliveryDays === 'custom' || !timelineOptions.find(opt => opt.value === formData.basicDeliveryDays)) && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={formData.basicDeliveryDays === 'custom' ? '' : (formData.basicDeliveryDays || '')}
+                            onChange={(e) => handleTimelineChange('basic', e.target.value)}
+                            placeholder="Enter number of days"
+                            className="flex-1 p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                            min="1"
+                          />
+                          <span className="text-xs text-gray-500 whitespace-nowrap">days</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -190,6 +273,39 @@ export default function AddServiceProjects() {
                       </div>
                     </div>
                   </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delivery Timeline
+                    </label>
+                    <div className="space-y-2">
+                      <select
+                        value={formData.advancedDeliveryDays && !timelineOptions.find(opt => opt.value === formData.advancedDeliveryDays) ? 'custom' : (formData.advancedDeliveryDays || '')}
+                        onChange={(e) => handleTimelineChange('advanced', e.target.value)}
+                        className="w-full p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                      >
+                        <option value="">Select delivery timeline</option>
+                        {timelineOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {(formData.advancedDeliveryDays === 'custom' || !timelineOptions.find(opt => opt.value === formData.advancedDeliveryDays)) && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={formData.advancedDeliveryDays === 'custom' ? '' : (formData.advancedDeliveryDays || '')}
+                            onChange={(e) => handleTimelineChange('advanced', e.target.value)}
+                            placeholder="Enter number of days"
+                            className="flex-1 p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                            min="1"
+                          />
+                          <span className="text-xs text-gray-500 whitespace-nowrap">days</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="mb-8">
@@ -233,6 +349,39 @@ export default function AddServiceProjects() {
                       <div className="text-xs text-gray-500">
                         {formData.premiumDescription.length}/1000
                       </div>
+                    </div>
+                  </div>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Delivery Timeline
+                    </label>
+                    <div className="space-y-2">
+                      <select
+                        value={formData.premiumDeliveryDays && !timelineOptions.find(opt => opt.value === formData.premiumDeliveryDays) ? 'custom' : (formData.premiumDeliveryDays || '')}
+                        onChange={(e) => handleTimelineChange('premium', e.target.value)}
+                        className="w-full p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                      >
+                        <option value="">Select delivery timeline</option>
+                        {timelineOptions.map(option => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      {(formData.premiumDeliveryDays === 'custom' || !timelineOptions.find(opt => opt.value === formData.premiumDeliveryDays)) && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            value={formData.premiumDeliveryDays === 'custom' ? '' : (formData.premiumDeliveryDays || '')}
+                            onChange={(e) => handleTimelineChange('premium', e.target.value)}
+                            placeholder="Enter number of days"
+                            className="flex-1 p-3 border border-gray-200 rounded-lg outline-none text-sm"
+                            min="1"
+                          />
+                          <span className="text-xs text-gray-500 whitespace-nowrap">days</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

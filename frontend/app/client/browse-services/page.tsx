@@ -1,10 +1,10 @@
 'use client'
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ServiceFilter } from '@/components/client/ServiceFilter';
-import { ServiceCardWithPricing } from '@/components/client/ServiceCardWithPricing';
-import { Button } from '@/components/ui/button';
-import { useServices } from '@/hooks/useServices';
+import { ServiceFilter } from '../../../components/client/ServiceFilter';
+import { ServiceCardWithPricing } from '../../../components/client/ServiceCardWithPricing';
+import { Button } from '../../../components/ui/button';
+import { useServices } from '../../../hooks/useServices';
 export default function BrowseServices() {
   const navigate = useRouter();
   const [activeCategory, setActiveCategory] = useState('');
@@ -18,7 +18,7 @@ export default function BrowseServices() {
   const { services, loading, error, refetch } = useServices(undefined, {
     category: activeCategory || undefined,
     search_term: searchTerm,
-    limit: 20,
+    limit: 50,
     offset: 0
   });
 
@@ -65,13 +65,16 @@ export default function BrowseServices() {
                 service={{
                   id: service.service_id,
                   title: service.title,
-                  image: service.cover_image_url || 
-                    (service.portfolio_images && service.portfolio_images.length > 0 
-                      ? service.portfolio_images[0] 
+                  image: service.cover_image_url ||
+                    (service.portfolio_images && service.portfolio_images.length > 0
+                      ? service.portfolio_images[0]
                       : "/default-service.svg"),
                   seller: `Freelancer ${service.freelancer_email ? service.freelancer_email.split('@')[0] : 'Unknown'}`,
                   rating: service.rating_avg,
-                  reviews: `${service.total_orders}+`
+                  reviews: `${service.total_orders}+`,
+                  deliveryTimeline: service.delivery_timeline,
+                  minDeliveryDays: service.min_delivery_days,
+                  maxDeliveryDays: service.max_delivery_days
                 }}
                 onClick={() => handleServiceClick(service.service_id)}
               />

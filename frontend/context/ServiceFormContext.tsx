@@ -5,6 +5,7 @@ import { useCreatePackage } from '@/hooks/usePackages';
 import { uploadImageToTebi, uploadMultipleImagesToTebi, UploadResult } from '@/lib/tebi-s3-upload';
 
 const STORAGE_KEY = 'service_form_data';
+
 interface ServiceFormData {
   // Overview
   serviceTitle: string;
@@ -15,6 +16,7 @@ interface ServiceFormData {
   whatsIncluded: string;
   // Projects
   tierMode: '1tier' | '3tier';
+  // Legacy package fields (for backward compatibility)
   basicTitle: string;
   basicDescription: string;
   basicDeliveryDays: string;
@@ -24,10 +26,23 @@ interface ServiceFormData {
   premiumTitle: string;
   premiumDescription: string;
   premiumDeliveryDays: string;
-  // Pricing
+  // Legacy pricing
   basicPrice: string;
   advancedPrice: string;
   premiumPrice: string;
+  // New packages array structure
+  packages: Array<{
+    package_id: string;
+    tier: string;
+    title: string;
+    description: string;
+    price_e8s: number;
+    delivery_days: number;
+    delivery_timeline: string;
+    features: string[];
+    revisions_included: number;
+    status: string;
+  }>;
   // Portfolio
   coverImage: string;
   portfolioImages: string[];
@@ -44,6 +59,7 @@ interface ServiceFormData {
     answer: string;
   }>;
 }
+
 interface ServiceFormContextType {
   formData: ServiceFormData;
   updateFormData: (data: Partial<ServiceFormData>) => void;
@@ -63,6 +79,7 @@ interface ServiceFormContextType {
   clearFormData: () => void;
   resetForm: () => void;
 }
+
 const defaultFormData: ServiceFormData = {
   serviceTitle: '',
   mainCategory: 'Web Designer',
@@ -71,6 +88,7 @@ const defaultFormData: ServiceFormData = {
   descriptionFormat: 'markdown',
   whatsIncluded: '',
   tierMode: '3tier',
+  // Legacy package fields (for backward compatibility)
   basicTitle: '',
   basicDescription: '',
   basicDeliveryDays: '',
@@ -83,11 +101,14 @@ const defaultFormData: ServiceFormData = {
   basicPrice: '',
   advancedPrice: '',
   premiumPrice: '',
+  // New packages array structure
+  packages: [],
   coverImage: '',
   portfolioImages: [],
   clientQuestions: [],
   faqs: []
 };
+
 export const ServiceFormContext = createContext<ServiceFormContextType>({
   formData: defaultFormData,
   updateFormData: () => {},
@@ -105,7 +126,20 @@ export const ServiceFormContext = createContext<ServiceFormContextType>({
   clearFormData: () => {},
   resetForm: () => {}
 });
+
 export const useServiceForm = () => useContext(ServiceFormContext);
+
+// Timeline helper functions
+const getTimelineDescription = (days: number): string => {
+  if (days <= 1) return 'Same day (24 hours)';
+  if (days <= 3) return '1-3 days';
+  if (days <= 7) return '1 week';
+  if (days <= 14) return '2 weeks';
+  if (days <= 21) return '3 weeks';
+  if (days <= 30) return '1 month';
+  return `${Math.floor(days / 30)} month${Math.floor(days / 30) > 1 ? 's' : ''}`;
+};
+
 // Configure axios with reasonable defaults
 axios.defaults.timeout = 30000; // 30 seconds timeout
 axios.defaults.maxRedirects = 5;
@@ -129,10 +163,11 @@ axios.interceptors.response.use(response => response, error => {
   }
   return Promise.reject(error);
 });
+
 // Load data from localStorage
 const loadFromStorage = (): ServiceFormData => {
   if (typeof window === 'undefined') return defaultFormData;
-  
+
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -148,7 +183,7 @@ const loadFromStorage = (): ServiceFormData => {
 // Save data to localStorage
 const saveToStorage = (data: ServiceFormData) => {
   if (typeof window === 'undefined') return;
-  
+
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
@@ -159,9 +194,10 @@ const saveToStorage = (data: ServiceFormData) => {
 // Clear data from localStorage
 const clearStorage = () => {
   if (typeof window === 'undefined') return;
-  
+
   try {
     localStorage.removeItem(STORAGE_KEY);
+    console.log('Form data cleared from localStorage');
   } catch (error) {
     console.error('Error clearing form data from localStorage:', error);
   }
@@ -169,9 +205,7 @@ const clearStorage = () => {
 
 export const ServiceFormProvider: React.FC<{
   children: ReactNode;
-}> = ({
-  children
-}) => {
+}> = ({ children }) => {
   const [formData, setFormData] = useState<ServiceFormData>(defaultFormData);
   const [currentStep, setCurrentStep] = useState(0);
   const [isSaved, setIsSaved] = useState<{
@@ -257,7 +291,7 @@ export const ServiceFormProvider: React.FC<{
     try {
       const results = await uploadMultipleImagesToTebi(files, 'portfolio');
       console.log('ServiceFormContext: Upload results received:', results);
-      
+
       const successfulUploads = results.filter(r => r.success && r.url);
       const uploadedUrls = successfulUploads.map(r => r.url!);
       console.log('ServiceFormContext: Successful uploads:', uploadedUrls);
@@ -314,68 +348,82 @@ export const ServiceFormProvider: React.FC<{
         return { success: false, error };
       }
 
-      // Create packages array for embedding in service data
-      const packages = [];
+      // Use packages array from form data if available, otherwise create from legacy fields
+      let packages = [];
 
-      if (formData.tierMode === '3tier') {
-        // Create Basic package
-        if (formData.basicTitle && formData.basicPrice) {
-          packages.push({
-            package_id: `package-${Date.now()}-basic`,
-            tier: 'Basic',
-            title: formData.basicTitle,
-            description: formData.basicDescription || 'Basic package service',
-            price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
-            delivery_days: parseInt(formData.basicDeliveryDays) || 1,
-            features: [],
-            revisions_included: 1,
-            status: 'Available'
-          });
-        }
-
-        // Create Advanced package
-        if (formData.advancedTitle && formData.advancedPrice) {
-          packages.push({
-            package_id: `package-${Date.now()}-advanced`,
-            tier: 'Advanced',
-            title: formData.advancedTitle,
-            description: formData.advancedDescription || 'Advanced package service',
-            price_e8s: Math.round(parseFloat(formData.advancedPrice) * 100000000),
-            delivery_days: parseInt(formData.advancedDeliveryDays) || 3,
-            features: [],
-            revisions_included: 2,
-            status: 'Available'
-          });
-        }
-
-        // Create Premium package
-        if (formData.premiumTitle && formData.premiumPrice) {
-          packages.push({
-            package_id: `package-${Date.now()}-premium`,
-            tier: 'Premium',
-            title: formData.premiumTitle,
-            description: formData.premiumDescription || 'Premium package service',
-            price_e8s: Math.round(parseFloat(formData.premiumPrice) * 100000000),
-            delivery_days: parseInt(formData.premiumDeliveryDays) || 7,
-            features: [],
-            revisions_included: 3,
-            status: 'Available'
-          });
-        }
+      if (formData.packages && formData.packages.length > 0) {
+        // Use packages from form data
+        packages = formData.packages;
       } else {
-        // Single tier - create one package
-        if (formData.basicTitle && formData.basicPrice) {
-          packages.push({
-            package_id: `package-${Date.now()}-single`,
-            tier: 'Basic',
-            title: formData.basicTitle || 'Service Package',
-            description: formData.basicDescription || 'Professional service offering',
-            price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
-            delivery_days: parseInt(formData.basicDeliveryDays) || 1,
-            features: [],
-            revisions_included: 1,
-            status: 'Available'
-          });
+        // Create packages from legacy fields for backward compatibility
+        if (formData.tierMode === '3tier') {
+          // Create Basic package
+          if (formData.basicTitle && formData.basicPrice) {
+            const deliveryDays = parseInt(formData.basicDeliveryDays) || 1;
+            packages.push({
+              package_id: `package-${Date.now()}-basic`,
+              tier: 'Basic',
+              title: formData.basicTitle,
+              description: formData.basicDescription || 'Basic package service',
+              price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
+              delivery_days: deliveryDays,
+              delivery_timeline: getTimelineDescription(deliveryDays),
+              features: [],
+              revisions_included: 1,
+              status: 'Available'
+            });
+          }
+
+          // Create Advanced package
+          if (formData.advancedTitle && formData.advancedPrice) {
+            const deliveryDays = parseInt(formData.advancedDeliveryDays) || 3;
+            packages.push({
+              package_id: `package-${Date.now()}-advanced`,
+              tier: 'Advanced',
+              title: formData.advancedTitle,
+              description: formData.advancedDescription || 'Advanced package service',
+              price_e8s: Math.round(parseFloat(formData.advancedPrice) * 100000000),
+              delivery_days: deliveryDays,
+              delivery_timeline: getTimelineDescription(deliveryDays),
+              features: [],
+              revisions_included: 2,
+              status: 'Available'
+            });
+          }
+
+          // Create Premium package
+          if (formData.premiumTitle && formData.premiumPrice) {
+            const deliveryDays = parseInt(formData.premiumDeliveryDays) || 7;
+            packages.push({
+              package_id: `package-${Date.now()}-premium`,
+              tier: 'Premium',
+              title: formData.premiumTitle,
+              description: formData.premiumDescription || 'Premium package service',
+              price_e8s: Math.round(parseFloat(formData.premiumPrice) * 100000000),
+              delivery_days: deliveryDays,
+              delivery_timeline: getTimelineDescription(deliveryDays),
+              features: [],
+              revisions_included: 3,
+              status: 'Available'
+            });
+          }
+        } else {
+          // Single tier - create one package
+          if (formData.basicTitle && formData.basicPrice) {
+            const deliveryDays = parseInt(formData.basicDeliveryDays) || 1;
+            packages.push({
+              package_id: `package-${Date.now()}-single`,
+              tier: 'Basic',
+              title: formData.basicTitle || 'Service Package',
+              description: formData.basicDescription || 'Professional service offering',
+              price_e8s: Math.round(parseFloat(formData.basicPrice) * 100000000),
+              delivery_days: deliveryDays,
+              delivery_timeline: getTimelineDescription(deliveryDays),
+              features: [],
+              revisions_included: 1,
+              status: 'Available'
+            });
+          }
         }
       }
 
@@ -437,23 +485,25 @@ export const ServiceFormProvider: React.FC<{
     }
   };
 
-  return <ServiceFormContext.Provider value={{
-    formData,
-    updateFormData,
-    currentStep,
-    setCurrentStep,
-    isSaved,
-    setSaved,
-    submitService,
-    isSubmitting,
-    uploadCoverImage,
-    uploadPortfolioImages,
-    uploadingImages,
-    createdServiceId,
-    submissionError,
-    clearFormData,
-    resetForm
-  }}>
+  return (
+    <ServiceFormContext.Provider value={{
+      formData,
+      updateFormData,
+      currentStep,
+      setCurrentStep,
+      isSaved,
+      setSaved,
+      submitService,
+      isSubmitting,
+      uploadCoverImage,
+      uploadPortfolioImages,
+      uploadingImages,
+      createdServiceId,
+      submissionError,
+      clearFormData,
+      resetForm
+    }}>
       {children}
-    </ServiceFormContext.Provider>;
+    </ServiceFormContext.Provider>
+  );
 };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPackagesByServiceId, addPackage, Package } from '../storage';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/packages - List packages by service
 export async function GET(request: NextRequest) {
@@ -16,8 +16,30 @@ export async function GET(request: NextRequest) {
 
     console.log('Fetching packages for service:', serviceId);
 
-    // Filter packages by service ID
-    const servicePackages = getPackagesByServiceId(serviceId);
+    // Validate configuration
+    try {
+      validateMarketplaceConfig();
+    } catch (configError) {
+      console.warn('Marketplace configuration missing:', configError);
+      return NextResponse.json({
+        success: false,
+        error: 'Marketplace service not configured'
+      }, { status: 503 });
+    }
+
+    // Get service from canister to extract package information
+    const actor = await getMarketplaceActor();
+    const serviceResult = await actor.getService(serviceId);
+
+    if ('err' in serviceResult) {
+      return NextResponse.json({
+        success: false,
+        error: handleApiError(serviceResult.err)
+      }, { status: 404 });
+    }
+
+    const service = serviceResult.ok;
+    const servicePackages = service.packages || [];
 
     return NextResponse.json({
       success: true,
@@ -63,6 +85,7 @@ export async function POST(request: NextRequest) {
       description: packageData.description || 'Professional service package',
       price_e8s: packageData.price_e8s.toString(),
       delivery_days: packageData.delivery_days || 1,
+      delivery_timeline: packageData.delivery_timeline || `${packageData.delivery_days || 1} day${(packageData.delivery_days || 1) > 1 ? 's' : ''}`,
       features: packageData.features || [],
       revisions_included: packageData.revisions_included || 1,
       status: packageData.status || 'Available',

@@ -193,6 +193,63 @@ class SocketService {
     })
   }
 
+  // Join a chat room
+  joinRoom(roomId: string): void {
+    if (this.socket?.connected) {
+      this.socket.emit('joinRoom', { roomId })
+    }
+  }
+
+  // Leave a chat room
+  leaveRoom(roomId: string): void {
+    if (this.socket?.connected) {
+      this.socket.emit('leaveRoom', { roomId })
+    }
+  }
+
+  // Get chat history from server
+  getChatHistory(contactEmail: string, limit: number, offset: number): Promise<any[]> {
+    return new Promise((resolve) => {
+      if (!this.socket?.connected) {
+        resolve([])
+        return
+      }
+
+      this.socket!.emit('getChatHistory', { contactEmail, limit, offset }, (response: any) => {
+        if (response?.success) {
+          resolve(response.messages || [])
+        } else {
+          resolve([])
+        }
+      })
+    })
+  }
+
+  // Send typing indicator
+  sendTypingIndicator(to: string, isTyping: boolean): void {
+    if (this.socket?.connected) {
+      this.socket.emit('typing', { to, isTyping })
+    }
+  }
+
+  // Mark message as read
+  markAsRead(messageId: string): Promise<{ success: boolean; error?: string }> {
+    return new Promise((resolve) => {
+      if (!this.socket?.connected) {
+        resolve({ success: false, error: 'Not connected' })
+        return
+      }
+
+      this.socket!.emit('markAsRead', { messageId }, (response: any) => {
+        if (response?.success) {
+          resolve({ success: true })
+        } else {
+          resolve({ success: false, error: 'Failed to mark as read' })
+        }
+      })
+    })
+  }
+
   // Check if user is online
   isUserOnline(username: string): boolean {
     return false // This would be tracked on the client side

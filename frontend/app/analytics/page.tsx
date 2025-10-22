@@ -28,13 +28,9 @@ interface ProjectCategory {
   color: string;
 }
 
-interface AnalyticsDashboardProps {
-  initialTimeframe?: '7days' | '30days' | '90days';
-}
-
-export default function AnalyticsDashboard({ initialTimeframe = '7days' }: AnalyticsDashboardProps) {
+export default function AnalyticsDashboard() {
   const router = useRouter();
-  const [activeTimeframe, setActiveTimeframe] = useState<'7days' | '30days' | '90days'>(initialTimeframe);
+  const [activeTimeframe, setActiveTimeframe] = useState<'7days' | '30days' | '90days'>('7days');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

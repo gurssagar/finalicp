@@ -7,11 +7,12 @@ import { Plus, Circle, CheckCircle, Square, ChevronDown, File, Check, HelpCircle
 import Image from 'next/image';
 type QuestionType = 'text' | 'file' | 'mcq' | 'checkbox' | 'dropdown';
 interface Question {
-  id: number;
+  id: string;
   type: QuestionType;
   question: string;
   options?: string[];
   saved?: boolean;
+  required: boolean;
 }
 export default function AddServiceOthers() {
   const navigate = useRouter();
@@ -21,31 +22,35 @@ export default function AddServiceOthers() {
   } = useServiceForm();
   const [showQuestionTypes, setShowQuestionTypes] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([{
-    id: 1,
+    id: '1',
     type: 'text',
     question: 'Explain me your Product?',
-    saved: true
+    saved: true,
+    required: true
   }, {
-    id: 2,
+    id: '2',
     type: 'file',
     question: 'Add your Sow Document',
-    saved: true
+    saved: true,
+    required: false
   }, {
-    id: 3,
+    id: '3',
     type: 'mcq',
     question: 'Ask your first question?',
     options: ['Enter Your Option A', 'Enter Your Option B'],
-    saved: false
+    saved: false,
+    required: true
   }]);
   const [currentQuestion, setCurrentQuestion] = useState('');
-  const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleAddQuestion = (type: QuestionType) => {
     const newQuestion: Question = {
-      id: questions.length + 1,
+      id: (questions.length + 1).toString(),
       type,
       question: currentQuestion || 'New Question',
-      saved: false
+      saved: false,
+      required: true
     };
     if (type === 'mcq' || type === 'checkbox' || type === 'dropdown') {
       newQuestion.options = ['Enter Your Option A', 'Enter Your Option B'];
@@ -54,28 +59,28 @@ export default function AddServiceOthers() {
     setCurrentQuestion('');
     setShowQuestionTypes(false);
   };
-  const handleQuestionChange = (id: number, value: string) => {
+  const handleQuestionChange = (id: string, value: string) => {
     setQuestions(questions.map(q => q.id === id ? {
       ...q,
       question: value,
       saved: false
     } : q));
   };
-  const handleOptionChange = (questionId: number, optionIndex: number, value: string) => {
+  const handleOptionChange = (questionId: string, optionIndex: number, value: string) => {
     setQuestions(questions.map(q => q.id === questionId && q.options ? {
       ...q,
       options: q.options.map((opt, i) => i === optionIndex ? value : opt),
       saved: false
     } : q));
   };
-  const handleAddOption = (questionId: number) => {
+  const handleAddOption = (questionId: string) => {
     setQuestions(questions.map(q => q.id === questionId && q.options ? {
       ...q,
       options: [...q.options, `Enter Your Option ${q.options.length + 1}`],
       saved: false
     } : q));
   };
-  const handleSaveQuestion = (id: number) => {
+  const handleSaveQuestion = (id: string) => {
     setQuestions(questions.map(q => q.id === id ? {
       ...q,
       saved: true
@@ -83,10 +88,10 @@ export default function AddServiceOthers() {
     // Clear editing state
     setEditingQuestionId(null);
   };
-  const handleEditQuestion = (id: number) => {
+  const handleEditQuestion = (id: string) => {
     setEditingQuestionId(id);
   };
-  const handleDeleteQuestion = (id: number) => {
+  const handleDeleteQuestion = (id: string) => {
     setQuestions(questions.filter(q => q.id !== id));
   };
   const handleFileUpload = () => {
@@ -95,7 +100,7 @@ export default function AddServiceOthers() {
   const handleContinue = () => {
     // Save questions to form context
     updateFormData({
-      clientQuestions: questions.map(q => q.question)
+      clientQuestions: questions
     });
     navigate.push('/service-preview');
   };

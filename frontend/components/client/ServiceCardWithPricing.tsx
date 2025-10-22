@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '../../components/ui/avatar';
-import { useServicePackages } from '@/hooks/useServices';
+import { useServicePackages } from '../../hooks/useServices';
 
 interface ServiceCardWithPricingProps {
   service: {
@@ -14,6 +14,9 @@ interface ServiceCardWithPricingProps {
     seller: string;
     rating: number;
     reviews: string;
+    deliveryTimeline?: string;
+    minDeliveryDays?: number;
+    maxDeliveryDays?: number;
   };
   onClick: () => void;
 }
@@ -96,6 +99,22 @@ export function ServiceCardWithPricing({
           </div>
           <div className="font-bold">USD ${minPrice}</div>
         </div>
+
+        {/* Display delivery timeline */}
+        {(service.deliveryTimeline || service.minDeliveryDays) && (
+          <div className="flex items-center mt-2 text-sm text-gray-600">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>
+              {service.deliveryTimeline ||
+               (service.minDeliveryDays === service.maxDeliveryDays
+                 ? `${service.minDeliveryDays} days`
+                 : `${service.minDeliveryDays}-${service.maxDeliveryDays} days`)}
+            </span>
+          </div>
+        )}
         <Button
           variant="link"
           className="p-0 h-auto mt-2 text-blue-500"

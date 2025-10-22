@@ -34,12 +34,31 @@ export function ServiceTierCard({
     });
     setSaved(descriptionKey, true);
   };
-  const handleDeliveryDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDeliveryDaysChange = (value: string) => {
     updateFormData({
-      [deliveryDaysKey]: e.target.value
+      [deliveryDaysKey]: value
     });
     setSaved(deliveryDaysKey, true);
   };
+
+  const handleTimelineSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    handleDeliveryDaysChange(e.target.value);
+  };
+
+  const handleCustomDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    handleDeliveryDaysChange(e.target.value);
+  };
+
+  // Timeline options mapping
+  const timelineOptions = [
+    { value: '1', label: 'Same day (24 hours)' },
+    { value: '3', label: '1-3 days' },
+    { value: '7', label: '1 week' },
+    { value: '14', label: '2 weeks' },
+    { value: '21', label: '3 weeks' },
+    { value: '30', label: '1 month' },
+    { value: 'custom', label: 'Custom timeline' }
+  ];
   return <div className="flex flex-col">
       <div className={`${color} p-4 rounded-t-lg text-center font-medium`}>
         {title}
@@ -62,7 +81,34 @@ export function ServiceTierCard({
             </div>}
         </div>
         <div className="relative">
-          <input type="text" value={formData[deliveryDaysKey] || ''} onChange={handleDeliveryDaysChange} placeholder="Enter Number of days of Delivery" className="w-full p-2 border border-gray-200 rounded outline-none" />
+          <div className="space-y-2">
+            <select
+              value={formData[deliveryDaysKey] && !timelineOptions.find(opt => opt.value === formData[deliveryDaysKey]) ? 'custom' : (formData[deliveryDaysKey] || '')}
+              onChange={handleTimelineSelectChange}
+              className="w-full p-2 border border-gray-200 rounded outline-none text-sm"
+            >
+              <option value="">Select delivery timeline</option>
+              {timelineOptions.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            {(formData[deliveryDaysKey] === 'custom' || !timelineOptions.find(opt => opt.value === formData[deliveryDaysKey])) && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={formData[deliveryDaysKey] === 'custom' ? '' : (formData[deliveryDaysKey] || '')}
+                  onChange={handleCustomDaysChange}
+                  placeholder="Enter number of days"
+                  className="flex-1 p-2 border border-gray-200 rounded outline-none text-sm"
+                  min="1"
+                />
+                <span className="text-xs text-gray-500 whitespace-nowrap">days</span>
+              </div>
+            )}
+          </div>
           {isSaved[deliveryDaysKey] && <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-green-500 flex items-center">
               <Check size={16} />
               <span className="text-xs ml-1">Saved</span>

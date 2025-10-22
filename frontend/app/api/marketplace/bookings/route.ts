@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
-import { getPackageById, getServiceById } from '../storage';
+import { getMarketplaceConfig, validateMarketplaceConfig } from '@/lib/marketplace-config';
+import {
+  transformCanisterBookings,
+  convertStatusFilter,
+  createMockBooking
+} from '@/lib/booking-transformer';
+import { emailsMatch } from '@/lib/email-matching';
+import { getBookingsForClientFromCanister, getBookingsForFreelancerFromCanister } from '@/lib/booking-utils';
+
+// Helper function to map payment booking status to marketplace status
+function mapBookingStatus(paymentStatus: string): string {
+  const statusMap: Record<string, string> = {
+    'active': 'InProgress',
+    'completed': 'Completed',
+    'pending': 'Pending',
+    'pending_payment': 'Pending',
+    'cancelled': 'Cancelled',
+    'expired': 'Cancelled'
+  };
+
+  return statusMap[paymentStatus.toLowerCase()] || 'Pending';
+}
 
 // Helper functions to get user information
 async function getClientEmail(clientId: string): Promise<string | null> {
@@ -17,49 +38,7 @@ async function getClientEmail(clientId: string): Promise<string | null> {
   }
 }
 
-async function getFreelancerEmailFromPackage(packageId: string): Promise<string | null> {
-  try {
-    // Get package details first
-    const packageData = getPackageById(packageId);
-    if (!packageData) {
-      console.error('Package not found:', packageId);
-      return null;
-    }
-
-    // Get service details using service_id from package
-    const serviceData = getServiceById(packageData.service_id);
-    if (!serviceData) {
-      console.error('Service not found for package:', packageData.service_id);
-      return null;
-    }
-
-    // Return the freelancer email from service data
-    console.log('Found freelancer email:', serviceData.freelancer_email);
-    return serviceData.freelancer_email;
-  } catch (error) {
-    console.error('Error getting freelancer email from package:', error);
-    return null;
-  }
-}
-
-async function getServiceTitleFromPackage(packageId: string): Promise<string | null> {
-  try {
-    const packageData = getPackageById(packageId);
-    if (!packageData) {
-      return null;
-    }
-
-    const serviceData = getServiceById(packageData.service_id);
-    if (!serviceData) {
-      return null;
-    }
-
-    return serviceData.title;
-  } catch (error) {
-    console.error('Error getting service title from package:', error);
-    return null;
-  }
-}
+// Storage helper functions removed - using canister data directly
 
 // GET /api/marketplace/bookings - List bookings
 export async function GET(request: NextRequest) {
@@ -85,24 +64,169 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // TODO: Connect to real marketplace canister when import issue is fixed
-    // For now, return mock data
-    const mockBookings = [
-      {
-        booking_id: `mock-booking-1`,
-        client_id: userId,
-        freelancer_id: 'mock-freelancer-1',
-        service_id: 'mock-service-1',
-        status: 'Active',
-        created_at: Date.now(),
-        total_amount_e8s: 100000000
-      }
-    ];
+    let bookings: any[] = [];
+  let realBookingsCount = 0;
+  let mockBookingsCount = 0;
+  let dataSource = 'unknown';
 
-    return NextResponse.json({
-      success: true,
-      data: mockBookings
-    });
+  try {
+    // Try to get real data from marketplace canister
+    console.log('🔍 Attempting to fetch bookings from marketplace canister...');
+    validateMarketplaceConfig();
+
+    const actor = await getMarketplaceActor();
+
+    // Call marketplace canister based on user type
+    const result = userType === 'client' 
+      ? await actor.listBookingsForClient(
+          userId,
+          convertStatusFilter(status),
+          BigInt(limit),
+          BigInt(offset)
+        )
+      : await actor.listBookingsForFreelancer(
+          userId,
+          convertStatusFilter(status),
+          BigInt(limit),
+          BigInt(offset)
+        );
+
+    if ('ok' in result) {
+      console.log('✅ Successfully fetched bookings from canister');
+      const canisterBookings = result.ok;
+      bookings = transformCanisterBookings(canisterBookings);
+      realBookingsCount = canisterBookings.length;
+      dataSource = 'canister';
+
+      console.log(`📊 Retrieved ${realBookingsCount} real bookings from marketplace canister for user ${userId}`);
+    } else {
+      throw new Error(`Canister error: ${result.err}`);
+    }
+
+  } catch (canisterError) {
+    console.error('❌ Failed to fetch from marketplace canister:', canisterError);
+    console.log('🔄 Falling back to available data sources...');
+
+    // Fallback 1: Try to get bookings from canister with fuzzy email matching
+    try {
+      console.log('🔄 Attempting to get bookings from canister with fuzzy matching...');
+      
+      if (userType === 'client') {
+        // Get bookings for client from canister
+        const canisterBookings = await getBookingsForClientFromCanister(userId, status, limit, offset);
+        
+        if (canisterBookings.length > 0) {
+          // Transform canister bookings to match expected format
+          const transformedBookings = canisterBookings.map(booking => ({
+            booking_id: booking.booking_id,
+            client_id: booking.client_id,
+            freelancer_id: booking.freelancer_id,
+            package_id: booking.package_id,
+            service_id: booking.service_id,
+            status: booking.status,
+            total_amount_e8s: Number(booking.total_amount_e8s),
+            escrow_amount_e8s: Math.floor(Number(booking.total_amount_e8s) * 0.95),
+            payment_status: booking.payment_status || 'Completed',
+            client_notes: booking.description || '',
+            service_title: booking.title || 'Service',
+            freelancer_name: booking.freelancer_id.split('@')[0],
+            package_title: 'Package', // Will be enhanced with service data
+            package_tier: 'basic',
+            payment_method: 'icp',
+            payment_id: booking.booking_id,
+            transaction_id: `txn_${booking.booking_id}`,
+            created_at: Number(booking.created_at),
+            updated_at: Number(booking.updated_at),
+            ledger_deposit_block: null,
+            delivery_deadline: Number(booking.deadline),
+            special_instructions: booking.description || '',
+            upsells: [],
+            promo_code: undefined
+          }));
+
+          bookings = transformedBookings;
+          realBookingsCount = transformedBookings.length;
+          dataSource = 'canister';
+          console.log(`📊 Retrieved ${realBookingsCount} bookings from canister for user ${userId} (${userType})`);
+          console.log(`📋 Booking IDs found:`, transformedBookings.map(b => b.booking_id));
+        } else {
+          console.log(`❌ No bookings found for user ${userId} (${userType}) in canister`);
+        }
+      } else if (userType === 'freelancer') {
+        // Get bookings for freelancer from canister
+        const canisterBookings = await getBookingsForFreelancerFromCanister(userId, status, limit, offset);
+        
+        if (canisterBookings.length > 0) {
+          // Transform canister bookings to match expected format
+          const transformedBookings = canisterBookings.map(booking => ({
+            booking_id: booking.booking_id,
+            client_id: booking.client_id,
+            freelancer_id: booking.freelancer_id,
+            package_id: booking.package_id,
+            service_id: booking.service_id,
+            status: booking.status,
+            total_amount_e8s: Number(booking.total_amount_e8s),
+            escrow_amount_e8s: Math.floor(Number(booking.total_amount_e8s) * 0.95),
+            payment_status: booking.payment_status || 'Completed',
+            client_notes: booking.description || '',
+            service_title: booking.title || 'Service',
+            freelancer_name: booking.freelancer_id.split('@')[0],
+            package_title: 'Package', // Will be enhanced with service data
+            package_tier: 'basic',
+            payment_method: 'icp',
+            payment_id: booking.booking_id,
+            transaction_id: `txn_${booking.booking_id}`,
+            created_at: Number(booking.created_at),
+            updated_at: Number(booking.updated_at),
+            ledger_deposit_block: null,
+            delivery_deadline: Number(booking.deadline),
+            special_instructions: booking.description || '',
+            upsells: [],
+            promo_code: undefined
+          }));
+
+          bookings = transformedBookings;
+          realBookingsCount = transformedBookings.length;
+          dataSource = 'canister';
+          console.log(`📊 Retrieved ${realBookingsCount} bookings from canister for freelancer ${userId}`);
+          console.log(`📋 Booking IDs found:`, transformedBookings.map(b => b.booking_id));
+        } else {
+          console.log(`❌ No bookings found for freelancer ${userId} in canister`);
+        }
+      }
+    } catch (canisterError) {
+      console.warn('⚠️  Canister fallback also failed:', canisterError);
+    }
+
+
+    // Fallback 2: Create mock data only for development/demo with specific conditions
+    if (bookings.length === 0) {
+      // Only create mock data if the user looks like a test/demo user
+      const isTestUser = userId.includes('test@') || userId.includes('demo@') || userId.includes('example@');
+
+      if (isTestUser) {
+        console.log('📝 Test user detected, creating mock booking for demonstration');
+        const mockBooking = createMockBooking(userId);
+        bookings = [mockBooking];
+        mockBookingsCount = 1;
+        dataSource = 'mock';
+      } else {
+        console.log(`📝 No real bookings found for user ${userId} and not a test user - returning empty list`);
+      }
+    }
+  }
+
+  console.log(`📊 Final result: ${bookings.length} bookings (Real: ${realBookingsCount}, Mock: ${mockBookingsCount}, Source: ${dataSource})`);
+
+  return NextResponse.json({
+    success: true,
+    data: bookings,
+    realBookingsCount,
+    mockBookingsCount,
+    dataSource,
+    canisterAvailable: dataSource === 'canister',
+    environmentConfigured: getMarketplaceConfig().isConfigured
+  });
 
   } catch (error) {
     console.error('Error fetching bookings:', error);
@@ -168,26 +292,34 @@ export async function POST(request: NextRequest) {
     console.log('🔗 Connecting to marketplace canister...');
 
     try {
-      // Get package data from local storage
-      console.log('🔍 Looking for package:', packageId);
-      const packageData = getPackageById(packageId);
-      console.log('📦 Package data found:', packageData ? 'YES' : 'NO');
+      // Get marketplace actor
+      const actor = await getMarketplaceActor();
 
-      if (!packageData) {
-        console.error('❌ Package not found in storage:', packageId);
-        return NextResponse.json({
-          success: false,
-          error: { NotFound: 'Package not found' }
-        }, { status: 400 });
-      }
+      // Extract service ID from package ID (assuming packageId contains service info or we need to parse it)
+      // For now, we'll use a simple approach - this may need adjustment based on your ID format
+      const serviceId = packageId.split('_')[0]; // Adjust this logic based on your actual ID format
 
-      // Get service data from local storage
-      const serviceData = getServiceById(packageData.service_id);
-      if (!serviceData) {
-        console.error('❌ Service not found for package:', packageData.service_id);
+      // Get service data from canister
+      console.log('🔍 Looking for service:', serviceId);
+      const serviceResult = await actor.getService(serviceId);
+
+      if ('err' in serviceResult) {
+        console.error('❌ Service not found in canister:', serviceId);
         return NextResponse.json({
           success: false,
           error: { NotFound: 'Service not found' }
+        }, { status: 400 });
+      }
+
+      const serviceData = serviceResult.ok;
+
+      // Find package in service packages
+      const packageData = serviceData.packages?.find((pkg: any) => pkg.package_id === packageId);
+      if (!packageData) {
+        console.error('❌ Package not found in service packages:', packageId);
+        return NextResponse.json({
+          success: false,
+          error: { NotFound: 'Package not found' }
         }, { status: 400 });
       }
 

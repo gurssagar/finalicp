@@ -63,12 +63,66 @@ export function ChatsList({
   // Load booking contacts
   const loadBookingContacts = async () => {
     try {
-      const response = await fetch(`/api/chat/booking-contacts?userEmail=${encodeURIComponent(userEmail)}&userType=${userType}`)
-      const data = await response.json()
+      // Import marketplace storage functions
+      const { getBookingsByFreelancerEmail, createChatRelationshipsFromBookings } = await import('@/lib/marketplace-storage')
+      const { getUserProfileByEmail } = await import('@/lib/user-profile')
 
-      if (data.success) {
-        setBookingContacts(data.contacts)
-      }
+      // Get bookings for freelancer
+      const bookings = await getBookingsByFreelancerEmail(userEmail)
+      console.log('Loaded bookings for freelancer:', bookings)
+
+      // Create chat relationships from bookings
+      await createChatRelationshipsFromBookings(bookings)
+
+      // Extract unique client emails from bookings
+      const uniqueClientEmails = [...new Set(bookings.map(booking => booking.client_email))]
+      console.log('Fetching profiles for clients:', uniqueClientEmails)
+
+      // Fetch client profiles
+      const clientProfiles = await Promise.allSettled(
+        uniqueClientEmails.map(email => getUserProfileByEmail(email))
+      )
+
+      // Create a map of email to profile
+      const profileMap = new Map<string, any>()
+      clientProfiles.forEach((result, index) => {
+        const email = uniqueClientEmails[index]
+        if (result.status === 'fulfilled') {
+          profileMap.set(email, result.value)
+          console.log('✅ Got profile for client:', email, result.value.displayName)
+        } else {
+          console.error('❌ Failed to fetch profile for:', email, result.reason)
+        }
+      })
+
+      // Extract unique client contacts from bookings with real profile data
+      const uniqueContacts = bookings.reduce((contacts: any[], booking: any) => {
+        const clientEmail = booking.client_email
+        const existingContact = contacts.find(c => c.email === clientEmail)
+
+        if (!existingContact) {
+          const clientProfile = profileMap.get(clientEmail)
+
+          // Use real profile data or fallback to email-based name
+          const displayName = clientProfile?.displayName ||
+                            clientProfile?.firstName + (clientProfile?.lastName ? ' ' + clientProfile.lastName : '') ||
+                            clientEmail.split('@')[0].charAt(0).toUpperCase() + clientEmail.split('@')[0].slice(1)
+
+          contacts.push({
+            email: clientEmail,
+            name: displayName,
+            type: 'client' as const,
+            profile: clientProfile,
+            serviceTitle: booking.service_title,
+            bookingId: booking.booking_id,
+            status: booking.status
+          })
+        }
+
+        return contacts
+      }, [])
+
+      setBookingContacts(uniqueContacts)
     } catch (error) {
       console.error('Error loading booking contacts:', error)
     }
@@ -107,19 +161,30 @@ export function ChatsList({
     type: 'chat' as const
   }))
 
-  // Convert booking contacts to display format
-  const displayBookingContacts = filteredBookingContacts.map(contact => ({
-    id: contact.email,
-    name: contact.name,
-    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(contact.name)}&background=10b981&color=fff`,
-    lastMessage: contact.lastMessage?.text || `Service: ${contact.serviceTitle}`,
-    time: contact.lastMessage ? new Date(contact.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
-    unread: 0,
-    type: 'booking' as const,
-    serviceTitle: contact.serviceTitle,
-    bookingId: contact.bookingId,
-    contactType: contact.type
-  }))
+  // Convert booking contacts to display format (simplified user info only)
+  const displayBookingContacts = filteredBookingContacts.map(contact => {
+    const clientProfile = contact.profile
+
+    // Use real client profile data if available
+    const displayName = clientProfile?.displayName || contact.name
+    const avatarUrl = clientProfile?.profileImage && !clientProfile.fallback
+      ? clientProfile.profileImage
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=10b981&color=fff`
+
+    return {
+      id: contact.email,
+      name: displayName,
+      avatar: avatarUrl,
+      lastMessage: 'Click to start conversation',
+      time: '',
+      unread: 0,
+      type: 'client' as const,
+      profile: clientProfile ? {
+        location: clientProfile.location,
+        bio: clientProfile.bio
+      } : null
+    }
+  })
 
   // Combine and deduplicate by email (prioritize chat contacts over booking contacts)
   const allContacts = [...displayChats]
@@ -203,9 +268,9 @@ export function ChatsList({
                   {chat.unread}
                 </div>
               )}
-              {chat.type === 'booking' && (
+              {chat.type === 'client' && (
                 <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
-                  💼
+                  👤
                 </div>
               )}
             </div>
@@ -216,17 +281,12 @@ export function ChatsList({
                 </h3>
                 <span className="text-xs text-gray-500">{chat.time}</span>
               </div>
-              {chat.type === 'booking' && chat.serviceTitle && (
-                <p className="text-xs text-green-600 font-medium truncate mb-1">
-                  📋 {chat.serviceTitle}
-                </p>
-              )}
               <p className="text-sm text-gray-500 truncate">
                 {chat.lastMessage}
               </p>
-              {chat.type === 'booking' && (
-                <p className="text-xs text-blue-600 mt-1">
-                  Click to start chat
+              {chat.type === 'client' && chat.profile && chat.profile.location && (
+                <p className="text-xs text-gray-400 mt-1">
+                  📍 {chat.profile.location}
                 </p>
               )}
             </div>

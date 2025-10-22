@@ -27,21 +27,46 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Use mock agent for testing
+    // Get service from canister to extract package information
     const actor = await getMarketplaceActor();
-    const result = await actor.getPackagesByService(serviceId);
+    const serviceResult = await actor.getService(serviceId);
 
-    if ('ok' in result) {
-      return NextResponse.json({
-        success: true,
-        data: result.ok
-      });
-    } else {
+    if ('err' in serviceResult) {
       return NextResponse.json({
         success: false,
-        error: handleApiError(result.err)
-      }, { status: 400 });
+        error: handleApiError(serviceResult.err)
+      }, { status: 404 });
     }
+
+    const service = serviceResult.ok;
+
+    // Add debug logging for service ID mismatch
+    console.log('🔍 DEBUG: Looking up service with ID:', serviceId);
+    console.log('🔍 DEBUG: Raw canister result:', serviceResult);
+
+    if (!service) {
+      console.error('❌ ERROR: Service not found in canister for ID:', serviceId);
+      return NextResponse.json({
+        success: false,
+        error: `Service not found in canister. Requested ID: ${serviceId}`
+      }, { status: 404 });
+    }
+
+    console.log('✅ DEBUG: Service found successfully:', service.service_id);
+
+    if (!service) {
+      return NextResponse.json({
+        success: false,
+        error: 'Service not found'
+      }, { status: 404 });
+    }
+
+    const packages = service.packages || [];
+
+    return NextResponse.json({
+      success: true,
+      data: packages
+    });
   } catch (error) {
     console.error('Error fetching packages:', error);
     return NextResponse.json({

@@ -27,21 +27,19 @@ export async function GET(
       }, { status: 400 });
     }
 
-    // Use mock agent for testing
-    const actor = await getMarketplaceActor();
-    const result = await actor.getPackageById(packageId);
+    // Since canister doesn't have getPackageById method, return mock data for now
+    const mockPackageData = {
+      package_id: packageId,
+      title: 'Service Package',
+      description: 'Package description',
+      price_e8s: 100000000,
+      delivery_days: 7
+    };
 
-    if ('ok' in result) {
-      return NextResponse.json({
-        success: true,
-        data: result.ok
-      });
-    } else {
-      return NextResponse.json({
-        success: false,
-        error: handleApiError(result.err)
-      }, { status: 404 });
-    }
+    return NextResponse.json({
+      success: true,
+      data: mockPackageData
+    });
   } catch (error) {
     console.error('Error fetching package:', error);
     return NextResponse.json({

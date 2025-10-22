@@ -188,12 +188,45 @@ export default function ServicePreview() {
               )}
             </div>
             
+            {/* Client Questions Section */}
+            {formData.clientQuestions && formData.clientQuestions.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-xl font-bold mb-4">Client Questions</h2>
+                <p className="text-gray-600 mb-4">Questions that will be asked to clients when they book this service:</p>
+                <div className="space-y-4">
+                  {formData.clientQuestions.map((question: any) => (
+                    <div key={question.id} className="bg-blue-50 rounded-lg p-4">
+                      <div className="flex items-start space-x-3">
+                        <span className="text-blue-600 font-medium">
+                          {question.type === 'text' ? '📝' :
+                           question.type === 'mcq' ? '🔘' :
+                           question.type === 'checkbox' ? '☑️' :
+                           question.type === 'dropdown' ? '📋' :
+                           question.type === 'file' ? '📎' : '❓'}
+                        </span>
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-900">
+                            {question.question}
+                          </h4>
+                          {question.required && (
+                            <span className="inline-block mt-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
+                              Required
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* FAQs Section */}
-            {formData.faqs.length > 0 && (
+            {formData.faqs && formData.faqs.length > 0 && (
               <div className="mb-8">
                 <h2 className="text-xl font-bold mb-4">Frequently Asked Questions</h2>
                 <div className="space-y-4">
-                  {formData.faqs.map((faq) => (
+                  {formData.faqs.map((faq: any) => (
                     <div key={faq.id} className="bg-gray-50 rounded-lg p-4">
                       <h3 className="font-semibold text-gray-900 mb-2 flex items-start">
                         <span className="text-blue-600 mr-2">Q:</span>
@@ -213,113 +246,198 @@ export default function ServicePreview() {
             <h2 className="text-xl font-bold mb-4">
               {formData.tierMode === '3tier' ? 'Choose Your Package' : 'Package Details'}
             </h2>
-            
-            {/* Basic Package */}
-            {formData.basicPrice && (
-              <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <div className="bg-yellow-50 p-3 border-b border-gray-200">
-                  <h3 className="font-bold text-gray-800">BASIC</h3>
-                </div>
-                <div className="p-4">
-                  <p className="font-medium mb-2">
-                    {formData.basicTitle || 'Basic Package'}
-                  </p>
-                  {formData.basicDescription && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {formData.basicDescription}
-                    </p>
-                  )}
-                  {formData.basicDeliveryDays && (
-                    <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-                      <span>Delivery Time</span>
-                      <span className="font-medium">{formData.basicDeliveryDays} days</span>
+
+            {/* Display packages from array if available */}
+            {formData.packages && formData.packages.length > 0 && (
+              <div className="space-y-4">
+                {formData.packages.map((pkg: any, index: number) => {
+                  const isPopular = formData.tierMode === '3tier' && index === 1; // Middle package is popular in 3-tier mode
+                  const priceInICP = parseFloat(pkg.price_e8s.toString()) / 100000000;
+
+                  return (
+                    <div
+                      key={pkg.package_id}
+                      className={`border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow ${
+                        isPopular
+                          ? 'border-2 border-blue-500'
+                          : 'border border-gray-200'
+                      }`}
+                    >
+                      <div className={`p-3 border-b ${isPopular ? 'bg-blue-50 border-blue-500' : 'border-gray-200'}`}>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-bold text-gray-800">
+                            {pkg.tier.toUpperCase()}
+                          </h3>
+                          {isPopular && (
+                            <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
+                              POPULAR
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <p className="font-medium mb-2">{pkg.title}</p>
+                        {pkg.description && (
+                          <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                            {pkg.description}
+                          </p>
+                        )}
+                        <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                          <span>Delivery Time</span>
+                          <span className="font-medium">{pkg.delivery_timeline}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                          <span>Revisions</span>
+                          <span className="font-medium">
+                            {pkg.revisions_included === 1 ? '1 revision' : `${pkg.revisions_included} revisions`}
+                          </span>
+                        </div>
+                        {pkg.features && pkg.features.length > 0 && (
+                          <div className="mb-3">
+                            <div className="text-sm text-gray-600 mb-2">Features:</div>
+                            <div className="space-y-1">
+                              {pkg.features.slice(0, 3).map((feature: string, idx: number) => (
+                                <div key={idx} className="text-xs text-gray-700 bg-gray-50 px-2 py-1 rounded">
+                                  • {feature}
+                                </div>
+                              ))}
+                              {pkg.features.length > 3 && (
+                                <div className="text-xs text-gray-500 italic">
+                                  +{pkg.features.length - 3} more features
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        <div className="text-right mt-4 pt-4 border-t border-gray-200">
+                          <p className="text-sm text-gray-500">Starting From</p>
+                          <p className="font-bold text-xl">
+                            ICP {priceInICP.toFixed(1)}
+                          </p>
+                          {priceInICP > 100 && (
+                            <p className="text-xs text-gray-500">
+                              ≈ ${(priceInICP / 50).toFixed(0)} USD
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-                    <span>Revisions</span>
-                    <span className="font-medium">Included</span>
-                  </div>
-                  <div className="text-right mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-500">Starting From</p>
-                    <p className="font-bold text-2xl text-blue-600">
-                      ${formData.basicPrice}
-                    </p>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             )}
-            
-            {/* Standard Package - Only show if 3 tier mode */}
-            {formData.tierMode === '3tier' && formData.advancedPrice && (
-              <div className="mb-6 border-2 border-blue-500 rounded-lg overflow-hidden shadow-md">
-                <div className="bg-green-50 p-3 border-b border-blue-500 relative">
-                  <h3 className="font-bold text-gray-800">STANDARD</h3>
-                  <span className="absolute top-1 right-2 text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">
-                    Popular
-                  </span>
-                </div>
-                <div className="p-4">
-                  <p className="font-medium mb-2">
-                    {formData.advancedTitle || 'Standard Package'}
-                  </p>
-                  {formData.advancedDescription && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {formData.advancedDescription}
-                    </p>
-                  )}
-                  {formData.advancedDeliveryDays && (
-                    <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-                      <span>Delivery Time</span>
-                      <span className="font-medium">{formData.advancedDeliveryDays} days</span>
+
+            {/* Fallback to old tier structure if packages array is empty */}
+            {(!formData.packages || formData.packages.length === 0) && (
+              <>
+                {/* Basic Package */}
+                {formData.basicPrice && (
+                  <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div className="bg-yellow-50 p-3 border-b border-gray-200">
+                      <h3 className="font-bold text-gray-800">BASIC</h3>
                     </div>
-                  )}
-                  <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-                    <span>Revisions</span>
-                    <span className="font-medium">Extended</span>
-                  </div>
-                  <div className="text-right mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-500">Starting From</p>
-                    <p className="font-bold text-2xl text-blue-600">
-                      ${formData.advancedPrice}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Premium Package - Only show if 3 tier mode */}
-            {formData.tierMode === '3tier' && formData.premiumPrice && (
-              <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                <div className="bg-purple-50 p-3 border-b border-gray-200">
-                  <h3 className="font-bold text-gray-800">PREMIUM</h3>
-                </div>
-                <div className="p-4">
-                  <p className="font-medium mb-2">
-                    {formData.premiumTitle || 'Premium Package'}
-                  </p>
-                  {formData.premiumDescription && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                      {formData.premiumDescription}
-                    </p>
-                  )}
-                  {formData.premiumDeliveryDays && (
-                    <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-                      <span>Delivery Time</span>
-                      <span className="font-medium">{formData.premiumDeliveryDays} days</span>
+                    <div className="p-4">
+                      <p className="font-medium mb-2">
+                        {formData.basicTitle || 'Basic Package'}
+                      </p>
+                      {formData.basicDescription && (
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                          {formData.basicDescription}
+                        </p>
+                      )}
+                      {formData.basicDeliveryDays && (
+                        <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                          <span>Delivery Time</span>
+                          <span className="font-medium">{formData.basicDeliveryDays} days</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                        <span>Revisions</span>
+                        <span className="font-medium">Included</span>
+                      </div>
+                      <div className="text-right mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-500">Starting From</p>
+                        <p className="font-bold text-2xl text-blue-600">
+                          ${formData.basicPrice}
+                        </p>
+                      </div>
                     </div>
-                  )}
-                  <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
-                    <span>Revisions</span>
-                    <span className="font-medium">Unlimited</span>
                   </div>
-                  <div className="text-right mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm text-gray-500">Starting From</p>
-                    <p className="font-bold text-2xl text-purple-600">
-                      ${formData.premiumPrice}
-                    </p>
+                )}
+
+                {/* Standard Package - Only show if 3 tier mode */}
+                {formData.tierMode === '3tier' && formData.advancedPrice && (
+                  <div className="mb-6 border-2 border-blue-500 rounded-lg overflow-hidden shadow-md">
+                    <div className="bg-green-50 p-3 border-b border-blue-500 relative">
+                      <h3 className="font-bold text-gray-800">STANDARD</h3>
+                      <span className="absolute top-1 right-2 text-xs bg-blue-500 text-white px-2 py-0.5 rounded-full">
+                        Popular
+                      </span>
+                    </div>
+                    <div className="p-4">
+                      <p className="font-medium mb-2">
+                        {formData.advancedTitle || 'Standard Package'}
+                      </p>
+                      {formData.advancedDescription && (
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                          {formData.advancedDescription}
+                        </p>
+                      )}
+                      {formData.advancedDeliveryDays && (
+                        <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                          <span>Delivery Time</span>
+                          <span className="font-medium">{formData.advancedDeliveryDays} days</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                        <span>Revisions</span>
+                        <span className="font-medium">Extended</span>
+                      </div>
+                      <div className="text-right mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-500">Starting From</p>
+                        <p className="font-bold text-2xl text-blue-600">
+                          ${formData.advancedPrice}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                )}
+
+                {/* Premium Package - Only show if 3 tier mode */}
+                {formData.tierMode === '3tier' && formData.premiumPrice && (
+                  <div className="mb-6 border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div className="bg-purple-50 p-3 border-b border-gray-200">
+                      <h3 className="font-bold text-gray-800">PREMIUM</h3>
+                    </div>
+                    <div className="p-4">
+                      <p className="font-medium mb-2">
+                        {formData.premiumTitle || 'Premium Package'}
+                      </p>
+                      {formData.premiumDescription && (
+                        <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                          {formData.premiumDescription}
+                        </p>
+                      )}
+                      {formData.premiumDeliveryDays && (
+                        <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                          <span>Delivery Time</span>
+                          <span className="font-medium">{formData.premiumDeliveryDays} days</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+                        <span>Revisions</span>
+                        <span className="font-medium">Unlimited</span>
+                      </div>
+                      <div className="text-right mt-4 pt-4 border-t border-gray-200">
+                        <p className="text-sm text-gray-500">Starting From</p>
+                        <p className="font-bold text-2xl text-purple-600">
+                          ${formData.premiumPrice}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
             
             {/* Service Summary */}
@@ -351,171 +469,260 @@ export default function ServicePreview() {
         {/* Detailed Package Comparison */}
         <div className="mt-12">
           <h2 className="text-2xl font-bold text-center mb-8">Package Comparison</h2>
-          <div className={`grid grid-cols-1 gap-6 ${formData.tierMode === '3tier' ? 'md:grid-cols-3' : 'md:grid-cols-1 max-w-md mx-auto'}`}>
-            {/* Basic Package */}
-            {formData.basicPrice && (
-              <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 transition-colors">
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold mb-2">Basic</h3>
-                  <div className="mb-2">
-                    <span className="text-4xl font-bold text-blue-600">
-                      ${formData.basicPrice}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {formData.basicTitle || 'Basic Package'}
-                  </p>
-                </div>
-                
-                {formData.basicDescription && (
-                  <div className="mb-6">
-                    <p className="text-gray-700 text-sm">
-                      {formData.basicDescription}
-                    </p>
-                  </div>
-                )}
-                
-                <div className="space-y-3 mb-6">
-                  {formData.basicDeliveryDays && (
-                    <div className="flex items-center text-sm">
-                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                      <span>{formData.basicDeliveryDays} days delivery</span>
-                    </div>
-                  )}
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>Professional service</span>
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>Revisions included</span>
-                  </div>
-                </div>
-                
-                <button 
-                  disabled
-                  className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
-                >
-                  Preview Only
-                </button>
-              </div>
-            )}
 
-            {/* Advanced Package - Only show if 3 tier mode */}
-            {formData.tierMode === '3tier' && formData.advancedPrice && (
-              <div className="border-2 border-blue-500 rounded-lg p-6 relative bg-blue-50">
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                    POPULAR
-                  </span>
-                </div>
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold mb-2">Standard</h3>
-                  <div className="mb-2">
-                    <span className="text-4xl font-bold text-blue-600">
-                      ${formData.advancedPrice}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {formData.advancedTitle || 'Standard Package'}
-                  </p>
-                </div>
-                
-                {formData.advancedDescription && (
-                  <div className="mb-6">
-                    <p className="text-gray-700 text-sm">
-                      {formData.advancedDescription}
-                    </p>
-                  </div>
-                )}
-                
-                <div className="space-y-3 mb-6">
-                  {formData.advancedDeliveryDays && (
-                    <div className="flex items-center text-sm">
-                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                      <span>{formData.advancedDeliveryDays} days delivery</span>
-                    </div>
-                  )}
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>All Basic features</span>
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>Enhanced support</span>
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>More revisions</span>
-                  </div>
-                </div>
-                
-                <button 
-                  disabled
-                  className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
-                >
-                  Preview Only
-                </button>
-              </div>
-            )}
+          {/* Display packages from array if available */}
+          {formData.packages && formData.packages.length > 0 && (
+            <div className={`grid grid-cols-1 gap-6 ${formData.tierMode === '3tier' ? 'md:grid-cols-3' : 'md:grid-cols-1 max-w-md mx-auto'}`}>
+              {formData.packages.map((pkg: any, index: number) => {
+                const isPopular = formData.tierMode === '3tier' && index === 1;
+                const priceInICP = parseFloat(pkg.price_e8s.toString()) / 100000000;
 
-            {/* Premium Package - Only show if 3 tier mode */}
-            {formData.tierMode === '3tier' && formData.premiumPrice && (
-              <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-purple-500 transition-colors">
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold mb-2">Premium</h3>
-                  <div className="mb-2">
-                    <span className="text-4xl font-bold text-purple-600">
-                      ${formData.premiumPrice}
-                    </span>
+                return (
+                  <div
+                    key={pkg.package_id}
+                    className={`border-2 rounded-lg p-6 transition-colors ${
+                      isPopular
+                        ? 'border-blue-500 bg-blue-50 relative'
+                        : 'border-gray-200 hover:border-blue-500'
+                    }`}
+                  >
+                    {isPopular && (
+                      <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                        <span className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                          POPULAR
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="text-center mb-6">
+                      <h3 className="text-xl font-bold mb-2">{pkg.tier}</h3>
+                      <div className="mb-2">
+                        <span className="text-4xl font-bold text-blue-600">
+                          ICP {priceInICP.toFixed(1)}
+                        </span>
+                      </div>
+                      {priceInICP > 100 && (
+                        <p className="text-sm text-gray-500">
+                          ≈ ${(priceInICP / 50).toFixed(0)} USD
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-600 mt-2">
+                        {pkg.title}
+                      </p>
+                    </div>
+
+                    {pkg.description && (
+                      <div className="mb-6">
+                        <p className="text-gray-700 text-sm">
+                          {pkg.description}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="space-y-3 mb-6">
+                      <div className="flex items-center text-sm">
+                        <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                        <span>{pkg.delivery_timeline}</span>
+                      </div>
+                      <div className="flex items-center text-sm">
+                        <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                        <span>{pkg.revisions_included} {pkg.revisions_included === 1 ? 'revision' : 'revisions'}</span>
+                      </div>
+                      {pkg.features && pkg.features.length > 0 && (
+                        pkg.features.slice(0, 3).map((feature: string, idx: number) => (
+                          <div key={idx} className="flex items-center text-sm">
+                            <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                            <span>{feature}</span>
+                          </div>
+                        ))
+                      )}
+                      {pkg.features && pkg.features.length > 3 && (
+                        <div className="text-xs text-gray-500 italic">
+                          +{pkg.features.length - 3} more features
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      disabled
+                      className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
+                    >
+                      Preview Only
+                    </button>
                   </div>
-                  <p className="text-sm text-gray-600">
-                    {formData.premiumTitle || 'Premium Package'}
-                  </p>
-                </div>
-                
-                {formData.premiumDescription && (
-                  <div className="mb-6">
-                    <p className="text-gray-700 text-sm">
-                      {formData.premiumDescription}
+                );
+              })}
+            </div>
+          )}
+
+          {/* Fallback to old tier structure if packages array is empty */}
+          {(!formData.packages || formData.packages.length === 0) && (
+            <div className={`grid grid-cols-1 gap-6 ${formData.tierMode === '3tier' ? 'md:grid-cols-3' : 'md:grid-cols-1 max-w-md mx-auto'}`}>
+              {/* Basic Package */}
+              {formData.basicPrice && (
+                <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-blue-500 transition-colors">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Basic</h3>
+                    <div className="mb-2">
+                      <span className="text-4xl font-bold text-blue-600">
+                        ${formData.basicPrice}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {formData.basicTitle || 'Basic Package'}
                     </p>
                   </div>
-                )}
-                
-                <div className="space-y-3 mb-6">
-                  {formData.premiumDeliveryDays && (
-                    <div className="flex items-center text-sm">
-                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                      <span>{formData.premiumDeliveryDays} days delivery</span>
+
+                  {formData.basicDescription && (
+                    <div className="mb-6">
+                      <p className="text-gray-700 text-sm">
+                        {formData.basicDescription}
+                      </p>
                     </div>
                   )}
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>All Standard features</span>
+
+                  <div className="space-y-3 mb-6">
+                    {formData.basicDeliveryDays && (
+                      <div className="flex items-center text-sm">
+                        <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                        <span>{formData.basicDeliveryDays} days delivery</span>
+                      </div>
+                    )}
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>Professional service</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>Revisions included</span>
+                    </div>
                   </div>
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>Priority support</span>
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>Unlimited revisions</span>
-                  </div>
-                  <div className="flex items-center text-sm">
-                    <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
-                    <span>Extended support period</span>
-                  </div>
+
+                  <button
+                    disabled
+                    className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
+                  >
+                    Preview Only
+                  </button>
                 </div>
-                
-                <button 
-                  disabled
-                  className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
-                >
-                  Preview Only
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+
+              {/* Advanced Package - Only show if 3 tier mode */}
+              {formData.tierMode === '3tier' && formData.advancedPrice && (
+                <div className="border-2 border-blue-500 rounded-lg p-6 relative bg-blue-50">
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <span className="bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
+                      POPULAR
+                    </span>
+                  </div>
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Standard</h3>
+                    <div className="mb-2">
+                      <span className="text-4xl font-bold text-blue-600">
+                        ${formData.advancedPrice}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {formData.advancedTitle || 'Standard Package'}
+                    </p>
+                  </div>
+
+                  {formData.advancedDescription && (
+                    <div className="mb-6">
+                      <p className="text-gray-700 text-sm">
+                        {formData.advancedDescription}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 mb-6">
+                    {formData.advancedDeliveryDays && (
+                      <div className="flex items-center text-sm">
+                        <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                        <span>{formData.advancedDeliveryDays} days delivery</span>
+                      </div>
+                    )}
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>All Basic features</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>Enhanced support</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>More revisions</span>
+                    </div>
+                  </div>
+
+                  <button
+                    disabled
+                    className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
+                  >
+                    Preview Only
+                  </button>
+                </div>
+              )}
+
+              {/* Premium Package - Only show if 3 tier mode */}
+              {formData.tierMode === '3tier' && formData.premiumPrice && (
+                <div className="border-2 border-gray-200 rounded-lg p-6 hover:border-purple-500 transition-colors">
+                  <div className="text-center mb-6">
+                    <h3 className="text-xl font-bold mb-2">Premium</h3>
+                    <div className="mb-2">
+                      <span className="text-4xl font-bold text-purple-600">
+                        ${formData.premiumPrice}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {formData.premiumTitle || 'Premium Package'}
+                    </p>
+                  </div>
+
+                  {formData.premiumDescription && (
+                    <div className="mb-6">
+                      <p className="text-gray-700 text-sm">
+                        {formData.premiumDescription}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 mb-6">
+                    {formData.premiumDeliveryDays && (
+                      <div className="flex items-center text-sm">
+                        <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                        <span>{formData.premiumDeliveryDays} days delivery</span>
+                      </div>
+                    )}
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>All Standard features</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>Priority support</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>Unlimited revisions</span>
+                    </div>
+                    <div className="flex items-center text-sm">
+                      <Check size={16} className="text-green-500 mr-2 flex-shrink-0" />
+                      <span>Extended support period</span>
+                    </div>
+                  </div>
+
+                  <button
+                    disabled
+                    className="w-full py-3 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
+                  >
+                    Preview Only
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
     </div>;

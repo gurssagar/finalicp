@@ -2,16 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Sidebar } from '../../../components/Sidebar';
-import { Header1 } from '../../../components/Header1';
-import { ProjectTabs } from '../../../components/project/ProjectTabs';
+import { Sidebar } from '@/components/Sidebar';
+import { Header1 } from '@/components/Header1';
+import { ProjectTabs } from '@/components/project/ProjectTabs';
 import { ChevronLeft, Edit, Share2, Star, Globe, Twitter, Heart } from 'lucide-react';
-import { TeamMember } from '../../../components/project/TeamMember';
-import { cn } from '../../../lib/utils';
+import { TeamMember } from '@/components/project/TeamMember';
+import { cn } from '@/lib/utils';
 
 // TypeScript interfaces
 interface TeamMemberData {
-  id: number;
+  id: string;
   name: string;
   role: string;
   location: string;
@@ -40,9 +40,6 @@ interface Project {
   team: TeamMemberData[];
 }
 
-interface ProjectDetailPageProps {
-  params: { id: string };
-}
 
 interface ProjectCardProps {
   title: string;
@@ -87,9 +84,10 @@ const SocialLink: React.FC<SocialLinkProps> = ({ href, icon, label }) => (
   </a>
 );
 
-export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+export default function ProjectDetailPage() {
   const router = useRouter();
-  const { id } = params;
+  const urlParams = useParams();
+  const id = urlParams.id as string;
   const [activeTab, setActiveTab] = useState('overview');
   const [isStarred, setIsStarred] = useState(false);
 
@@ -119,7 +117,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     submissionType: 'Team project',
     team: [
       {
-        id: 1,
+        id: '1',
         name: 'Lovepreet Singh',
         role: 'Team Leader',
         location: 'New Del',
@@ -128,7 +126,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
         image: 'https://via.placeholder.com/80'
       },
       {
-        id: 2,
+        id: '2',
         name: 'GURSAGAR Singh',
         role: 'Team Member',
         location: 'Quack planet',
@@ -470,7 +468,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
             </div>
             
             {/* Tabs navigation */}
-            <ProjectTabs activeTab={activeTab} setActiveTab={setActiveTab} />
+            <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} />
             
             {/* Main content area */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-8">

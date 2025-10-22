@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 
 export interface Service {
   service_id: string;
+  freelancer_id: string;
   freelancer_email: string;
   title: string;
   main_category: string;
@@ -18,6 +19,41 @@ export interface Service {
   total_orders: number;
   created_at: number;
   updated_at: number;
+  delivery_time_days: number;
+  starting_from_e8s: number;
+  total_rating: number;
+  review_count: number;
+  tags: string[];
+  // Timeline information from packages
+  min_delivery_days?: number;
+  max_delivery_days?: number;
+  delivery_timeline?: string;
+  // Package information
+  tier_mode: '1tier' | '3tier';
+  packages: Array<{
+    package_id: string;
+    tier: string;
+    title: string;
+    description: string;
+    price_e8s: number;
+    delivery_days: number;
+    delivery_timeline: string;
+    features: string[];
+    revisions_included: number;
+    status: string;
+  }>;
+  // Additional fields
+  client_questions: Array<{
+    id: string;
+    type: string;
+    question: string;
+    required: boolean;
+  }>;
+  faqs: Array<{
+    id: string;
+    question: string;
+    answer: string;
+  }>;
 }
 
 export interface ServiceFilters {

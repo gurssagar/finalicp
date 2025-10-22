@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { Header } from '@/components/Header';
+import { Header1 } from '@/components/Header1';
 import { useBookings, useStages, useProjectCompletion } from '@/hooks/useMarketplace';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -55,14 +55,14 @@ export default function FreelancerBookings() {
     setUserId(mockUserId);
     
     if (mockUserId) {
-      fetchBookings(statusFilter || undefined);
+      fetchBookings();
     }
   }, [fetchBookings, statusFilter]);
 
   const handleCreateStages = async (stageDefinitions: any[]) => {
     if (!userId || !selectedBooking) return;
     
-    const result = await createStages(userId, selectedBooking, stageDefinitions);
+    const result = await createStages(stageDefinitions);
     if (result) {
       setShowStageForm(false);
     }
@@ -72,7 +72,7 @@ export default function FreelancerBookings() {
     if (!userId) return;
     
     const result = await submitStage(
-      userId, 
+      userId,
       stageId, 
       submissionData.notes, 
       submissionData.artifacts.filter(a => a.trim() !== '')
@@ -118,7 +118,7 @@ export default function FreelancerBookings() {
   if (bookingsLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-white">
-        <Header />
+        <Header1 />
         <main className="flex-1 container mx-auto px-4 py-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-lg">Loading bookings...</div>
@@ -130,7 +130,7 @@ export default function FreelancerBookings() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      <Header />
+        <Header1 />
       <main className="flex-1 container mx-auto px-4 py-6">
         <div className="mb-6 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-[#161616]">My Bookings</h1>
@@ -175,11 +175,11 @@ export default function FreelancerBookings() {
                     <div>
                       <CardTitle className="text-lg">Booking #{booking.booking_id.slice(-8)}</CardTitle>
                       <div className="flex items-center gap-2 mt-1">
-                        {getStatusIcon(booking.booking_status)}
+                        {getStatusIcon(booking.status)}
                         <Badge 
-                          variant={booking.booking_status === 'Completed' ? 'default' : 'secondary'}
+                          variant={booking.status === 'Completed' ? 'default' : 'secondary'}
                         >
-                          {booking.booking_status}
+                          {booking.status}
                         </Badge>
                         <Badge 
                           variant={booking.payment_status === 'Funded' ? 'default' : 'outline'}
@@ -190,7 +190,7 @@ export default function FreelancerBookings() {
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-semibold text-[#0B1F36]">
-                        {formatICP(booking.escrow_amount_e8s)}
+                        {formatICP(BigInt(booking.escrow_amount_e8s))}
                       </div>
                       <div className="text-sm text-gray-500">
                         {new Date(booking.created_at / 1000000).toLocaleDateString()}
@@ -256,7 +256,7 @@ export default function FreelancerBookings() {
                             </p>
                             <div className="flex items-center justify-between mt-3">
                               <div className="text-sm font-semibold text-[#0B1F36]">
-                                {formatICP(stage.amount_e8s)}
+                                {formatICP(BigInt(stage.amount_e8s))}
                               </div>
                               <div className="flex gap-2">
                                 {stage.status === 'Pending' && (
@@ -296,11 +296,11 @@ export default function FreelancerBookings() {
                                 <strong>Submission Notes:</strong> {stage.submission_notes}
                               </div>
                             )}
-                            {stage.submission_artifacts.length > 0 && (
+                            {stage.submission_artifacts && stage.submission_artifacts.length > 0 && (
                               <div className="mt-2">
                                 <div className="text-sm font-medium">Artifacts:</div>
                                 <div className="flex flex-wrap gap-1 mt-1">
-                                  {stage.submission_artifacts.map((artifact, idx) => (
+                                  {stage.submission_artifacts?.map((artifact, idx) => (
                                     <Badge key={idx} variant="outline" className="text-xs">
                                       {artifact}
                                     </Badge>

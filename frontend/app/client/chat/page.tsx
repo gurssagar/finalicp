@@ -1,8 +1,8 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { MessageSquare, Users, Plus, Search } from 'lucide-react'
-import { ClientChatsList } from '@/components/client/chat/ClientChatsList'
-import { ClientChatConversation } from '@/components/client/chat/ClientChatConversation'
+import { ClientChatsList } from '../../../components/client/chat/ClientChatsList'
+import { ClientChatConversation } from '../../../components/client/chat/ClientChatConversation'
 import ClientLayout from '../layout'
 
 export default function ChatPage() {

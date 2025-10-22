@@ -14,6 +14,28 @@ export default function ServiceDetails() {
   const [service, setService] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookingNotes, setBookingNotes] = useState('');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+
+  // Fetch current user session
+  useEffect(() => {
+    const fetchUserSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+
+        if (data.success && data.session && data.session.email) {
+          setCurrentUserEmail(data.session.email);
+        } else {
+          // If no session, you might want to redirect to login or show a message
+          console.warn('No active user session found');
+        }
+      } catch (error) {
+        console.error('Error fetching user session:', error);
+      }
+    };
+
+    fetchUserSession();
+  }, []);
 
   // Fetch service data
   useEffect(() => {
@@ -21,7 +43,7 @@ export default function ServiceDetails() {
       try {
         const response = await fetch(`/api/marketplace/services/${id}`);
         const data = await response.json();
-        
+
         if (data.success) {
           setService(data.data);
         } else {
@@ -50,11 +72,13 @@ export default function ServiceDetails() {
       return;
     }
 
-    // TODO: Get from auth context - for now use a placeholder
-    // In production, this would come from authentication context
-    const userEmail = 'client@example.com'; // This should be dynamic based on logged-in user
+    // Check if user is authenticated
+    if (!currentUserEmail) {
+      alert('Please log in to book a service');
+      return;
+    }
 
-    const result = await bookPackage(userEmail, packageId, bookingNotes.trim());
+    const result = await bookPackage(currentUserEmail, packageId, bookingNotes.trim());
 
     if (result.success) {
       // Check chat initiation status
@@ -155,6 +179,7 @@ export default function ServiceDetails() {
         price: pkg.price_e8s / 100000000, // Convert from e8s to ICP
         description: pkg.description,
         deliveryDays: pkg.delivery_days,
+        deliveryTimeline: pkg.delivery_timeline || `${pkg.delivery_days} days`,
         revisions: pkg.revisions_included,
         packageId: pkg.package_id
       };
@@ -178,10 +203,10 @@ export default function ServiceDetails() {
 
     const rows = [];
 
-    // Delivery days row
+    // Delivery timeline row
     rows.push([
-      'Delivery Days',
-      ...packages.map(pkg => `${pkg.delivery_days} Days`)
+      'Delivery Timeline',
+      ...packages.map(pkg => pkg.delivery_timeline || `${pkg.delivery_days} Days`)
     ]);
 
     // Revisions row
@@ -230,7 +255,7 @@ export default function ServiceDetails() {
   }
   const handleContinue = async () => {
     // Find the selected package from embedded data
-    const selectedPackage = service.packages ? service.packages.find(pkg => pkg.tier.toLowerCase() === selectedTier) : null;
+    const selectedPackage = service.packages ? service.packages.find((pkg: any) => pkg.tier.toLowerCase() === selectedTier) : null;
 
     if (!selectedPackage) {
       alert('Please select a package');
@@ -518,9 +543,9 @@ export default function ServiceDetails() {
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Delivery Days</span>
-                  <span>
-                    {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.deliveryDays || 'N/A'}
+                  <span>Delivery Timeline</span>
+                  <span className="text-right">
+                    {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.deliveryTimeline || 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -19,6 +19,60 @@ export default function MyServices() {
   console.log('🔍 MY-SERVICES PAGE - Component State Update');
   console.log('Current state:', { userId, userEmail, isCheckingAuth });
 
+  // Date formatting utilities
+  const formatDate = (timestamp: number | string | undefined | null) => {
+    if (!timestamp) return 'Date not set';
+
+    try {
+      const date = new Date(typeof timestamp === 'number' ? timestamp : Number(timestamp));
+      if (isNaN(date.getTime())) return 'Invalid date';
+
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.warn('Date formatting error:', error);
+      return 'Date format error';
+    }
+  };
+
+  const getRelativeTime = (timestamp: number | string | undefined | null) => {
+    if (!timestamp) return '';
+
+    try {
+      // Handle both millisecond and nanosecond timestamps
+      let date: Date;
+
+      if (typeof timestamp === 'number') {
+        if (timestamp > 10000000000) { // Assume nanoseconds if very large number
+          date = new Date(Number(timestamp) / 1000000);
+        } else {
+          date = new Date(timestamp);
+        }
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else {
+        console.warn('Invalid timestamp format:', timestamp);
+        return 'Unknown';
+      }
+
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 1) return 'Today';
+      if (diffDays < 7) return `${diffDays} days ago`;
+      if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+      if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+      return `${Math.floor(diffDays / 365)} years ago`;
+    } catch (error) {
+      console.warn('Relative time calculation error:', error);
+      return '';
+    }
+  };
+
   // Get current user data from session
   useEffect(() => {
     const checkAuth = async () => {
@@ -52,7 +106,6 @@ export default function MyServices() {
 
   // Fetch services using the hook with email filter only when userEmail is available
   const { services: fetchedServices, loading, error, refetch } = useServices(userEmail || undefined, {
-    freelancer_email: userEmail || undefined,
     limit: 50
   })
 
@@ -104,12 +157,12 @@ export default function MyServices() {
         const prices = service.packages
           .filter((pkg: any) => pkg.price_e8s && pkg.status === 'Available')
           .map((pkg: any) => {
-            const price = typeof pkg.price_e8s === 'string' 
+            const price = typeof pkg.price_e8s === 'string'
               ? parseFloat(pkg.price_e8s) / 100000000
               : Number(pkg.price_e8s) / 100000000;
             return price;
           });
-        
+
         if (prices.length > 0) {
           minPrice = Math.min(...prices).toFixed(2);
         }
@@ -119,16 +172,48 @@ export default function MyServices() {
       }
     }
 
+    // Get cover image with better fallback logic
+    const getCoverImage = (service: any) => {
+      // Handle different image data formats from API
+      if (service.cover_image_url) {
+        // If cover_image_url is a string, use it directly
+        if (typeof service.cover_image_url === 'string' && service.cover_image_url.trim()) {
+          return service.cover_image_url;
+        }
+        // If cover_image_url is an array with items, use the first one
+        if (Array.isArray(service.cover_image_url) && service.cover_image_url.length > 0) {
+          return service.cover_image_url[0];
+        }
+      }
+
+      // Try portfolio images as fallback
+      if (service.portfolio_images && Array.isArray(service.portfolio_images) && service.portfolio_images.length > 0) {
+        return service.portfolio_images[0];
+      }
+
+      // Use category-specific placeholder images (SVG format)
+      const categoryPlaceholders: Record<string, string> = {
+        'Web Development': '/images/web-dev-placeholder.svg',
+        'Web Designer': '/images/web-design-placeholder.svg',
+        'Mobile Development': '/images/web-dev-placeholder.svg',
+        'UI/UX Design': '/images/web-design-placeholder.svg',
+        'Backend Development': '/images/web-dev-placeholder.svg',
+        'Full Stack Development': '/images/web-dev-placeholder.svg',
+        'DevOps': '/images/web-dev-placeholder.svg',
+        'Database Development': '/images/web-dev-placeholder.svg'
+      };
+
+      return categoryPlaceholders[service.main_category] || '/images/default-service-placeholder.svg';
+    };
+
     return {
       id: service.service_id,
       title: service.title,
       category: service.main_category,
       subCategory: service.sub_category,
       price: minPrice,
-      coverImage: service.cover_image_url ||
-        (service.portfolio_images && service.portfolio_images.length > 0
-          ? service.portfolio_images[0]
-          : '/placeholder-service.jpg'),
+      coverImage: getCoverImage(service),
+      coverImages: Array.isArray(service.portfolio_images) ? service.portfolio_images : [],
       status: service.status?.toLowerCase() || 'active',
       views: 0, // Mock data doesn't include view count
       orders: service.total_orders || 0,
@@ -224,7 +309,10 @@ export default function MyServices() {
         'Are you sure you want to delete this service? This action cannot be undone.',
       )
     ) {
-      if (!userId) return
+      if (!userId || !userEmail) {
+        alert('You must be logged in to delete a service.')
+        return
+      }
 
       try {
         // Make actual API call to delete from canister
@@ -234,7 +322,8 @@ export default function MyServices() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            userEmail: userEmail
+            userEmail: userEmail,
+            userId: userId
           })
         })
 
@@ -257,7 +346,7 @@ export default function MyServices() {
   }
 
   const handleToggleStatus = async (serviceId: string, currentStatus: string) => {
-    if (!userId) return
+    if (!userId || !userEmail) return
 
     const newStatus = currentStatus === 'active' ? 'Paused' : 'Active'
 
@@ -395,12 +484,23 @@ export default function MyServices() {
               {services.map((service) => (
                 <Card key={service.id} className="overflow-hidden">
                   <div className="flex flex-col md:flex-row">
-                    <div className="w-full md:w-1/3 h-48 md:h-auto">
+                    <div className="w-full md:w-1/3 h-48 md:h-auto relative">
+                      {/* Main cover image */}
                       <img
                         src={service.coverImage}
                         alt={service.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = '/images/default-service-placeholder.svg';
+                        }}
                       />
+
+                      {/* Show multiple images indicator */}
+                      {service.coverImages && service.coverImages.length > 1 && (
+                        <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded-full">
+                          +{service.coverImages.length - 1}
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 p-5">
                       <div className="flex justify-between items-start">
@@ -487,8 +587,10 @@ export default function MyServices() {
                       </div>
                       <div className="flex justify-between items-center mt-2">
                         <div className="text-xs text-gray-500">
-                          Created on{' '}
-                          {new Date(service.createdAt).toLocaleDateString()}
+                          <div className="flex flex-col gap-1">
+                            <span>Created {formatDate(service.createdAt)}</span>
+                            <span className="text-gray-400">({getRelativeTime(service.createdAt)})</span>
+                          </div>
                         </div>
                         <div className="flex gap-2">
                           <Button

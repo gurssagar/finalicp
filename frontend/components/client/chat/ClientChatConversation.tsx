@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect } from 'react'
 import { ClientMessageInput } from './ClientMessageInput'
-import socketService, { SocketMessage } from '@/lib/socket-service'
+import socketService, { SocketMessage } from '../../../lib/socket-service'
 import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
 
 interface Message {
@@ -39,6 +39,9 @@ export function ClientChatConversation({
         const connected = await socketService.connect(userEmail)
         if (connected) {
           console.log('[ClientChat] Socket connected')
+
+          // Join chat room
+          socketService.joinRoom(chatId)
         } else {
           console.warn('[ClientChat] Socket connection failed')
         }
@@ -47,9 +50,36 @@ export function ClientChatConversation({
       }
     }
 
-    // Load chat history from storage canister
+    // Load chat history from canister
     const loadChatHistory = async () => {
       try {
+        setLoading(true)
+
+        // Try Socket.IO first for real-time history
+        if (socketService.isConnected()) {
+          const socketHistory = await socketService.getChatHistory(chatId, 50, 0)
+          if (socketHistory && socketHistory.length > 0) {
+            const formattedMessages = socketHistory.map(msg => ({
+              id: msg.id,
+              from: msg.from,
+              to: msg.to,
+              text: msg.text,
+              timestamp: msg.timestamp,
+              delivered: msg.delivered,
+              read: msg.read,
+              messageType: msg.messageType || 'text',
+              fileUrl: msg.fileUrl,
+              fileName: msg.fileName,
+              fileSize: msg.fileSize,
+              replyTo: msg.replyTo
+            }))
+            setMessages(formattedMessages)
+            setLoading(false)
+            return
+          }
+        }
+
+        // Fallback to API if Socket.IO doesn't have history
         const response = await fetch(
           `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
         )
@@ -70,6 +100,10 @@ export function ClientChatConversation({
 
     // Cleanup on unmount
     return () => {
+      // Leave chat room
+      if (socketService.isConnected()) {
+        socketService.leaveRoom(chatId)
+      }
       // Don't disconnect here as it might be used by other components
     }
   }, [chatId, userEmail])
@@ -91,14 +125,14 @@ export function ClientChatConversation({
           (message.to === chatId && message.from === userEmail)) {
 
         const newMessage: Message = {
-          id: `socket-${Date.now()}`,
+          id: message.id || `socket-${Date.now()}`,
           from: message.from,
           to: message.to,
           text: message.text,
           timestamp: message.timestamp || new Date().toISOString(),
           delivered: true,
           read: false,
-          messageType: 'text'
+          messageType: message.messageType || 'text'
         }
 
         setMessages(prev => {
@@ -109,33 +143,93 @@ export function ClientChatConversation({
           )
           return exists ? prev : [...prev, newMessage]
         })
+
+        // Mark as read if it's a message sent to us
+        if (message.to === userEmail) {
+          setTimeout(() => {
+            markMessageAsRead(newMessage.id)
+          }, 1000) // Mark as read after 1 second
+        }
+      }
+    }
+
+    // Listen for typing indicators
+    const handleTypingIndicator = (data: { from: string; isTyping: boolean; timestamp: string }) => {
+      if (data.from === chatId) {
+        console.log(`[ClientChat] ${data.from} is ${data.isTyping ? 'typing...' : 'not typing'}`)
+        // You can add a typing indicator UI here
+      }
+    }
+
+    // Listen for read receipts
+    const handleMessageRead = (data: { messageId: string; readBy: string; timestamp: string }) => {
+      if (data.readBy === chatId) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === data.messageId ? { ...msg, read: true } : msg
+        ))
+      }
+    }
+
+    // Listen for online status changes
+    const handleUserPresence = (data: { user: string; isOnline: boolean; lastSeen: string }) => {
+      if (data.user === chatId) {
+        console.log(`[ClientChat] ${data.user} is ${data.isOnline ? 'online' : 'offline'}`)
       }
     }
 
     // Register event listeners
     socketService.on('connectionStatus', handleConnectionStatus)
     socketService.on('privateMessage', handlePrivateMessage)
+    socketService.on('typingIndicator', handleTypingIndicator)
+    socketService.on('messageRead', handleMessageRead)
+    socketService.on('userPresence', handleUserPresence)
 
     // Initial connection status
     setSocketConnected(socketService.isConnected())
+
+    // Mark message as read
+    const markMessageAsRead = async (messageId: string) => {
+      try {
+        await socketService.markAsRead(messageId)
+        setMessages(prev => prev.map(msg =>
+          msg.id === messageId ? { ...msg, read: true } : msg
+        ))
+      } catch (error) {
+        console.error('[ClientChat] Failed to mark message as read:', error)
+      }
+    }
 
     // Cleanup
     return () => {
       socketService.off('connectionStatus', handleConnectionStatus)
       socketService.off('privateMessage', handlePrivateMessage)
+      socketService.off('typingIndicator', handleTypingIndicator)
+      socketService.off('messageRead', handleMessageRead)
+      socketService.off('userPresence', handleUserPresence)
     }
   }, [chatId, userEmail])
 
-  // Send message via Socket.IO or fallback to storage canister
-  const sendMessage = async (text: string) => {
-    if (!text.trim() || !chatId || !userEmail) {
+  // Send message via Socket.IO with enhanced features
+  const sendMessage = async (text: string, options?: {
+    messageType?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+    replyTo?: string;
+  }) => {
+    if (!text.trim() && !options?.fileUrl || !chatId || !userEmail) {
       throw new Error('Missing required information to send message')
     }
 
     const messageData = {
       to: chatId,
       text: text.trim(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      messageType: options?.messageType || 'text',
+      fileUrl: options?.fileUrl,
+      fileName: options?.fileName,
+      fileSize: options?.fileSize,
+      replyTo: options?.replyTo
     }
 
     // Try Socket.IO first if connected
@@ -152,7 +246,7 @@ export function ClientChatConversation({
             timestamp: result.timestamp || messageData.timestamp,
             delivered: true,
             read: false,
-            messageType: 'text'
+            messageType: options?.messageType || 'text'
           }
           setMessages(prev => [...prev, optimisticMessage])
           return // Success, no need to try storage
@@ -172,8 +266,12 @@ export function ClientChatConversation({
           from: userEmail,
           to: chatId,
           text: text.trim(),
-          messageType: 'text',
-          timestamp: messageData.timestamp
+          messageType: options?.messageType || 'text',
+          timestamp: messageData.timestamp,
+          fileUrl: options?.fileUrl,
+          fileName: options?.fileName,
+          fileSize: options?.fileSize,
+          replyTo: options?.replyTo
         })
       })
 
@@ -187,7 +285,7 @@ export function ClientChatConversation({
           timestamp: messageData.timestamp,
           delivered: true,
           read: false,
-          messageType: 'text'
+          messageType: options?.messageType || 'text'
         }
         setMessages(prev => [...prev, storedMessage])
         return // Success
@@ -197,6 +295,13 @@ export function ClientChatConversation({
     } catch (error) {
       console.error('[ClientChat] Failed to send message via storage:', error)
       throw new Error('Failed to send message. Please try again.')
+    }
+  }
+
+  // Typing indicator function
+  const sendTypingIndicator = (isTyping: boolean) => {
+    if (socketConnected && chatId) {
+      socketService.sendTypingIndicator(chatId, isTyping)
     }
   }
 

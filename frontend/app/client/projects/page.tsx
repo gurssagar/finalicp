@@ -8,36 +8,41 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatICP } from '@/lib/ic-marketplace-agent';
-import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle, 
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
   Eye,
   ThumbsUp,
   ThumbsDown,
   DollarSign,
   Calendar,
-  User
+  User,
+  RefreshCw,
+  Activity
 } from 'lucide-react';
 
 export default function ClientProjects() {
   const router = useRouter();
-  const [userId, setUserId] = useState<string>(''); // This should come from auth context
+  const [session, setSession] = useState<any>(null);
+  const [userId, setUserId] = useState<string>('');
   const [selectedBooking, setSelectedBooking] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
 
-  const { 
-    bookings, 
-    loading: bookingsLoading, 
-    error: bookingsError, 
-    fetchBookings 
+  const {
+    bookings,
+    loading: bookingsLoading,
+    error: bookingsError,
+    fetchBookings
   } = useBookings(userId, 'client');
 
-  const { 
-    stages, 
-    loading: stagesLoading, 
-    error: stagesError, 
+  const {
+    stages,
+    loading: stagesLoading,
+    error: stagesError,
     approveStage,
     rejectStage
   } = useStages(selectedBooking || undefined);
@@ -45,15 +50,52 @@ export default function ClientProjects() {
   const [showRejectionForm, setShowRejectionForm] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // Fetch current session on component mount
   useEffect(() => {
-    // TODO: Get userId from auth context
-    const mockUserId = 'USER123'; // Replace with actual user ID
-    setUserId(mockUserId);
-    
-    if (mockUserId) {
-      fetchBookings(statusFilter || undefined);
+    const fetchSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+
+        if (data.success && data.session) {
+          setSession(data.session);
+          setUserId(data.session.email); // Use email as user ID for now
+        } else {
+          // Redirect to login if no session
+          router.push('/auth/login');
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error);
+        router.push('/auth/login');
+      }
+    };
+
+    fetchSession();
+  }, [router]);
+
+  useEffect(() => {
+    if (userId) {
+      fetchBookings();
     }
-  }, [fetchBookings, statusFilter]);
+  }, [fetchBookings, userId, statusFilter]);
+
+  // Auto-refresh bookings every 30 seconds
+  useEffect(() => {
+    if (!autoRefresh || !userId) return;
+
+    const interval = setInterval(() => {
+      fetchBookings();
+      setLastUpdate(Date.now());
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, userId, fetchBookings]);
+
+  // Manual refresh function
+  const handleRefresh = () => {
+    fetchBookings();
+    setLastUpdate(Date.now());
+  };
 
   const handleApproveStage = async (stageId: string) => {
     if (!userId) return;
@@ -73,13 +115,27 @@ export default function ClientProjects() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  // Helper function to convert status object to string
+  const getStatusString = (status: any): string => {
+    if (typeof status === 'string') {
+      return status;
+    } else if (typeof status === 'object' && status !== null) {
+      // Handle canister variant status format like {Active: null}, {Pending: null}, etc.
+      const statusKey = Object.keys(status)[0];
+      return statusKey || 'Pending';
+    }
+    return 'Pending';
+  };
+
+  const getStatusIcon = (status: any) => {
+    const statusStr = getStatusString(status);
+    switch (statusStr) {
       case 'Pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'InProgress': return <Clock className="w-4 h-4 text-blue-500" />;
       case 'Completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'Cancelled': return <XCircle className="w-4 h-4 text-red-500" />;
       case 'Disputed': return <AlertCircle className="w-4 h-4 text-orange-500" />;
+      case 'Active': return <Clock className="w-4 h-4 text-blue-500" />;
       default: return <Clock className="w-4 h-4 text-gray-500" />;
     }
   };
@@ -99,7 +155,6 @@ export default function ClientProjects() {
   if (bookingsLoading) {
     return (
       <div className="flex flex-col min-h-screen bg-white">
-        <Header />
         <main className="flex-1 container mx-auto px-4 py-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-lg">Loading projects...</div>
@@ -111,11 +166,35 @@ export default function ClientProjects() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      <Header />
+      
       <main className="flex-1 container mx-auto px-4 py-6">
         <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-[#161616]">My Projects</h1>
-          <div className="flex gap-2">
+          <div>
+            <h1 className="text-2xl font-bold text-[#161616]">My Projects</h1>
+            <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+              <Activity size={14} />
+              <span>Last updated: {new Date(lastUpdate).toLocaleTimeString()}</span>
+              <button
+                onClick={handleRefresh}
+                className="flex items-center gap-1 text-purple-600 hover:text-purple-700 transition-colors"
+                disabled={bookingsLoading}
+              >
+                <RefreshCw size={14} className={bookingsLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
+          </div>
+          <div className="flex gap-2 items-center">
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+                autoRefresh
+                  ? 'bg-green-100 text-green-700 border border-green-300'
+                  : 'bg-gray-100 text-gray-700 border border-gray-300'
+              }`}
+            >
+              {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+            </button>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -155,39 +234,88 @@ export default function ClientProjects() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg">Project #{booking.booking_id.slice(-8)}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getStatusIcon(booking.booking_status)}
-                        <Badge 
-                          variant={booking.booking_status === 'Completed' ? 'default' : 'secondary'}
+                      {booking.service_title && (
+                        <p className="text-sm font-medium text-gray-700 mt-1">{booking.service_title}</p>
+                      )}
+                      {booking.package_title && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {booking.package_tier && `${booking.package_tier.charAt(0).toUpperCase() + booking.package_tier.slice(1)} Package`} • {booking.package_title}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        {getStatusIcon(booking.status)}
+                        <Badge
+                          variant={getStatusString(booking.status) === 'Completed' ? 'default' : 'secondary'}
                         >
-                          {booking.booking_status}
+                          {getStatusString(booking.status)}
                         </Badge>
-                        <Badge 
-                          variant={booking.payment_status === 'Funded' ? 'default' : 'outline'}
+                        <Badge
+                          variant={getStatusString(booking.payment_status) === 'Completed' ? 'default' : 'outline'}
                         >
-                          {booking.payment_status}
+                          {getStatusString(booking.payment_status)}
                         </Badge>
+                        {booking.payment_method && (
+                          <Badge variant="outline" className="text-xs">
+                            {booking.payment_method.replace('-', ' ').toUpperCase()}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-semibold text-[#0B1F36]">
-                        {formatICP(booking.escrow_amount_e8s)}
+                        {formatICP(BigInt(booking.escrow_amount_e8s))}
                       </div>
                       <div className="text-sm text-gray-500">
                         {new Date(booking.created_at / 1000000).toLocaleDateString()}
                       </div>
+                      {booking.delivery_deadline && (
+                        <div className="text-xs text-orange-600 mt-1">
+                          📅 Due: {new Date(booking.delivery_deadline / 1000000).toLocaleDateString()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <p className="text-sm text-gray-600 line-clamp-2">
-                    {booking.special_instructions}
-                  </p>
-                  {booking.ledger_deposit_block && (
-                    <div className="text-xs text-gray-500 mt-2">
-                      Block: {booking.ledger_deposit_block.toString()}
+                  <div className="space-y-3">
+                    {booking.special_instructions && (
+                      <p className="text-sm text-gray-600 line-clamp-2">
+                        {booking.special_instructions}
+                      </p>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <div className="flex items-center gap-4">
+                        <span className="flex items-center gap-1">
+                          <User size={12} />
+                          {booking.freelancer_name || booking.freelancer_id}
+                        </span>
+                        {booking.ledger_deposit_block && (
+                          <span>Block: {booking.ledger_deposit_block.toString()}</span>
+                        )}
+                      </div>
+                      {booking.payment_id && (
+                        <span className="text-xs">
+                          ID: {booking.payment_id.slice(-8)}
+                        </span>
+                      )}
                     </div>
-                  )}
+
+                    {booking.upsells && booking.upsells.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {booking.upsells.slice(0, 2).map((upsell, idx) => (
+                          <Badge key={idx} variant="secondary" className="text-xs">
+                            + {upsell.name}
+                          </Badge>
+                        ))}
+                        {booking.upsells.length > 2 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{booking.upsells.length - 2} more
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -228,7 +356,7 @@ export default function ClientProjects() {
                             </p>
                             <div className="flex items-center justify-between mt-3">
                               <div className="text-sm font-semibold text-[#0B1F36]">
-                                {formatICP(stage.amount_e8s)}
+                                {formatICP(BigInt(stage.amount_e8s))}
                               </div>
                               <div className="flex gap-2">
                                 {stage.status === 'Submitted' && (
@@ -279,7 +407,7 @@ export default function ClientProjects() {
                                 <strong>Submission Notes:</strong> {stage.submission_notes}
                               </div>
                             )}
-                            {stage.submission_artifacts.length > 0 && (
+                            {stage.submission_artifacts && stage.submission_artifacts.length > 0 && (
                               <div className="mt-2">
                                 <div className="text-sm font-medium">Deliverables:</div>
                                 <div className="flex flex-wrap gap-1 mt-1">

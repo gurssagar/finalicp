@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Sidebar } from '../../../components/Sidebar';
-import { Header1 } from '../../../components/Header1';
+import { Sidebar } from '@/components/Sidebar';
+import { Header1 } from '@/components/Header1';
 import { ChevronLeft, Save, Plus, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,9 +28,6 @@ interface ProjectFormData {
   teamMembers: TeamMember[];
 }
 
-interface ProjectEditPageProps {
-  params: { id: string };
-}
 
 // Extracted components
 interface TechStackInputProps {
@@ -208,9 +205,10 @@ const mockProjectData: ProjectFormData = {
   }]
 };
 
-export default function ProjectEditPage({ params }: ProjectEditPageProps) {
+export default function ProjectEditPage() {
   const router = useRouter();
-  const { id } = params;
+  const urlParams = useParams();
+  const id = urlParams.id as string;
   
   const [formData, setFormData] = useState<ProjectFormData>(initialFormData);
   const [activeTab, setActiveTab] = useState<'basic' | 'media' | 'technical' | 'team'>('basic');
@@ -775,7 +773,7 @@ export default function ProjectEditPage({ params }: ProjectEditPageProps) {
       
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        <Header />
+        <Header1 />
         <main className="flex-1 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Back button */}

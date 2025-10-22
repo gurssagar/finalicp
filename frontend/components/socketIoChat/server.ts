@@ -2,6 +2,8 @@ import express from "express";
 import { createServer } from "http";
 import { Server, Socket } from "socket.io";
 import dotenv from "dotenv";
+import { Actor, HttpAgent } from "@dfinity/agent";
+import { Ed25519KeyIdentity } from "@dfinity/identity";
 
 dotenv.config();
 
@@ -10,12 +12,29 @@ interface ChatMessage {
   timestamp: string;
   to: string;
   from: string;
+  messageType?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  replyTo?: string;
 }
 
 interface UserConnection {
   socket: Socket;
   username: string;
   lastSeen: number;
+  isOnline: boolean;
+  typingTo: Set<string>;
+  room?: string;
+}
+
+interface ChatRoom {
+  roomId: string;
+  participants: string[];
+  bookingId?: string;
+  serviceTitle?: string;
+  createdAt: Date;
+  lastActivity: Date;
 }
 
 const app = express();
@@ -52,8 +71,183 @@ const io = new Server(httpServer, {
   },
 });
 
-// Store active connections
+// Store active connections and rooms
 const activeConnections = new Map<string, UserConnection>();
+const chatRooms = new Map<string, ChatRoom>();
+
+// Canister configuration
+const CHAT_CANISTER_ID = process.env.CHAT_CANISTER_ID || "bkyz2-fmaaa-aaaaa-qaaaq-cai";
+const DFX_NETWORK = process.env.DFX_NETWORK || "local";
+
+// Initialize canister actor
+let chatActor: Actor | null = null;
+
+async function initializeCanister() {
+  try {
+    const agent = new HttpAgent({
+      host: DFX_NETWORK === "local" ? "http://127.0.0.1:8080" : "https://ic0.app",
+    });
+
+    // Only fetch root key for local development
+    if (DFX_NETWORK === "local") {
+      await agent.fetchRootKey();
+    }
+
+    // Create a temporary identity for the server
+    const identity = Ed25519KeyIdentity.generate();
+    agent.setIdentity(identity);
+
+    // Define the canister interface (simplified version)
+    const chatCanisterId = Actor.canisterIdOf(CHAT_CANISTER_ID);
+    chatActor = Actor.createActor(
+      {
+        authenticateUser: (email: string, displayName: string) => Promise<boolean>,
+        saveMessage: (
+          from: string,
+          to: string,
+          text: string,
+          messageType: string,
+          timestamp: string,
+          fileUrl?: [string],
+          fileName?: [string],
+          fileSize?: [bigint],
+          replyTo?: [string]
+        ) => Promise<{ ok: string } | { err: any }>,
+        getChatHistory: (
+          userEmail: string,
+          contactEmail: string,
+          limit: bigint,
+          offset: bigint
+        ) => Promise<{ ok: any[] } | { err: any }>,
+        getChatRelationships: (userEmail: string) => Promise<{ ok: any[] } | { err: any }>,
+        updatePresence: (
+          userEmail: string,
+          socketId?: [string],
+          isOnline: boolean,
+          status: string,
+          customStatus?: [string],
+          deviceInfo?: [string]
+        ) => Promise<{ ok: boolean } | { err: any }>,
+        setTypingIndicator: (
+          from: string,
+          to: string,
+          isTyping: boolean,
+          chatRoom: string
+        ) => Promise<{ ok: boolean } | { err: any }>,
+        markMessageAsRead: (
+          messageId: string,
+          userEmail: string
+        ) => Promise<{ ok: boolean } | { err: any }>,
+        createChatRelationship: (
+          clientEmail: string,
+          freelancerEmail: string,
+          bookingId: string,
+          serviceTitle: string,
+          serviceId: string,
+          packageId: string,
+          status: string
+        ) => Promise<{ ok: boolean } | { err: any }>,
+        healthCheck: () => Promise<string>
+      },
+      {
+        agent,
+        canisterId: chatCanisterId,
+      }
+    );
+
+    console.log("[Canister] Chat storage canister initialized");
+    const healthCheck = await chatActor.healthCheck();
+    console.log("[Canister] Health check:", healthCheck);
+
+  } catch (error) {
+    console.error("[Canister] Failed to initialize canister:", error);
+    // Continue without canister for development
+  }
+}
+
+// Initialize canister on startup
+initializeCanister();
+
+// Canister wrapper functions
+async function saveMessageToCanister(message: ChatMessage): Promise<boolean> {
+  if (!chatActor) return false;
+
+  try {
+    const result = await chatActor.saveMessage(
+      message.from,
+      message.to,
+      message.text,
+      message.messageType || "text",
+      message.timestamp,
+      message.fileUrl ? [message.fileUrl] : [],
+      message.fileName ? [message.fileName] : [],
+      message.fileSize ? [BigInt(message.fileSize)] : [],
+      message.replyTo ? [message.replyTo] : []
+    );
+
+    return "ok" in result;
+  } catch (error) {
+    console.error("[Canister] Failed to save message:", error);
+    return false;
+  }
+}
+
+async function getChatHistoryFromCanister(
+  userEmail: string,
+  contactEmail: string,
+  limit: number = 50,
+  offset: number = 0
+): Promise<any[]> {
+  if (!chatActor) return [];
+
+  try {
+    const result = await chatActor.getChatHistory(userEmail, contactEmail, BigInt(limit), BigInt(offset));
+    return "ok" in result ? result.ok : [];
+  } catch (error) {
+    console.error("[Canister] Failed to get chat history:", error);
+    return [];
+  }
+}
+
+async function updatePresenceInCanister(
+  userEmail: string,
+  socketId?: string,
+  isOnline: boolean = true
+): Promise<boolean> {
+  if (!chatActor) return false;
+
+  try {
+    const result = await chatActor.updatePresence(
+      userEmail,
+      socketId ? [socketId] : [],
+      isOnline,
+      "available",
+      [],
+      ["Socket.IO Server"]
+    );
+    return "ok" in result;
+  } catch (error) {
+    console.error("[Canister] Failed to update presence:", error);
+    return false;
+  }
+}
+
+async function setTypingIndicatorInCanister(
+  from: string,
+  to: string,
+  isTyping: boolean,
+  chatRoom: string
+): Promise<boolean> {
+  if (!chatActor) return false;
+
+  try {
+    const result = await chatActor.setTypingIndicator(from, to, isTyping, chatRoom);
+    return "ok" in result;
+  } catch (error) {
+    console.error("[Canister] Failed to set typing indicator:", error);
+    return false;
+  }
+}
 
 // Utility functions
 function getActiveUsers(): string[] {
@@ -70,11 +264,35 @@ function broadcastUsersList(): void {
 }
 
 function isUserOnline(username: string): boolean {
-  return activeConnections.has(username);
+  const connection = activeConnections.get(username);
+  return connection ? connection.isOnline : false;
 }
 
 function getUserSocket(username: string): Socket | null {
   return activeConnections.get(username)?.socket || null;
+}
+
+function getChatRoomId(user1: string, user2: string): string {
+  const sorted = [user1, user2].sort();
+  return `room_${sorted[0]}_${sorted[1]}`;
+}
+
+function getOrCreateChatRoom(user1: string, user2: string, bookingId?: string, serviceTitle?: string): ChatRoom {
+  const roomId = getChatRoomId(user1, user2);
+
+  if (!chatRooms.has(roomId)) {
+    const room: ChatRoom = {
+      roomId,
+      participants: [user1, user2],
+      bookingId,
+      serviceTitle,
+      createdAt: new Date(),
+      lastActivity: new Date()
+    };
+    chatRooms.set(roomId, room);
+  }
+
+  return chatRooms.get(roomId)!;
 }
 
 // Authentication middleware
@@ -111,7 +329,12 @@ io.on("connection", (socket: Socket) => {
     socket,
     username,
     lastSeen: Date.now(),
+    isOnline: true,
+    typingTo: new Set(),
   });
+
+  // Update presence in canister
+  updatePresenceInCanister(username, socket.id, true);
 
   // Send auth confirmation and user list
   socket.emit("authenticated", { username });
@@ -120,8 +343,8 @@ io.on("connection", (socket: Socket) => {
   // Broadcast updated user list
   broadcastUsersList();
 
-  // Handle private messages
-  socket.on("privateMessage", (data, callback) => {
+  // Enhanced private message handling with canister integration
+  socket.on("privateMessage", async (data, callback) => {
     console.log(`[PrivateMessage] From: ${username} to: ${data.to}`);
 
     try {
@@ -132,32 +355,119 @@ io.on("connection", (socket: Socket) => {
         return callback?.({ error });
       }
 
-      // Check if recipient exists and is online
-      const recipientSocket = getUserSocket(data.to);
-      if (!recipientSocket) {
-        const error = "Recipient not online";
-        console.log(`[MessageError] ${error}: ${data.to}`);
-        return callback?.({ error });
-      }
-
       // Create message object
       const message: ChatMessage = {
         text: data.text.trim(),
         timestamp: data.timestamp || new Date().toISOString(),
         to: data.to,
         from: username,
+        messageType: data.messageType || "text",
+        fileUrl: data.fileUrl,
+        fileName: data.fileName,
+        fileSize: data.fileSize,
+        replyTo: data.replyTo,
       };
 
-      // Send message to recipient
-      recipientSocket.emit("privateMessage", message);
+      // Save message to canister
+      const savedToCanister = await saveMessageToCanister(message);
+      if (!savedToCanister) {
+        console.warn(`[Canister] Failed to save message, continuing with real-time delivery`);
+      }
+
+      // Get or create chat room
+      const room = getOrCreateChatRoom(username, data.to);
+      room.lastActivity = new Date();
+
+      // Send message to recipient if online
+      const recipientSocket = getUserSocket(data.to);
+      if (recipientSocket) {
+        recipientSocket.emit("privateMessage", message);
+        console.log(`[MessageDelivered] Real-time delivery to ${data.to}`);
+      } else {
+        console.log(`[MessageStored] Recipient ${data.to} offline, message stored in canister`);
+      }
 
       // Send confirmation to sender
-      callback?.({ success: true, timestamp: message.timestamp });
+      callback?.({ success: true, timestamp: message.timestamp, savedToCanister });
 
       console.log(`[MessageSent] ${username} -> ${data.to}`);
     } catch (error) {
       console.error(`[MessageError] ${error}`);
       callback?.({ error: "Failed to send message" });
+    }
+  });
+
+  // Handle typing indicators
+  socket.on("typing", async (data) => {
+    const { to, isTyping } = data;
+    if (!to) return;
+
+    const connection = activeConnections.get(username);
+    if (connection) {
+      if (isTyping) {
+        connection.typingTo.add(to);
+      } else {
+        connection.typingTo.delete(to);
+      }
+    }
+
+    // Update typing indicator in canister
+    const room = getChatRoomId(username, to);
+    await setTypingIndicatorInCanister(username, to, isTyping, room);
+
+    // Notify recipient
+    const recipientSocket = getUserSocket(to);
+    if (recipientSocket) {
+      recipientSocket.emit("typingIndicator", {
+        from: username,
+        isTyping,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  // Handle read receipts
+  socket.on("markAsRead", async (data) => {
+    const { messageId } = data;
+    if (!messageId) return;
+
+    try {
+      // Mark as read in canister (when canister method is available)
+      console.log(`[ReadReceipt] ${username} marked message ${messageId} as read`);
+
+      // Notify sender that message was read
+      // Parse message ID to get sender information
+      // This is simplified - in production, track message senders properly
+      const parts = messageId.split('_');
+      if (parts.length >= 2) {
+        // Notify potential sender
+        const recipientSocket = getUserSocket(parts[1]);
+        if (recipientSocket) {
+          recipientSocket.emit("messageRead", {
+            messageId,
+            readBy: username,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    } catch (error) {
+      console.error(`[ReadReceiptError] ${error}`);
+    }
+  });
+
+  // Handle chat history requests
+  socket.on("getChatHistory", async (data, callback) => {
+    const { contactEmail, limit = 50, offset = 0 } = data;
+    if (!contactEmail) {
+      return callback?.({ error: "Contact email required" });
+    }
+
+    try {
+      const messages = await getChatHistoryFromCanister(username, contactEmail, limit, offset);
+      callback?.({ success: true, messages });
+    } catch (error) {
+      console.error(`[ChatHistoryError] ${error}`);
+      callback?.({ error: "Failed to load chat history" });
     }
   });
 
@@ -172,6 +482,16 @@ io.on("connection", (socket: Socket) => {
   socket.on("disconnect", (reason) => {
     console.log(`[Disconnect] ${username} disconnected: ${reason}`);
 
+    // Update presence in canister
+    updatePresenceInCanister(username, socket.id, false);
+
+    // Mark user as offline
+    const connection = activeConnections.get(username);
+    if (connection) {
+      connection.isOnline = false;
+      connection.lastSeen = Date.now();
+    }
+
     // Remove user after a short delay to handle page refreshes
     setTimeout(() => {
       const currentConnection = activeConnections.get(username);
@@ -183,6 +503,33 @@ io.on("connection", (socket: Socket) => {
         broadcastUsersList();
       }
     }, 5000); // 5 second grace period
+  });
+
+  // Handle room-based events for future group chat support
+  socket.on("joinRoom", (data) => {
+    const { roomId } = data;
+    if (!roomId) return;
+
+    socket.join(roomId);
+    console.log(`[RoomJoin] ${username} joined room: ${roomId}`);
+
+    const connection = activeConnections.get(username);
+    if (connection) {
+      connection.room = roomId;
+    }
+  });
+
+  socket.on("leaveRoom", (data) => {
+    const { roomId } = data;
+    if (!roomId) return;
+
+    socket.leave(roomId);
+    console.log(`[RoomLeave] ${username} left room: ${roomId}`);
+
+    const connection = activeConnections.get(username);
+    if (connection && connection.room === roomId) {
+      connection.room = undefined;
+    }
   });
 
   // Update last seen periodically

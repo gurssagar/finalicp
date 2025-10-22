@@ -395,55 +395,127 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
             </Card>
 
             {/* Packages */}
-            {packages && packages.length > 0 && (
+            {(service.packages || (packages && packages.length > 0)) && (
               <Card>
                 <CardContent className="p-6">
                   <h2 className="text-xl font-semibold mb-4 mb-6">Packages</h2>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {packages.map((pkg, index) => (
-                      <Card key={pkg.id} className="relative">
-                        {index === 1 && (
-                          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                            <Badge className="bg-blue-600 text-white">
-                              Most Popular
-                            </Badge>
-                          </div>
-                        )}
+                    {(service.packages || packages).map((pkg: any, index: number) => {
+                      const isPopular = service.packages ?
+                        service.packages.length === 3 && index === 1 :
+                        packages.length === 3 && index === 1;
 
-                        <CardHeader>
-                          <h3 className="text-lg font-semibold">{pkg.title}</h3>
-                          <div className="text-2xl font-bold text-gray-900">
-                            ICP {parseFloat(pkg.price_e8s.toString()) / 100000000}
-                          </div>
-                          <div className="text-sm text-gray-600">
-                            {pkg.delivery_days} days delivery
-                          </div>
-                        </CardHeader>
+                      return (
+                        <Card key={pkg.package_id || index} className="relative">
+                          {isPopular && (
+                            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                              <Badge className="bg-blue-600 text-white">
+                                Most Popular
+                              </Badge>
+                            </div>
+                          )}
 
-                        <CardContent>
-                          <div className="space-y-2">
-                            {pkg.features && pkg.features.length > 0 && (
-                              <ul className="text-sm text-gray-600 space-y-1">
-                                {pkg.features.map((feature, idx) => (
-                                  <li key={idx} className="flex items-start gap-2">
-                                    <CheckCircle size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
-                                    <span>{feature}</span>
-                                  </li>
-                                ))}
-                              </ul>
+                          <CardHeader>
+                            <h3 className="text-lg font-semibold">{pkg.title}</h3>
+                            <div className="text-2xl font-bold text-gray-900">
+                              ICP {parseFloat(pkg.price_e8s.toString()) / 100000000}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {pkg.delivery_timeline || `${pkg.delivery_days} days delivery`}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {pkg.revisions_included} {pkg.revisions_included === 1 ? 'revision' : 'revisions'} included
+                            </div>
+                          </CardHeader>
+
+                          <CardContent>
+                            <div className="space-y-2">
+                              {(pkg.features || []).length > 0 && (
+                                <ul className="text-sm text-gray-600 space-y-1">
+                                  {(pkg.features || []).slice(0, 5).map((feature: string, idx: number) => (
+                                    <li key={idx} className="flex items-start gap-2">
+                                      <CheckCircle size={16} className="text-green-500 mt-0.5 flex-shrink-0" />
+                                      <span>{feature}</span>
+                                    </li>
+                                  ))}
+                                  {(pkg.features || []).length > 5 && (
+                                    <li className="text-xs text-gray-500 italic">
+                                      +{(pkg.features || []).length - 5} more features
+                                    </li>
+                                  )}
+                                </ul>
+                              )}
+
+                              <Button
+                                className="w-full mt-4 bg-rainbow-gradient text-white hover:opacity-90"
+                                asChild
+                              >
+                                <Link href={`/client/service/${service.service_id}?package=${pkg.package_id}`}>
+                                  Select Package
+                                </Link>
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Client Questions */}
+            {service.client_questions && service.client_questions.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Client Questions</h2>
+                  <p className="text-gray-600 mb-4">Questions that will be asked to clients when they book this service:</p>
+                  <div className="space-y-3">
+                    {service.client_questions.map((question: any) => (
+                      <div key={question.id} className="bg-blue-50 rounded-lg p-4">
+                        <div className="flex items-start space-x-3">
+                          <span className="text-blue-600 font-medium">
+                            {question.type === 'text' ? '📝' :
+                             question.type === 'mcq' ? '🔘' :
+                             question.type === 'checkbox' ? '☑️' :
+                             question.type === 'dropdown' ? '📋' :
+                             question.type === 'file' ? '📎' : '❓'}
+                          </span>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-gray-900">
+                              {question.question}
+                            </h4>
+                            {question.required && (
+                              <span className="inline-block mt-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded">
+                                Required
+                              </span>
                             )}
-
-                            <Button
-                              className="w-full mt-4 bg-rainbow-gradient text-white hover:opacity-90"
-                              asChild
-                            >
-                              <Link href={`/client/service/${service.id}?package=${pkg.id}`}>
-                                Select Package
-                              </Link>
-                            </Button>
                           </div>
-                        </CardContent>
-                      </Card>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* FAQs */}
+            {service.faqs && service.faqs.length > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Frequently Asked Questions</h2>
+                  <div className="space-y-4">
+                    {service.faqs.map((faq: any) => (
+                      <div key={faq.id} className="bg-gray-50 rounded-lg p-4">
+                        <h3 className="font-semibold text-gray-900 mb-2 flex items-start">
+                          <span className="text-blue-600 mr-2">Q:</span>
+                          {faq.question}
+                        </h3>
+                        <p className="text-gray-700 ml-6">
+                          <span className="text-green-600 mr-2">A:</span>
+                          {faq.answer}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 </CardContent>
@@ -535,7 +607,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                     Have questions about this service? Feel free to reach out!
                   </p>
                   <Button className="w-full" asChild>
-                    <Link href={`/client/service/${service.id}`}>
+                    <Link href={`/client/service/${service.service_id}`}>
                       <Eye size={16} className="mr-2" />
                       Contact Provider
                     </Link>

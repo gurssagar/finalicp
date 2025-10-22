@@ -40,6 +40,7 @@ export interface Booking {
   client_id: string;
   freelancer_id: string;
   package_id: string;
+  service_id?: string;
   status: string;
   total_amount_e8s: number;
   escrow_amount_e8s: number;
@@ -47,11 +48,32 @@ export interface Booking {
   client_notes?: string;
   created_at: number;
   updated_at: number;
+
+  // Enhanced fields from payment confirmations
+  service_title?: string;
+  freelancer_name?: string;
+  package_title?: string;
+  package_tier?: string;
+  payment_method?: string;
+  payment_id?: string;
+  transaction_id?: string;
+  ledger_deposit_block?: bigint | null;
+  delivery_deadline?: number;
+  special_instructions?: string;
+  upsells?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    description: string;
+    category: string;
+  }>;
+  promo_code?: string;
 }
 
 export interface Stage {
   stage_id: string;
   booking_id: string;
+  stage_number: number;
   title: string;
   description: string;
   amount_e8s: number;

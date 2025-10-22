@@ -1,26 +1,111 @@
 'use client'
-import React, { useState } from 'react'
-import { User, Mail, Phone, MapPin, Award, Edit3, Camera, Save, X } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { User, Mail, Phone, MapPin, Award, Edit3, Camera, Save, X, AlertCircle, CheckCircle } from 'lucide-react'
 import ClientLayout from '../layout'
+import { useUserProfile } from '@/hooks/useUserProfile'
+import { useUserContext } from '@/contexts/UserContext'
 
 export default function ProfilePage() {
+  const { profile, isLoading: profileLoading } = useUserProfile()
+  const { refreshProfile } = useUserContext()
   const [isEditing, setIsEditing] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Initialize profile data with real user data
   const [profileData, setProfileData] = useState({
-    fullName: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    location: 'San Francisco, CA',
-    bio: 'Passionate developer and hackathon enthusiast. Love building innovative solutions with AI, Web3, and mobile technologies.',
-    skills: ['JavaScript', 'React', 'Node.js', 'TypeScript', 'Python', 'Blockchain'],
-    github: 'johndoe',
-    linkedin: 'john-doe-developer',
+    fullName: '',
+    email: '',
+    phone: '',
+    location: '',
+    bio: '',
+    skills: [] as string[],
+    github: '',
+    linkedin: '',
   })
 
   const [editData, setEditData] = useState(profileData)
 
-  const handleSave = () => {
-    setProfileData(editData)
-    setIsEditing(false)
+  // Update profile data when user profile loads
+  useEffect(() => {
+    if (profile.isLoaded && !profileLoading) {
+      const newProfileData = {
+        fullName: `${profile.firstName} ${profile.lastName}`.trim() || '',
+        email: profile.email || '',
+        phone: '',
+        location: '',
+        bio: '',
+        skills: [] as string[],
+        github: '',
+        linkedin: '',
+      }
+      setProfileData(newProfileData)
+      setEditData(newProfileData)
+    }
+  }, [profile, profileLoading])
+
+  const handleSave = async () => {
+    setSaveLoading(true)
+    setSaveMessage(null)
+
+    try {
+      // Split full name into first and last name
+      const nameParts = editData.fullName.trim().split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+
+      const profileUpdateData = {
+        firstName,
+        lastName,
+        email: editData.email,
+        phone: editData.phone,
+        location: editData.location,
+        bio: editData.bio,
+        github: editData.github,
+        linkedin: editData.linkedin,
+        skills: editData.skills,
+      }
+
+      const response = await fetch('/api/profile/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileUpdateData),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setProfileData(editData)
+        setIsEditing(false)
+        setSaveMessage({
+          type: 'success',
+          text: result.message || 'Profile updated successfully!'
+        })
+
+        // Refresh user context to update profile across the app
+        await refreshProfile()
+      } else {
+        setSaveMessage({
+          type: 'error',
+          text: result.error || 'Failed to update profile. Please try again.'
+        })
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      setSaveMessage({
+        type: 'error',
+        text: 'An unexpected error occurred. Please try again.'
+      })
+    } finally {
+      setSaveLoading(false)
+
+      // Clear message after 5 seconds
+      if (saveMessage?.type === 'success') {
+        setTimeout(() => setSaveMessage(null), 5000)
+      }
+    }
   }
 
   const handleCancel = () => {
@@ -44,9 +129,63 @@ export default function ProfilePage() {
     })
   }
 
+  // Show loading state while profile is loading
+  if (profileLoading) {
+    return (
+      <ClientLayout>
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+              <div className="flex items-center gap-6">
+                <div className="w-24 h-24 bg-gray-200 rounded-full"></div>
+                <div className="space-y-2">
+                  <div className="h-6 bg-gray-200 rounded w-48"></div>
+                  <div className="h-4 bg-gray-200 rounded w-32"></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div className="h-4 bg-gray-200 rounded w-20"></div>
+                  <div className="space-y-2">
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div className="h-4 bg-gray-200 rounded w-16"></div>
+                  <div className="space-y-2">
+                    <div className="h-20 bg-gray-200 rounded"></div>
+                    <div className="h-10 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ClientLayout>
+    )
+  }
+
   return (
-    
+    <ClientLayout>
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Save Message Notification */}
+        {saveMessage && (
+          <div className={`rounded-lg p-4 flex items-center gap-3 ${
+            saveMessage.type === 'success'
+              ? 'bg-green-50 border border-green-200 text-green-800'
+              : 'bg-red-50 border border-red-200 text-red-800'
+          }`}>
+            {saveMessage.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            )}
+            <span>{saveMessage.text}</span>
+          </div>
+        )}
         {/* Profile Header */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
@@ -223,10 +362,20 @@ export default function ProfilePage() {
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                disabled={saveLoading}
+                className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4" />
-                Save Changes
+                {saveLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -242,57 +391,33 @@ export default function ProfilePage() {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Total Participations</span>
-                <span className="font-semibold">12</span>
+                <span className="font-semibold">0</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Teams Created</span>
-                <span className="font-semibold">8</span>
+                <span className="font-semibold">0</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Prizes Won</span>
-                <span className="font-semibold">3</span>
+                <span className="font-semibold">0</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Success Rate</span>
-                <span className="font-semibold">75%</span>
+                <span className="font-semibold">-</span>
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Achievements</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 bg-yellow-50 rounded-lg">
-                <div className="w-10 h-10 bg-yellow-200 rounded-full flex items-center justify-center">
-                  🏆
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">First Place Winner</p>
-                  <p className="text-sm text-gray-600">AI Innovation Hackathon 2024</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
-                <div className="w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center">
-                  ⭐
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Best Innovation</p>
-                  <p className="text-sm text-gray-600">Web3 Developer Challenge</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
-                <div className="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center">
-                  🎯
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">People's Choice</p>
-                  <p className="text-sm text-gray-600">Sustainability Hack Week</p>
-                </div>
-              </div>
+            <div className="text-center py-8 text-gray-500">
+              <Award className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p>No achievements yet</p>
+              <p className="text-sm">Start participating in hackathons to earn achievements!</p>
             </div>
           </div>
         </div>
       </div>
-   
+    </ClientLayout>
   )
 }

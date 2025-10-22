@@ -5,7 +5,27 @@ import { Principal } from '@dfinity/principal';
 const idlFactory = ({ IDL }: any) => {
   return IDL.Service({
     // Service methods
+    getAllServices: IDL.Func([], [IDL.Vec(IDL.Record({
+      service_id: IDL.Text,
+      freelancer_id: IDL.Text,
+      title: IDL.Text,
+      main_category: IDL.Text,
+      sub_category: IDL.Text,
+      description: IDL.Text,
+      whats_included: IDL.Text,
+      cover_image_url: IDL.Opt(IDL.Text),
+      portfolio_images: IDL.Vec(IDL.Text),
+      status: IDL.Variant({ Active: IDL.Null, Paused: IDL.Null, Deleted: IDL.Null }),
+      created_at: IDL.Int,
+      updated_at: IDL.Int,
+      delivery_time_days: IDL.Nat,
+      starting_from_e8s: IDL.Nat64,
+      total_rating: IDL.Float64,
+      review_count: IDL.Nat,
+      tags: IDL.Vec(IDL.Text)
+    }))]),
     createService: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
+    createServiceForBooking: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
     updateService: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
     deleteService: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
     getService: IDL.Func([IDL.Text], [IDL.Opt(IDL.Record({
@@ -73,6 +93,10 @@ const idlFactory = ({ IDL }: any) => {
       review_count: IDL.Nat,
       tags: IDL.Vec(IDL.Text)
     }))]),
+
+    // Package methods
+    createPackage: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Nat64, IDL.Nat, IDL.Text, IDL.Nat, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
+    createPackageForBooking: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat64, IDL.Nat, IDL.Text, IDL.Nat, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
 
     // Booking methods
     bookPackage: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Variant({
@@ -211,6 +235,144 @@ const idlFactory = ({ IDL }: any) => {
         BookingNotFunded: IDL.Null,
         InvalidStatus: IDL.Text
       })
+    })]),
+
+    // Stage methods
+    getStageById: IDL.Func([IDL.Text], [IDL.Variant({
+      ok: IDL.Record({
+        stage_id: IDL.Text,
+        booking_id: IDL.Text,
+        stage_number: IDL.Nat,
+        title: IDL.Text,
+        description: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        status: IDL.Variant({ Pending: IDL.Null, InProgress: IDL.Null, Submitted: IDL.Null, Approved: IDL.Null, Rejected: IDL.Null, Released: IDL.Null }),
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        submitted_at: IDL.Opt(IDL.Int),
+        approved_at: IDL.Opt(IDL.Int),
+        rejected_at: IDL.Opt(IDL.Int),
+        released_at: IDL.Opt(IDL.Int),
+        submission_notes: IDL.Opt(IDL.Text),
+        submission_artifacts: IDL.Vec(IDL.Text),
+        rejection_reason: IDL.Opt(IDL.Text)
+      }),
+      err: IDL.Text
+    })]),
+
+    listStagesForBooking: IDL.Func([IDL.Text], [IDL.Variant({
+      ok: IDL.Vec(IDL.Record({
+        stage_id: IDL.Text,
+        booking_id: IDL.Text,
+        stage_number: IDL.Nat,
+        title: IDL.Text,
+        description: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        status: IDL.Variant({ Pending: IDL.Null, InProgress: IDL.Null, Submitted: IDL.Null, Approved: IDL.Null, Rejected: IDL.Null, Released: IDL.Null }),
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        submitted_at: IDL.Opt(IDL.Int),
+        approved_at: IDL.Opt(IDL.Int),
+        rejected_at: IDL.Opt(IDL.Int),
+        released_at: IDL.Opt(IDL.Int),
+        submission_notes: IDL.Opt(IDL.Text),
+        submission_artifacts: IDL.Vec(IDL.Text),
+        rejection_reason: IDL.Opt(IDL.Text)
+      })),
+      err: IDL.Text
+    })]),
+
+    createStages: IDL.Func([IDL.Text, IDL.Text, IDL.Vec(IDL.Record({
+      stage_number: IDL.Nat,
+      title: IDL.Text,
+      description: IDL.Text,
+      amount_e8s: IDL.Nat64
+    }))], [IDL.Variant({
+      ok: IDL.Vec(IDL.Record({
+        stage_id: IDL.Text,
+        booking_id: IDL.Text,
+        stage_number: IDL.Nat,
+        title: IDL.Text,
+        description: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        status: IDL.Variant({ Pending: IDL.Null, InProgress: IDL.Null, Submitted: IDL.Null, Approved: IDL.Null, Rejected: IDL.Null, Released: IDL.Null }),
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        submitted_at: IDL.Opt(IDL.Int),
+        approved_at: IDL.Opt(IDL.Int),
+        rejected_at: IDL.Opt(IDL.Int),
+        released_at: IDL.Opt(IDL.Int),
+        submission_notes: IDL.Opt(IDL.Text),
+        submission_artifacts: IDL.Vec(IDL.Text),
+        rejection_reason: IDL.Opt(IDL.Text)
+      })),
+      err: IDL.Text
+    })]),
+
+    submitStage: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Vec(IDL.Text)], [IDL.Variant({
+      ok: IDL.Record({
+        stage_id: IDL.Text,
+        booking_id: IDL.Text,
+        stage_number: IDL.Nat,
+        title: IDL.Text,
+        description: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        status: IDL.Variant({ Pending: IDL.Null, InProgress: IDL.Null, Submitted: IDL.Null, Approved: IDL.Null, Rejected: IDL.Null, Released: IDL.Null }),
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        submitted_at: IDL.Opt(IDL.Int),
+        approved_at: IDL.Opt(IDL.Int),
+        rejected_at: IDL.Opt(IDL.Int),
+        released_at: IDL.Opt(IDL.Int),
+        submission_notes: IDL.Opt(IDL.Text),
+        submission_artifacts: IDL.Vec(IDL.Text),
+        rejection_reason: IDL.Opt(IDL.Text)
+      }),
+      err: IDL.Text
+    })]),
+
+    approveStage: IDL.Func([IDL.Text, IDL.Text], [IDL.Variant({
+      ok: IDL.Record({
+        stage_id: IDL.Text,
+        booking_id: IDL.Text,
+        stage_number: IDL.Nat,
+        title: IDL.Text,
+        description: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        status: IDL.Variant({ Pending: IDL.Null, InProgress: IDL.Null, Submitted: IDL.Null, Approved: IDL.Null, Rejected: IDL.Null, Released: IDL.Null }),
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        submitted_at: IDL.Opt(IDL.Int),
+        approved_at: IDL.Opt(IDL.Int),
+        rejected_at: IDL.Opt(IDL.Int),
+        released_at: IDL.Opt(IDL.Int),
+        submission_notes: IDL.Opt(IDL.Text),
+        submission_artifacts: IDL.Vec(IDL.Text),
+        rejection_reason: IDL.Opt(IDL.Text)
+      }),
+      err: IDL.Text
+    })]),
+
+    rejectStage: IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Variant({
+      ok: IDL.Record({
+        stage_id: IDL.Text,
+        booking_id: IDL.Text,
+        stage_number: IDL.Nat,
+        title: IDL.Text,
+        description: IDL.Text,
+        amount_e8s: IDL.Nat64,
+        status: IDL.Variant({ Pending: IDL.Null, InProgress: IDL.Null, Submitted: IDL.Null, Approved: IDL.Null, Rejected: IDL.Null, Released: IDL.Null }),
+        created_at: IDL.Int,
+        updated_at: IDL.Int,
+        submitted_at: IDL.Opt(IDL.Int),
+        approved_at: IDL.Opt(IDL.Int),
+        rejected_at: IDL.Opt(IDL.Int),
+        released_at: IDL.Opt(IDL.Int),
+        submission_notes: IDL.Opt(IDL.Text),
+        submission_artifacts: IDL.Vec(IDL.Text),
+        rejection_reason: IDL.Opt(IDL.Text)
+      }),
+      err: IDL.Text
     })]),
 
     // Review methods

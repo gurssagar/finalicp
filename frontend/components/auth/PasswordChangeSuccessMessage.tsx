@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { CheckCircle } from 'lucide-react';
 const PasswordChangeSuccessMessage = () => {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [redirectCount, setRedirectCount] = useState(5);
   useEffect(() => {
     const timer = setInterval(() => {
       setRedirectCount(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          setTimeout(() => navigate('/login'), 1000);
+          setTimeout(() => router.push('/login'), 1000);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [navigate]);
+  }, [router]);
   return <div className="max-w-xl w-full mx-auto px-6 py-12 bg-white rounded-3xl shadow-lg border border-gray-100 relative overflow-hidden">
       {/* Gradient background effect */}
       <div className="absolute inset-0 bg-gradient-to-r from-blue-100 via-pink-100 to-yellow-100 opacity-50 rounded-3xl"></div>
