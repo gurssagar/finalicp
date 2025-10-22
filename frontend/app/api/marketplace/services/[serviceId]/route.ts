@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceById, getSimilarServices } from '../../storage';
-import { validateMarketplaceConfig, getMarketplaceActor, handleApiError } from '@/lib/ic-marketplace-agent';
 
 // GET /api/marketplace/services/[serviceId] - Get service by ID
 export async function GET(
@@ -69,7 +68,6 @@ export async function PUT(
     const { serviceId } = await params;
     const body = await request.json();
     const { userEmail, updates } = body;
-    const userId = userEmail;
 
     if (!userEmail) {
       return NextResponse.json({
@@ -136,7 +134,6 @@ export async function DELETE(
     const { serviceId } = await params;
     const body = await request.json();
     const { userEmail } = body;
-    const userId = userEmail;
 
     if (!userEmail) {
       return NextResponse.json({

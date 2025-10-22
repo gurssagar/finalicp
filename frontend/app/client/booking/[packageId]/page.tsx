@@ -28,7 +28,7 @@ export default function BookingPage() {
   const [bookingStep, setBookingStep] = useState<'details' | 'payment' | 'confirming' | 'success'>('details');
   const [bookingResult, setBookingResult] = useState<any>(null);
 
-  const { packages, loading: packagesLoading, error: packagesError, refetch: fetchPackages } = usePackages();
+  const { packages, loading: packagesLoading, error: packagesError, fetchPackages } = usePackages();
   const { bookPackage, loading: bookingLoading, error: bookingError } = useBookPackage();
 
   const [selectedPackage, setSelectedPackage] = useState<any>(null);

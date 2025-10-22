@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 const PasswordChangeSuccessMessage = () => {
-  const navigate = useRouter();
+  const navigate = useNavigate();
   const [redirectCount, setRedirectCount] = useState(5);
   useEffect(() => {
     const timer = setInterval(() => {
       setRedirectCount(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          setTimeout(() => navigate.push('/login'), 1000);
+          setTimeout(() => navigate('/login'), 1000);
           return 0;
         }
         return prev - 1;

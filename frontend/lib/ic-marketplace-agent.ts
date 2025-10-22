@@ -258,7 +258,6 @@ export interface Service {
   total_rating: number;
   review_count: number;
   tags: string[];
-  id?: string;
 }
 
 export interface Booking {
@@ -284,9 +283,6 @@ export interface Booking {
   freelancer_review?: string;
   freelancer_rating?: number;
   dispute_id?: string;
-  booking_status?: string;
-  special_instructions?: string;
-  ledger_deposit_block?: bigint;
 }
 
 export interface BookingResponse {

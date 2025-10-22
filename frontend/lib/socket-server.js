@@ -4,9 +4,6 @@ const { Server } = require("socket.io");
 const cors = require("cors");
 require("dotenv").config();
 
-// Use ICP authentication proxy for dual persistence to ICP canister
-const { icpAuthProxy } = require('./icp-auth-proxy');
-
 const app = express();
 const port = parseInt(process.env.PORT || "4000", 10);
 const httpServer = createServer(app);
@@ -72,25 +69,6 @@ function isUserOnline(username) {
 function getUserSocket(username) {
   const connection = activeConnections.get(username);
   return connection ? connection.socket : null;
-}
-
-// Function to save messages to ICP canister via authentication proxy
-async function saveMessageToICP(message) {
-  try {
-    const displayName = message.from.split('@')[0];
-    const result = await icpAuthProxy.saveMessage(
-      message.from,
-      message.to,
-      message.text,
-      'text',
-      message.timestamp,
-      displayName
-    );
-    return result !== null;
-  } catch (error) {
-    console.error('Error saving message to ICP via proxy:', error);
-    return false;
-  }
 }
 
 // Authentication middleware
@@ -166,19 +144,6 @@ io.on("connection", (socket) => {
 
       // Send message to recipient
       recipientSocket.emit("privateMessage", message);
-
-      // Dual persistence: Save message to ICP canister
-      saveMessageToICP(message)
-        .then((saved) => {
-          if (saved) {
-            console.log(`[MessagePersisted] ${username} -> ${data.to} (ICP)`);
-          } else {
-            console.warn(`[MessagePersistFailed] ${username} -> ${data.to} (ICP)`);
-          }
-        })
-        .catch((error) => {
-          console.error(`[MessagePersistError] ${username} -> ${data.to}:`, error);
-        });
 
       // Send confirmation to sender
       callback?.({ success: true, timestamp: message.timestamp });

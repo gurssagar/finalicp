@@ -51,6 +51,7 @@ export default function MarkdownRenderer({
         source={content}
         style={customStyles}
         skipHtml={skipHtml}
+        allowHtml={allowHtml}
       />
     </div>
   )

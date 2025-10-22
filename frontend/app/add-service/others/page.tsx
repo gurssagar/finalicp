@@ -95,12 +95,7 @@ export default function AddServiceOthers() {
   const handleContinue = () => {
     // Save questions to form context
     updateFormData({
-      clientQuestions: questions.map(q => ({
-        id: q.id.toString(),
-        type: q.type.toString(),
-        question: q.question,
-        required: false
-      }))
+      clientQuestions: questions.map(q => q.question)
     });
     navigate.push('/service-preview');
   };

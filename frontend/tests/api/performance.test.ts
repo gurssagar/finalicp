@@ -1,9 +1,10 @@
-import { TestRunner, TestResult, makeApiCall, TEST_CONFIG, assertEqual, assertTrue, generateMockService } from './test-setup';
+import { TestRunner, makeApiCall, TEST_CONFIG, resetMockData, assertEqual, assertTrue, generateMockService } from './test-setup';
 
-export async function runPerformanceTests(): Promise<TestResult[]> {
+export async function runPerformanceTests(): Promise<void> {
   const runner = new TestRunner();
 
   // Reset mock data before running tests
+  resetMockData();
 
   // Performance Test 1: Response time for basic operations
   await runner.runTest('Basic Operations Response Time', async () => {

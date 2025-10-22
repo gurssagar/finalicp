@@ -16,7 +16,7 @@ export default function ServicePreview() {
   };
   const handlePublish = () => {
     // In a real app, you would submit the service data to the server
-    navigate.push('/clientorfreelancer');
+    navigate.push('/dashboard');
   };
   const goToPreviousImage = () => {
     setCurrentImageIndex(prev => prev === 0 ? allImages.length - 1 : prev - 1);

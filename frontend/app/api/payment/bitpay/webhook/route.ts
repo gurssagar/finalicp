@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { getPackageById, getServiceById } from '@/app/api/marketplace/storage';
+import { getPackageById, getServiceById } from '../../../../../marketplace/storage';
 
 interface BitPayWebhookData {
   event: BitPayEvent;
@@ -101,7 +101,7 @@ async function handleInvoicePaidInFull(invoiceData: BitPayInvoiceData) {
     // Extract payment details from BitPay data
     const paymentId = invoiceData.orderId;
     const transactionId = invoiceData.transactions[0]?.txid;
-    const amount = invoiceData.price;
+    const amount = parseFloat(invoiceData.price);
     const currency = invoiceData.currency;
 
     // Forward to payment confirmation endpoint

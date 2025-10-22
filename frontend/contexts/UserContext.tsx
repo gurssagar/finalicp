@@ -183,11 +183,11 @@ function getUserDesignation(profileData?: any): string {
   const designSkills = ['figma', 'photoshop', 'illustrator', 'ui design', 'ux design', 'sketch', 'adobe xd'];
   const businessSkills = ['marketing', 'seo', 'content writing', 'project management', 'sales', 'leadership'];
 
-  const userSkills = skills.map((skill: string) => skill.toLowerCase());
+  const userSkills = skills.map(skill => skill.toLowerCase());
 
-  const hasTechnicalSkills = technicalSkills.some((skill: string) => userSkills.some((userSkill: string) => userSkill.includes(skill)));
-  const hasDesignSkills = designSkills.some((skill: string) => userSkills.some((userSkill: string) => userSkill.includes(skill)));
-  const hasBusinessSkills = businessSkills.some((skill: string) => userSkills.some((userSkill: string) => userSkill.includes(skill)));
+  const hasTechnicalSkills = technicalSkills.some(skill => userSkills.some(userSkill => userSkill.includes(skill)));
+  const hasDesignSkills = designSkills.some(skill => userSkills.some(userSkill => userSkill.includes(skill)));
+  const hasBusinessSkills = businessSkills.some(skill => userSkills.some(userSkill => userSkill.includes(skill)));
 
   // Determine designation based on skills count and type
   if (skills.length >= 10 || (hasTechnicalSkills && hasResume)) {

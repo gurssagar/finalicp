@@ -1,9 +1,10 @@
-import { TestRunner, TestResult, makeApiCall, TEST_CONFIG, MOCK_DATA, assertEqual, assertNotNull, assertTrue, assertHasProperty } from './test-setup';
+import { TestRunner, makeApiCall, TEST_CONFIG, MOCK_DATA, resetMockData, assertEqual, assertNotNull, assertTrue, assertHasProperty } from './test-setup';
 
-export async function runServicesTests(): Promise<TestResult[]> {
+export async function runServicesTests(): Promise<void> {
   const runner = new TestRunner();
 
   // Reset mock data before running tests
+  resetMockData();
 
   // Test 1: List services (should work even with empty result)
   await runner.runTest('List Services - Empty Result', async () => {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/Header';
-import { useServices, usePackages, useCreateService } from '@/hooks/useMarketplace';
+import { useServices, usePackages } from '@/hooks/useMarketplace';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,16 +18,20 @@ export default function FreelancerServices() {
     services, 
     loading: servicesLoading, 
     error: servicesError, 
-    refetch: fetchServices
+    fetchServices, 
+    createService, 
+    updateService, 
+    deleteService 
   } = useServices();
-  
-  const { createService } = useCreateService();
   
   const { 
     packages, 
     loading: packagesLoading, 
     error: packagesError, 
-    refetch: fetchPackages
+    fetchPackages, 
+    createPackage, 
+    updatePackage, 
+    deletePackage 
   } = usePackages(selectedService || undefined);
 
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -41,7 +45,13 @@ export default function FreelancerServices() {
     setUserId(mockUserId);
     
     if (mockUserId) {
-      fetchServices();
+      fetchServices({
+        category: undefined,
+        freelancer_id: mockUserId,
+        search_term: '',
+        limit: 50,
+        offset: 0
+      });
     }
   }, [fetchServices]);
 
@@ -57,47 +67,43 @@ export default function FreelancerServices() {
   const handleUpdateService = async (serviceId: string, updates: any) => {
     if (!userId) return;
     
-    // TODO: Implement service update functionality
-    console.log('Update service:', serviceId, updates);
-    setEditingService(null);
-    fetchServices();
+    const result = await updateService(userId, serviceId, updates);
+    if (result) {
+      setEditingService(null);
+    }
   };
 
   const handleDeleteService = async (serviceId: string) => {
     if (!userId) return;
     
     if (confirm('Are you sure you want to delete this service?')) {
-      // TODO: Implement service delete functionality
-      console.log('Delete service:', serviceId);
-      fetchServices();
+      await deleteService(userId, serviceId);
     }
   };
 
   const handleCreatePackage = async (packageData: any) => {
     if (!userId || !selectedService) return;
     
-    // TODO: Implement package create functionality
-    console.log('Create package:', packageData, selectedService);
-    setShowPackageForm(false);
-    fetchPackages();
+    const result = await createPackage(userId, { ...packageData, service_id: selectedService });
+    if (result) {
+      setShowPackageForm(false);
+    }
   };
 
   const handleUpdatePackage = async (packageId: string, updates: any) => {
     if (!userId) return;
     
-    // TODO: Implement package update functionality
-    console.log('Update package:', packageId, updates);
-    setEditingPackage(null);
-    fetchPackages();
+    const result = await updatePackage(userId, packageId, updates);
+    if (result) {
+      setEditingPackage(null);
+    }
   };
 
   const handleDeletePackage = async (packageId: string) => {
     if (!userId) return;
     
     if (confirm('Are you sure you want to delete this package?')) {
-      // TODO: Implement package delete functionality
-      console.log('Delete package:', packageId);
-      fetchPackages();
+      await deletePackage(userId, packageId);
     }
   };
 
@@ -244,7 +250,7 @@ export default function FreelancerServices() {
                           </p>
                           <div className="flex items-center justify-between mt-3">
                             <div className="text-lg font-semibold text-[#0B1F36]">
-                              {formatICP(BigInt(pkg.price_e8s))}
+                              {formatICP(pkg.price_e8s)}
                             </div>
                             <div className="text-sm text-gray-500">
                               {pkg.delivery_days} days
@@ -314,7 +320,6 @@ export default function FreelancerServices() {
         {/* Edit Package Modal */}
         {editingPackage && (
           <PackageForm
-            serviceId={selectedService || ''}
             package={editingPackage}
             onSubmit={(data) => handleUpdatePackage(editingPackage.package_id, data)}
             onCancel={() => setEditingPackage(null)}
@@ -469,7 +474,7 @@ function PackageForm({
   };
 
   const removeFeature = (index: number) => {
-    const newFeatures = formData.features.filter((_: any, i: number) => i !== index);
+    const newFeatures = formData.features.filter((_, i) => i !== index);
     setFormData({ ...formData, features: newFeatures });
   };
 
@@ -544,7 +549,7 @@ function PackageForm({
           
           <div>
             <label className="block text-sm font-medium mb-1">Features</label>
-            {formData.features.map((feature: any, index: number) => (
+            {formData.features.map((feature, index) => (
               <div key={index} className="flex gap-2 mb-2">
                 <input
                   type="text"

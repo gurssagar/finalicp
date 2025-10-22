@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Edit2, Monitor, Smartphone } from 'lucide-react';
 import Image from 'next/image';
+import Image from 'next/image';
 export function ProfilePreview() {
   const navigate = useRouter();
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop');

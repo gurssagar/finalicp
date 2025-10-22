@@ -100,7 +100,7 @@ export const profileUpdateSchema = z.object({
 
 // File upload schemas
 export const profileImageSchema = z.object({
-  file: z.instanceof(File, { message: 'File is required' }),
+  file: z.instanceof(File, 'File is required'),
 }).refine((data) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
   return allowedTypes.includes(data.file.type);
@@ -113,7 +113,7 @@ export const profileImageSchema = z.object({
 });
 
 export const resumeSchema = z.object({
-  file: z.instanceof(File, { message: 'File is required' }),
+  file: z.instanceof(File, 'File is required'),
 }).refine((data) => {
   const allowedTypes = [
     'application/pdf',

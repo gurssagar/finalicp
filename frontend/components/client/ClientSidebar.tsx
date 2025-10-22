@@ -13,7 +13,6 @@ import {
   User,
   LogOut,
   MessageSquare,
-  Package,
 } from 'lucide-react'
 
 export function ClientSidebar() {
@@ -35,11 +34,6 @@ export function ClientSidebar() {
       icon: <MessageSquare size={20} />,
       label: 'Messages',
       path: '/client/chat',
-    },
-    {
-      icon: <Package size={20} />,
-      label: 'Booked Services',
-      path: '/client/booked-services',
     },
     {
       icon: <Calendar size={20} />,

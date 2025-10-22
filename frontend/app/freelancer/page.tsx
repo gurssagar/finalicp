@@ -6,7 +6,11 @@ import FreelancerDashboard from '@/app/freelancer/dashboard/page'
 
 export default function FreelancerPage() {
   return (
-    <FreelancerLayout>
+    <FreelancerLayout
+      title="Freelancer Dashboard"
+      showSearch={true}
+      showCreateButton={true}
+    >
       <FreelancerDashboard />
     </FreelancerLayout>
   )

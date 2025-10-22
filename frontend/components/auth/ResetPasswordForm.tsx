@@ -4,12 +4,11 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 import { resetPasswordAction } from '@/lib/actions/auth'
-import { safeLocalStorage } from '@/lib/browser-storage'
 const ResetPasswordForm = () => {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
-  const email = searchParams.get('email') || safeLocalStorage.getItem('resetEmail') || 'user@example.com'
+  const email = searchParams.get('email') || localStorage.getItem('resetEmail') || 'user@example.com'
 
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''))
   const [newPassword, setNewPassword] = useState('')

@@ -4,12 +4,12 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Eye, Star, Clock, Package, Users, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
+import { Footer } from '@/components/footer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Service } from '@/lib/ic-marketplace-agent';
+import { Service } from '@/hooks/useServices';
 import { useUpdateService } from '@/hooks/useServices';
 import { usePackages } from '@/hooks/usePackages';
 
@@ -92,7 +92,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
   // Check ownership after user data is loaded
   useEffect(() => {
     if (service && userEmail) {
-      setIsOwner(service.freelancer_id === userEmail);
+      setIsOwner(service.freelancer_email === userEmail);
     }
   }, [service, userEmail]);
 
@@ -115,7 +115,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
     setIsUpdating(true);
     setNotification(null);
 
-    const newStatus = service.status === 'Active' ? 'Paused' : 'Active';
+    const newStatus = service.status === 'Active' ? 'Inactive' : 'Active';
 
     try {
       const result = await updateService(userEmail!, serviceId, { status: newStatus });
@@ -274,7 +274,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                   variant="outline"
                   size="sm"
                 >
-                  {isUpdating ? 'Updating...' : `Mark as ${service.status === 'Active' ? 'Paused' : 'Active'}`}
+                  {isUpdating ? 'Updating...' : `Mark as ${service.status === 'Active' ? 'Inactive' : 'Active'}`}
                 </Button>
                 <Button
                   onClick={handleEditService}
@@ -401,7 +401,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                   <h2 className="text-xl font-semibold mb-4 mb-6">Packages</h2>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     {packages.map((pkg, index) => (
-                      <Card key={pkg.package_id} className="relative">
+                      <Card key={pkg.id} className="relative">
                         {index === 1 && (
                           <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                             <Badge className="bg-blue-600 text-white">
@@ -437,7 +437,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                               className="w-full mt-4 bg-rainbow-gradient text-white hover:opacity-90"
                               asChild
                             >
-                              <Link href={`/client/service/${service.service_id}?package=${pkg.package_id}`}>
+                              <Link href={`/client/service/${service.id}?package=${pkg.id}`}>
                                 Select Package
                               </Link>
                             </Button>
@@ -464,7 +464,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                       Rating
                     </span>
                     <span className="font-medium">
-                      {(service.total_rating || 0).toFixed(1)} ({service.review_count || 0} reviews)
+                      {service.rating_avg.toFixed(1)} ({service.review_count || 0} reviews)
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -472,7 +472,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                       <Users className="w-4 h-4 text-blue-500" />
                       Orders
                     </span>
-                    <span className="font-medium">0</span>
+                    <span className="font-medium">{service.total_orders}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 flex items-center gap-2">
@@ -493,7 +493,7 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
                   <div>
                     <span className="text-sm text-gray-600">Email</span>
                     <p className="font-medium text-gray-900 break-all">
-                      {service.freelancer_id}
+                      {service.freelancer_email}
                     </p>
                   </div>
                 </div>

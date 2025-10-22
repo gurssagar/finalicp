@@ -2,9 +2,9 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sidebar } from '@/components/Sidebar';
-import { Header1 } from '@/components/Header1';
-import { ProjectCard } from '@/components/project/ProjectCard';
+import { Sidebar } from '../../components/Sidebar';
+import { Header1 } from '../../components/Header1';
+import { ProjectCard } from '../../components/project/ProjectCard';
 import { ChevronLeft, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,10 @@ interface Project {
   status: 'Live' | 'Voting' | 'Completed' | 'Draft';
   daysLeft: string;
   teamLeader: string;
+}
+
+interface SubmittedProjectsPageProps {
+  className?: string;
 }
 
 // Static data moved outside component for better performance
@@ -58,7 +62,7 @@ const mockProjects: Project[] = [
   }
 ];
 
-export default function SubmittedProjectsPage() {
+export default function SubmittedProjectsPage({ className }: SubmittedProjectsPageProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -83,7 +87,7 @@ export default function SubmittedProjectsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className={cn("flex min-h-screen bg-white", className)}>
       {/* Sidebar */}
       
 
@@ -148,21 +152,7 @@ export default function SubmittedProjectsPage() {
               {filteredProjects.map(project => (
                 <div key={project.id} role="listitem">
                   <ProjectCard 
-                    project={{
-                      id: project.id.toString(),
-                      title: project.name,
-                      description: project.description,
-                      budget: 'N/A',
-                      deadline: 'N/A',
-                      teamSize: 1,
-                      status: project.status === 'Live' ? 'active' : project.status === 'Completed' ? 'completed' : 'pending',
-                      rating: 0,
-                      tags: project.tags,
-                      client: {
-                        name: 'Hackathon',
-                        avatar: undefined
-                      }
-                    }} 
+                    project={project} 
                     onClick={() => handleProjectClick(project.id)}
                   />
                  

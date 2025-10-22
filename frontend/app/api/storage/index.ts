@@ -52,7 +52,7 @@ const services: Service[] = [
     created_at: Date.now(),
     updated_at: Date.now(),
     delivery_time_days: 7,
-    starting_from_e8s: BigInt(500000000), // 5 ICP
+    starting_from_e8s: 500000000n, // 5 ICP
     total_rating: 4.8,
     review_count: 25,
     tags: ['react', 'nextjs', 'typescript', 'responsive', 'modern']
@@ -72,7 +72,7 @@ const services: Service[] = [
     created_at: Date.now(),
     updated_at: Date.now(),
     delivery_time_days: 5,
-    starting_from_e8s: BigInt(300000000), // 3 ICP
+    starting_from_e8s: 300000000n, // 3 ICP
     total_rating: 4.9,
     review_count: 18,
     tags: ['ui', 'ux', 'figma', 'design', 'prototype']
@@ -85,7 +85,7 @@ const packages: Package[] = [
     service_id: 'SVC_TEST_001',
     name: 'Basic Website',
     description: 'Simple responsive landing page with up to 5 sections',
-    price_e8s: BigInt(500000000), // 5 ICP
+    price_e8s: 500000000n, // 5 ICP
     delivery_time_days: 7,
     revisions: 2,
     features: [
@@ -103,7 +103,7 @@ const packages: Package[] = [
     service_id: 'SVC_TEST_001',
     name: 'Standard Web App',
     description: 'Multi-page web application with advanced features',
-    price_e8s: BigInt(1000000000), // 10 ICP
+    price_e8s: 1000000000n, // 10 ICP
     delivery_time_days: 14,
     revisions: 3,
     features: [
@@ -122,7 +122,7 @@ const packages: Package[] = [
     service_id: 'SVC_TEST_001',
     name: 'Premium Full-Stack',
     description: 'Complete full-stack web application with deployment',
-    price_e8s: BigInt(2000000000), // 20 ICP
+    price_e8s: 2000000000n, // 20 ICP
     delivery_time_days: 21,
     revisions: 5,
     features: [
@@ -141,7 +141,7 @@ const packages: Package[] = [
     service_id: 'SVC_TEST_002',
     name: 'Basic UI Design',
     description: 'UI design for up to 5 screens',
-    price_e8s: BigInt(300000000), // 3 ICP
+    price_e8s: 300000000n, // 3 ICP
     delivery_time_days: 5,
     revisions: 2,
     features: [
@@ -158,7 +158,7 @@ const packages: Package[] = [
     service_id: 'SVC_TEST_002',
     name: 'Complete UI/UX Design',
     description: 'Complete UI/UX design for web or mobile app',
-    price_e8s: BigInt(600000000), // 6 ICP
+    price_e8s: 600000000n, // 6 ICP
     delivery_time_days: 10,
     revisions: 3,
     features: [

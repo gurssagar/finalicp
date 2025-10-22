@@ -27,7 +27,7 @@ const CreateHackathonPrizes: React.FC<CreateHackathonPrizesProps> = ({ hackathon
   };
 
   const removePrize = (index: number) => {
-    const updatedPrizes = prizes.filter((_: any, i: number) => i !== index);
+    const updatedPrizes = prizes.filter((_, i) => i !== index);
     updateHackathonData({ prizes: updatedPrizes });
   };
 
@@ -67,7 +67,7 @@ const CreateHackathonPrizes: React.FC<CreateHackathonPrizesProps> = ({ hackathon
     const prize = updatedPrizes[prizeIndex];
     updatedPrizes[prizeIndex] = {
       ...prize,
-      criteria: prize.criteria.filter((_: any, i: number) => i !== criteriaIndex)
+      criteria: prize.criteria.filter((_, i) => i !== criteriaIndex)
     };
     updateHackathonData({ prizes: updatedPrizes });
   };
@@ -77,7 +77,7 @@ const CreateHackathonPrizes: React.FC<CreateHackathonPrizesProps> = ({ hackathon
       <h2 className="text-2xl font-bold mb-6">Set Up Prizes</h2>
 
       <div className="space-y-6">
-        {prizes.map((prize: any, index: number) => (
+        {prizes.map((prize, index) => (
           <div key={prize.id} className="border border-gray-200 rounded-lg p-6 bg-gray-50">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-lg font-medium">Prize {index + 1}</h3>
@@ -156,7 +156,7 @@ const CreateHackathonPrizes: React.FC<CreateHackathonPrizesProps> = ({ hackathon
                 </div>
 
                 <div className="space-y-2">
-                  {prize.criteria.map((criteria: any, criteriaIndex: number) => (
+                  {prize.criteria.map((criteria, criteriaIndex) => (
                     <div key={criteria.id} className="border border-gray-100 rounded p-3 bg-white">
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-sm text-gray-600">Criteria {criteriaIndex + 1}</span>

@@ -1,6 +1,6 @@
-import { TestRunner, TestResult, makeApiCall, TEST_CONFIG, MOCK_DATA } from './test-setup';
+import { TestRunner, makeApiCall, TEST_CONFIG, MOCK_DATA } from './test-setup';
 
-export async function runBookingsTests(): Promise<TestResult[]> {
+export async function runBookingsTests(): Promise<void> {
   const runner = new TestRunner();
 
   // Setup: Create service and package for booking tests

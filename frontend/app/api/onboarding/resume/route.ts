@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     try {
-      const actor = await getUserActor();
+      const actor = getUserActor();
 
       // Upload resume to ICP backend
       const result = await actor.upload_resume({

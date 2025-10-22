@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { Sidebar } from '@/components/Sidebar';
-import { Header1 } from '@/components/Header1';
-import { ProjectTabs } from '@/components/project/ProjectTabs';
+import { Sidebar } from '../../../components/Sidebar';
+import { Header1 } from '../../../components/Header1';
+import { ProjectTabs } from '../../../components/project/ProjectTabs';
 import { ChevronLeft, Edit, Share2, Star, Globe, Twitter, Heart } from 'lucide-react';
-import { TeamMember } from '@/components/project/TeamMember';
-import { cn } from '@/lib/utils';
+import { TeamMember } from '../../../components/project/TeamMember';
+import { cn } from '../../../lib/utils';
 
 // TypeScript interfaces
 interface TeamMemberData {
@@ -41,7 +41,7 @@ interface Project {
 }
 
 interface ProjectDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 interface ProjectCardProps {
@@ -87,9 +87,9 @@ const SocialLink: React.FC<SocialLinkProps> = ({ href, icon, label }) => (
   </a>
 );
 
-export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
+export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const router = useRouter();
-  const { id } = await params;
+  const { id } = params;
   const [activeTab, setActiveTab] = useState('overview');
   const [isStarred, setIsStarred] = useState(false);
 
@@ -371,7 +371,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
               <h2 className="text-xl font-bold mb-6">Team Members</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {project.team.map((member) => (
-                  <TeamMember key={member.id} member={{...member, id: member.id.toString()}} />
+                  <TeamMember key={member.id} member={member} />
                 ))}
               </div>
             </div>
@@ -470,7 +470,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
             </div>
             
             {/* Tabs navigation */}
-            <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} />
+            <ProjectTabs activeTab={activeTab} setActiveTab={setActiveTab} />
             
             {/* Main content area */}
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-8">

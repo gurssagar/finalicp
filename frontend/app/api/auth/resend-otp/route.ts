@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getUserActor } from '@/lib/ic-agent';
 import emailService from '@/lib/email';
 import { checkOTPRateLimit } from '@/lib/rate-limit';
-import { isValidEmail } from '@/lib/auth-server';
+import { isValidEmail } from '@/lib/auth';
 
 // Get client IP for rate limiting
 async function getClientIP(request: NextRequest): Promise<string> {

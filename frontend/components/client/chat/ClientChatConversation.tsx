@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ClientMessageInput } from './ClientMessageInput'
 import socketService, { SocketMessage } from '@/lib/socket-service'
 import { MessageCircle, Wifi, WifiOff } from 'lucide-react'
@@ -28,123 +28,51 @@ export function ClientChatConversation({
   const [loading, setLoading] = useState(true)
   const [socketConnected, setSocketConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
-  const [canChatPermission, setCanChatPermission] = useState<boolean | null>(null)
-  const [permissionLoading, setPermissionLoading] = useState(true)
 
   // Initialize Socket.IO and load chat history when chatId changes
   useEffect(() => {
     if (!chatId || !userEmail) return
 
-    const initializeChat = async () => {
+    // Initialize Socket.IO connection
+    const initializeSocket = async () => {
       try {
-        // Check chat permissions first
-        await checkChatPermissions();
-
-        // First, authenticate user for chat storage
-        await authenticateUserForChat();
-
-        // Initialize Socket.IO connection
         const connected = await socketService.connect(userEmail)
         if (connected) {
           console.log('[ClientChat] Socket connected')
         } else {
           console.warn('[ClientChat] Socket connection failed')
         }
-
-        // Load chat history from storage canister (permission will be checked after it's set)
-        await loadChatHistory()
       } catch (error) {
-        console.error('[ClientChat] Chat initialization error:', error)
+        console.error('[ClientChat] Socket initialization error:', error)
+      }
+    }
+
+    // Load chat history from storage canister
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch(
+          `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
+        )
+        const data = await response.json()
+
+        if (data.success) {
+          setMessages(data.messages || [])
+        }
+      } catch (error) {
+        console.error('Error loading chat history:', error)
       } finally {
         setLoading(false)
-        setPermissionLoading(false)
       }
     }
 
-    // Check if users have permission to chat
-    const checkChatPermissions = async () => {
-      try {
-        const response = await fetch('/api/chat/can-chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userEmail: userEmail,
-            otherUserEmail: chatId
-          })
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          setCanChatPermission(data.canChat)
-          console.log('[ClientChat] Chat permission check:', data.canChat)
-        } else {
-          console.warn('[ClientChat] Permission check failed')
-          setCanChatPermission(false)
-        }
-      } catch (error) {
-        console.error('[ClientChat] Permission check error:', error)
-        setCanChatPermission(false)
-      }
-    }
-
-    // Authenticate user for chat storage
-    const authenticateUserForChat = async () => {
-      try {
-        const displayName = userEmail.split('@')[0]; // Use email prefix as display name
-        const response = await fetch('/api/chat/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userEmail, displayName })
-        })
-
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            console.log('[ClientChat] User authenticated for chat storage');
-          }
-        }
-      } catch (error) {
-        console.warn('[ClientChat] Chat authentication failed:', error);
-      }
-    }
-
-    initializeChat()
+    initializeSocket()
+    loadChatHistory()
 
     // Cleanup on unmount
     return () => {
       // Don't disconnect here as it might be used by other components
     }
   }, [chatId, userEmail])
-
-  // Load chat history from storage canister
-  const loadChatHistory = useCallback(async () => {
-    try {
-      // Only load history if user has permission to chat
-      if (canChatPermission === false) {
-        console.log('[ClientChat] Skipping chat history load - no permission');
-        return;
-      }
-
-      const response = await fetch(
-        `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
-      )
-      const data = await response.json()
-
-      if (data.success) {
-        setMessages(data.messages || [])
-        console.log(`[ClientChat] Loaded ${data.messages?.length || 0} messages from history`);
-      }
-    } catch (error) {
-      console.error('Error loading chat history:', error)
-    }
-  }, [canChatPermission, userEmail, chatId])
-
-  // Reload chat history when permission is granted
-  useEffect(() => {
-    if (canChatPermission === true && !loading) {
-      loadChatHistory()
-    }
-  }, [canChatPermission, loading, loadChatHistory])
 
   // Setup Socket.IO event listeners
   useEffect(() => {
@@ -204,36 +132,24 @@ export function ClientChatConversation({
       throw new Error('Missing required information to send message')
     }
 
-    // Check if user has permission to chat
-    if (canChatPermission === false) {
-      throw new Error('You do not have permission to chat with this user. An active booking relationship is required.')
+    const messageData = {
+      to: chatId,
+      text: text.trim(),
+      timestamp: new Date().toISOString()
     }
-
-    // Wait for permission check to complete if still loading
-    if (canChatPermission === null && permissionLoading) {
-      throw new Error('Checking chat permissions... Please wait.')
-    }
-
-    const messageText = text.trim()
-    const timestamp = new Date().toISOString()
-    const displayName = userEmail.split('@')[0]
 
     // Try Socket.IO first if connected
     if (socketConnected) {
       try {
-        const result = await socketService.sendPrivateMessage({
-          to: chatId,
-          text: messageText,
-          timestamp
-        })
+        const result = await socketService.sendPrivateMessage(messageData)
         if (result.success) {
           // Add message to local state immediately for better UX
           const optimisticMessage: Message = {
             id: `socket-${Date.now()}`,
             from: userEmail,
             to: chatId,
-            text: messageText,
-            timestamp: result.timestamp || timestamp,
+            text: text.trim(),
+            timestamp: result.timestamp || messageData.timestamp,
             delivered: true,
             read: false,
             messageType: 'text'
@@ -255,10 +171,9 @@ export function ClientChatConversation({
         body: JSON.stringify({
           from: userEmail,
           to: chatId,
-          text: messageText,
+          text: text.trim(),
           messageType: 'text',
-          timestamp,
-          displayName
+          timestamp: messageData.timestamp
         })
       })
 
@@ -268,14 +183,13 @@ export function ClientChatConversation({
           id: data.messageId || `storage-${Date.now()}`,
           from: userEmail,
           to: chatId,
-          text: messageText,
-          timestamp,
+          text: text.trim(),
+          timestamp: messageData.timestamp,
           delivered: true,
           read: false,
           messageType: 'text'
         }
         setMessages(prev => [...prev, storedMessage])
-        console.log('[ClientChat] Message saved to ICP:', data.messageId)
         return // Success
       } else {
         throw new Error(data.error || 'Failed to send message')
@@ -305,91 +219,6 @@ export function ClientChatConversation({
       year: 'numeric'
     })
   }))
-
-  // Show permission checking state
-  if (permissionLoading) {
-    return (
-      <div className="flex flex-col h-full bg-white">
-        <div className="p-4 border-b border-gray-200 animate-pulse">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
-            <div className="flex-1">
-              <div className="h-4 bg-gray-200 rounded mb-2"></div>
-              <div className="h-3 bg-gray-200 rounded w-32"></div>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Checking chat permissions...</p>
-            <p className="text-sm text-gray-500 mt-2">Verifying booking relationship</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Show permission denied state
-  if (canChatPermission === false) {
-    return (
-      <div className="flex flex-col h-full bg-white">
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <img
-              src={`https://ui-avatars.com/api/?name=${encodeURIComponent(chatId)}&background=ef4444&color=fff`}
-              alt={chatId}
-              className="w-12 h-12 rounded-full object-cover"
-            />
-            <div className="flex-1">
-              <div className="flex items-center space-x-2">
-                <h3 className="font-medium text-gray-900">{chatId.split('@')[0]}</h3>
-                <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded-full">
-                  No Access
-                </span>
-              </div>
-              <p className="text-sm text-red-600">Chat not available</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center max-w-md mx-auto px-4">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 15.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Chat Access Restricted</h3>
-            <p className="text-gray-600 mb-4">
-              You can only chat with freelancers you have an active or completed booking relationship with.
-              To start a conversation, please book their service first.
-            </p>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-sm text-amber-800">
-                <strong>Already have a booking?</strong><br/>
-                If you have an active or completed booking with this freelancer, please try refreshing the page.
-                Otherwise, browse available services and complete a booking to enable chat.
-              </p>
-            </div>
-            <div className="mt-4 flex space-x-3">
-              <button
-                onClick={() => window.location.href = '/client/browse-services'}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
-              >
-                Browse Services
-              </button>
-              <button
-                onClick={() => window.location.href = '/client/booked-services'}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
-              >
-                View My Bookings
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (

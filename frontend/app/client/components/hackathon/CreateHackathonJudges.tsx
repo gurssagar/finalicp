@@ -30,12 +30,12 @@ const CreateHackathonJudges: React.FC<CreateHackathonJudgesProps> = ({ hackathon
   };
 
   const removeJudge = (index: number) => {
-    const updatedJudges = judges.filter((_: any, i: number) => i !== index);
+    const updatedJudges = judges.filter((_, i) => i !== index);
     updateHackathonData({ judges: updatedJudges });
   };
 
   const removePendingJudge = (index: number) => {
-    const updatedPendingJudges = pendingJudges.filter((_: any, i: number) => i !== index);
+    const updatedPendingJudges = pendingJudges.filter((_, i) => i !== index);
     updateHackathonData({ pendingJudges: updatedPendingJudges });
   };
 
@@ -78,7 +78,7 @@ const CreateHackathonJudges: React.FC<CreateHackathonJudgesProps> = ({ hackathon
           </div>
 
           <div className="space-y-4">
-            {judges.map((judge: any, index: number) => (
+            {judges.map((judge, index) => (
               <div key={judge.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex justify-between items-start mb-3">
                   <h4 className="font-medium">Judge {index + 1}</h4>
@@ -160,7 +160,7 @@ const CreateHackathonJudges: React.FC<CreateHackathonJudgesProps> = ({ hackathon
           </div>
 
           <div className="space-y-4">
-            {pendingJudges.map((judge: any, index: number) => (
+            {pendingJudges.map((judge, index) => (
               <div key={judge.id} className="border border-gray-200 rounded-lg p-4 bg-blue-50">
                 <div className="flex justify-between items-start mb-3">
                   <h4 className="font-medium">Invitation {index + 1}</h4>

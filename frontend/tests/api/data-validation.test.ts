@@ -1,9 +1,10 @@
-import { TestRunner, TestResult, makeApiCall, TEST_CONFIG, assertEqual, assertTrue, assertHasProperty, generateMockService, generateMockPackage } from './test-setup';
+import { TestRunner, makeApiCall, TEST_CONFIG, resetMockData, assertEqual, assertTrue, assertHasProperty, generateMockService, generateMockPackage } from './test-setup';
 
-export async function runDataValidationTests(): Promise<TestResult[]> {
+export async function runDataValidationTests(): Promise<void> {
   const runner = new TestRunner();
 
   // Reset mock data before running tests
+  resetMockData();
 
   // Validation Test 1: Service field validation
   await runner.runTest('Service Field Validation', async () => {

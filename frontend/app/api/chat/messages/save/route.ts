@@ -3,7 +3,7 @@ import { chatStorageApi } from '@/lib/chat-storage-agent';
 
 export async function POST(request: NextRequest) {
   try {
-    const { from, to, text, messageType, timestamp, displayName } = await request.json();
+    const { from, to, text, messageType, timestamp } = await request.json();
 
     if (!from || !to || !text) {
       return NextResponse.json(
@@ -12,27 +12,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if users have permission to chat (active booking relationship)
-    const canChat = await chatStorageApi.canChat(from, to);
-    if (!canChat) {
-      return NextResponse.json(
-        { error: 'Chat not allowed - no active booking relationship between these users' },
-        { status: 403 }
-      );
-    }
-
     const messageId = await chatStorageApi.saveMessage(
       from,
       to,
       text,
       messageType || 'text',
-      timestamp,
-      displayName || from.split('@')[0] // Use email prefix as default display name
+      timestamp
     );
 
     if (!messageId) {
       return NextResponse.json(
-        { error: 'Failed to save message - user may not be authenticated' },
+        { error: 'Failed to save message' },
         { status: 500 }
       );
     }

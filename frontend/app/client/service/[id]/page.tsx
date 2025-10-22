@@ -230,7 +230,7 @@ export default function ServiceDetails() {
   }
   const handleContinue = async () => {
     // Find the selected package from embedded data
-    const selectedPackage = service.packages ? service.packages.find((pkg: any) => pkg.tier.toLowerCase() === selectedTier) : null;
+    const selectedPackage = service.packages ? service.packages.find(pkg => pkg.tier.toLowerCase() === selectedTier) : null;
 
     if (!selectedPackage) {
       alert('Please select a package');

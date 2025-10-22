@@ -10,7 +10,7 @@ import {
   PieChart,
   ChevronRight,
 } from 'lucide-react'
-export default function AnalyticsDashboard() {
+export function AnalyticsDashboard() {
   const router = useRouter()
   const [activeTimeframe, setActiveTimeframe] = useState<
     '7days' | '30days' | '90days'

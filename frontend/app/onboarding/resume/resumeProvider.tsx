@@ -1,7 +1,7 @@
 "use client"
 import React, { useState } from 'react'
-import { Header } from '@/components/Header'
-import { Footer } from '@/components/Footer'
+import { Header } from '@/components/header'
+import { Footer } from '@/components/footer'
 import { ProgressStepper } from '@/components/progress-stepper'
 import { ProfilePreview } from '@/components/ProfilePreview'
 import { useRouter } from 'next/navigation'

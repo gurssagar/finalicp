@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { loginSchema } from '@/lib/validations';
 import { getUserActor } from '@/lib/ic-agent';
-import { verifyPassword, createSession } from '@/lib/auth-server';
+import { verifyPassword, createSession } from '@/lib/auth';
 import { cookies } from 'next/headers';
 import { checkLoginRateLimit, resetLoginRateLimit } from '@/lib/rate-limit';
 

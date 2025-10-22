@@ -2,9 +2,6 @@ import Link from 'next/link';
 import { getCurrentSession } from '@/lib/actions/auth';
 import { redirect } from 'next/navigation';
 
-// Force dynamic rendering
-export const dynamic = 'force-dynamic';
-
 export default async function Home() {
   const session = await getCurrentSession();
   
