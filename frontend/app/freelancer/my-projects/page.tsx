@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Plus, Clock, CheckCircle, XCircle, AlertCircle, Eye, DollarSign, Calendar, User, RefreshCw, Activity } from 'lucide-react';
-import { Sidebar } from '@/components/Sidebar';
 import { useBookings } from '@/hooks/useMarketplace';
 import { formatICP } from '@/lib/ic-marketplace-agent';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -98,7 +97,7 @@ export default function MyProjectsPage() {
   if (bookingsLoading) {
     return (
       <div className="flex min-h-screen bg-white">
-        <Sidebar />
+        
         <div className="flex-1">
           <div className="flex items-center justify-center h-64">
             <div className="text-lg">Loading projects...</div>
@@ -111,7 +110,7 @@ export default function MyProjectsPage() {
   if (bookingsError) {
     return (
       <div className="flex min-h-screen bg-white">
-        <Sidebar />
+        
         <div className="flex-1">
           <div className="flex items-center justify-center h-64">
             <div className="text-lg text-red-600">Error: {bookingsError}</div>
@@ -123,7 +122,7 @@ export default function MyProjectsPage() {
 
   return (
     <div className="flex min-h-screen bg-white">
-      <Sidebar />
+     
       <div className="flex-1">
         <div className="p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">

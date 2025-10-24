@@ -28,6 +28,7 @@ export function CreateHackathonOverview({ className }: CreateHackathonOverviewPr
   const { formData, updateFormData, setSaved } = useHackathonForm();
   const [bannerPreview, setBannerPreview] = useState<string>('');
   const [newTag, setNewTag] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateField = (field: keyof typeof formData, value: any) => {
@@ -35,14 +36,46 @@ export function CreateHackathonOverview({ className }: CreateHackathonOverviewPr
     setSaved(field, true);
   };
 
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // For now, create a preview URL
-      const preview = URL.createObjectURL(file);
-      setBannerPreview(preview);
-      updateField('bannerImage', preview);
-      setSaved('bannerImage', true);
+      setIsUploading(true);
+      try {
+        // Create a preview URL for immediate display
+        const preview = URL.createObjectURL(file);
+        setBannerPreview(preview);
+        
+        // Upload to Tebi S3
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('folder', 'hackathons');
+        
+        const response = await fetch('/api/upload/s3', {
+          method: 'POST',
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success && result.url) {
+          console.log('✅ Banner image uploaded to Tebi:', result.url);
+          updateField('bannerImage', result.url);
+          setSaved('bannerImage', true);
+        } else {
+          console.error('❌ Failed to upload banner image:', result.error);
+          // Keep the blob URL as fallback
+          updateField('bannerImage', preview);
+          setSaved('bannerImage', true);
+        }
+      } catch (error) {
+        console.error('Error uploading banner image:', error);
+        // Keep the blob URL as fallback
+        const preview = URL.createObjectURL(file);
+        updateField('bannerImage', preview);
+        setSaved('bannerImage', true);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -99,9 +132,18 @@ export function CreateHackathonOverview({ className }: CreateHackathonOverviewPr
                 alt="Hackathon banner"
                 className="w-full h-48 object-cover rounded-lg"
               />
+              {isUploading && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center rounded-lg">
+                  <div className="text-white text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                    <p className="text-sm">Uploading to Tebi...</p>
+                  </div>
+                </div>
+              )}
               <button
                 onClick={removeBanner}
-                className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                disabled={isUploading}
+                className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 disabled:opacity-50"
               >
                 <X size={16} />
               </button>
@@ -119,9 +161,13 @@ export function CreateHackathonOverview({ className }: CreateHackathonOverviewPr
                     className="sr-only"
                     accept="image/*"
                     onChange={handleBannerUpload}
+                    disabled={isUploading}
                   />
                 </label>
                 <p className="text-gray-500">PNG, JPG up to 10MB</p>
+                {isUploading && (
+                  <p className="text-blue-600 text-sm mt-1">Uploading to Tebi...</p>
+                )}
               </div>
             </div>
           )}

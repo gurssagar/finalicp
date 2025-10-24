@@ -167,8 +167,28 @@ export default function ClientDashboard() {
       service_title: booking.service_title || 'Service',
       amount: Number(booking.total_amount_e8s) / 100000000, // Convert e8s to ICP
       status: mapBookingStatus(booking.status),
-      created_at: new Date(Number(booking.created_at) / 1000000).toISOString(),
-      deadline: new Date(Number(booking.delivery_deadline) / 1000000).toISOString()
+      created_at: (() => {
+        try {
+          const timestamp = Number(booking.created_at) / 1000000;
+          const date = new Date(timestamp);
+          return date.toISOString();
+        } catch (error) {
+          console.warn('Invalid booking created_at timestamp:', booking.created_at);
+          return new Date().toISOString();
+        }
+      })(),
+      deadline: (() => {
+        try {
+          const timestamp = Number(booking.delivery_deadline) / 1000000;
+          const date = new Date(timestamp);
+          return date.toISOString();
+        } catch (error) {
+          console.warn('Invalid booking delivery_deadline timestamp:', booking.delivery_deadline);
+          const futureDate = new Date();
+          futureDate.setDate(futureDate.getDate() + 7);
+          return futureDate.toISOString();
+        }
+      })()
     }))
 
     setStats({

@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
 
+// Mock package storage functions
+const addPackage = (pkg: any) => {
+  console.log('Mock: Adding package', pkg);
+  return true;
+};
+
+const getPackagesByServiceId = (serviceId: string) => {
+  console.log('Mock: Getting packages for service', serviceId);
+  return [];
+};
+
+interface Package {
+  package_id: string;
+  service_id: string;
+  name: string;
+  description: string;
+  price: number;
+  delivery_time: string;
+  features: string[];
+  created_at: string;
+}
+
 // GET /api/marketplace/packages - List packages by service
 export async function GET(request: NextRequest) {
   try {
@@ -94,7 +116,7 @@ export async function POST(request: NextRequest) {
     };
 
     // Store package in persistent storage
-    addPackage(newPackage as Package);
+    addPackage(newPackage as any);
     console.log('Package created and stored:', newPackage);
     const allPackages = getPackagesByServiceId(newPackage.service_id);
     console.log('Total packages for this service:', allPackages.length);

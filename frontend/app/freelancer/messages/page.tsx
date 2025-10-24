@@ -55,8 +55,8 @@ export default function MessagesPage() {
           if (localEmail) return localEmail
         }
 
-        // For development - in production this should come from auth system
-        return 'freelancer@example.com'
+        // No fallback - require proper authentication
+        return ''
       }
 
       // Try real session first, then fallback
@@ -73,7 +73,7 @@ export default function MessagesPage() {
 
     // Authenticate with the canister
     const authenticateWithCanister = async () => {
-      if (userEmail) {
+      if (userEmail && userEmail !== '') {
         try {
           const response = await fetch('/api/chat/auth', {
             method: 'POST',
@@ -88,11 +88,13 @@ export default function MessagesPage() {
         } catch (error) {
           console.error('Authentication error:', error)
         }
+      } else {
+        console.warn('[FreelancerChat] No user email available for authentication')
       }
     }
 
     // Delay authentication until we have user email
-    if (userEmail) {
+    if (userEmail && userEmail !== '') {
       authenticateWithCanister()
     }
   }, [userEmail, userType])

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig, serializeBigInts } from '@/lib/ic-marketplace-agent';
 
 // POST /api/marketplace/admin - Admin operations (refund, reconciliation)
 export async function POST(request: NextRequest) {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     if ('ok' in result) {
       return NextResponse.json({
         success: true,
-        data: result.ok,
+        data: serializeBigInts(result.ok),
         action: action
       });
     } else {

@@ -16,20 +16,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const messages = await chatStorageApi.getChatHistory(
+    console.log(`[ChatHistory] Loading chat history: ${userEmail} <-> ${contactEmail}`);
+    
+    // Load all messages (use a high limit to get all messages)
+    const allMessages = await chatStorageApi.getChatHistory(
       userEmail,
       contactEmail,
-      limit,
-      offset
+      1000, // High limit to get all messages
+      0
     );
+
+    // Sort messages by timestamp (oldest first, newest last)
+    const sortedMessages = allMessages.sort((a, b) => {
+      const timestampA = new Date(a.timestamp).getTime();
+      const timestampB = new Date(b.timestamp).getTime();
+      return timestampA - timestampB; // Oldest first
+    });
+
+    console.log(`[ChatHistory] Loaded ${sortedMessages.length} messages, sorted by timestamp`);
 
     return NextResponse.json({
       success: true,
-      messages,
+      messages: sortedMessages,
       pagination: {
         limit,
         offset,
-        count: messages.length
+        count: sortedMessages.length,
+        total: sortedMessages.length
       }
     });
   } catch (error) {

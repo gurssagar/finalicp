@@ -1,9 +1,11 @@
+"use client"
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FreelancerProfileLayout } from '../../components/FreelancerProfileLayout';
+import { useRouter } from 'next/navigation';
+import { FreelancerProfileLayout } from '@/components/FreelancerProfileLayout';
 import { Plus, Edit2 } from 'lucide-react';
+
 export function ProfileWorkList() {
-  const navigate = useNavigate();
+  const navigate = useRouter();
   const [workExperiences, setWorkExperiences] = useState([{
     id: '1',
     role: 'Frontend Web Developer',
@@ -12,51 +14,130 @@ export function ProfileWorkList() {
     endDate: 'July 2023',
     description: 'Developed responsive web applications using React and TypeScript.'
   }]);
-  const handleAddMoreExperience = () => {
-    navigate('/profile/work');
+
+  const addWorkExperience = () => {
+    const newExperience = {
+      id: Date.now().toString(),
+      role: '',
+      company: '',
+      startDate: '',
+      endDate: '',
+      description: ''
+    };
+    setWorkExperiences([...workExperiences, newExperience]);
   };
-  const handleEditExperience = (id: string) => {
-    navigate(`/profile/work?id=${id}`);
+
+  const updateWorkExperience = (id: string, field: string, value: string) => {
+    setWorkExperiences(workExperiences.map(exp => 
+      exp.id === id ? { ...exp, [field]: value } : exp
+    ));
   };
-  const handleContinue = () => {
-    navigate('/profile/others');
+
+  const removeWorkExperience = (id: string) => {
+    setWorkExperiences(workExperiences.filter(exp => exp.id !== id));
   };
-  return <FreelancerProfileLayout activeTab="work" progress="1/3" detailsType="Work">
-      <div>
-        <h2 className="text-xl font-semibold text-[#161616] mb-6">
-          Work Experience Requirements
-        </h2>
-        <div className="space-y-6">
-          {workExperiences.map(experience => <div key={experience.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex-shrink-0 flex items-center justify-center">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 7H4C2.89543 7 2 7.89543 2 9V19C2 20.1046 2.89543 21 4 21H20C21.1046 21 22 20.1046 22 19V9C22 7.89543 21.1046 7 20 7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M16 21V5C16 3.89543 15.1046 3 14 3H10C8.89543 3 8 3.89543 8 5V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">{experience.role}</h3>
-                  <button onClick={() => handleEditExperience(experience.id)} className="text-gray-500">
-                    <Edit2 size={16} />
-                  </button>
-                </div>
-                <p className="text-[#2ba24c]">{experience.company}</p>
-                <p className="text-sm text-gray-500">
-                  {experience.startDate} - {experience.endDate}
-                </p>
-              </div>
-            </div>)}
-          <button onClick={handleAddMoreExperience} className="flex items-center gap-2 text-blue-600 mt-4">
-            <Plus size={16} className="text-blue-600" />
-            ADD MORE EXPERIENCE
+
+  return (
+    <FreelancerProfileLayout>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-gray-900">Work Experience</h2>
+          <button
+            onClick={addWorkExperience}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Experience
           </button>
         </div>
-        <div className="flex justify-center pt-10">
-          <button onClick={handleContinue} className="px-12 py-3 bg-[#0B1F36] text-white rounded-full font-medium hover:bg-[#1a3a5f] transition-colors">
-            Next
+
+        <div className="space-y-4">
+          {workExperiences.map((experience) => (
+            <div key={experience.id} className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Work Experience</h3>
+                <div className="flex gap-2">
+                  <button className="p-2 text-gray-500 hover:text-gray-700">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button 
+                    onClick={() => removeWorkExperience(experience.id)}
+                    className="p-2 text-red-500 hover:text-red-700"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <input
+                    type="text"
+                    value={experience.role}
+                    onChange={(e) => updateWorkExperience(experience.id, 'role', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., Frontend Developer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                  <input
+                    type="text"
+                    value={experience.company}
+                    onChange={(e) => updateWorkExperience(experience.id, 'company', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., Tech Corp"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="text"
+                    value={experience.startDate}
+                    onChange={(e) => updateWorkExperience(experience.id, 'startDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., June 2022"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <input
+                    type="text"
+                    value={experience.endDate}
+                    onChange={(e) => updateWorkExperience(experience.id, 'endDate', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="e.g., July 2023 or Present"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={experience.description}
+                  onChange={(e) => updateWorkExperience(experience.id, 'description', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  rows={3}
+                  placeholder="Describe your role and achievements..."
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={() => navigate.push('/profile')}
+            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Save Changes
           </button>
         </div>
       </div>
-    </FreelancerProfileLayout>;
+    </FreelancerProfileLayout>
+  );
 }

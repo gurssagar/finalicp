@@ -43,7 +43,9 @@ export interface Booking {
   service_id?: string;
   status: string;
   total_amount_e8s: number;
+  total_amount_dollars?: number;
   escrow_amount_e8s: number;
+  escrow_amount_dollars?: number;
   payment_status: string;
   client_notes?: string;
   created_at: number;

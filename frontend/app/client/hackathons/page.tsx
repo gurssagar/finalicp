@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect, useCallback } from 'react';
-import { Calendar, Plus, Search, Edit, Trash2, Users, MapPin, Clock, DollarSign, Eye, Settings, AlertCircle, CheckCircle } from 'lucide-react';
+import { Calendar, Plus, Search, Edit, Trash2, Users, MapPin, Clock, DollarSign, Eye, Settings, AlertCircle, CheckCircle, Trophy, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { HackathonCanister } from '@/lib/hackathon-canister';
@@ -12,6 +12,42 @@ interface HackathonWithActions extends Hackathon {
   canDelete?: boolean;
   participantCount?: number;
   teamsCount?: number;
+  // Additional properties from storage
+  banner_image?: string;
+  registration_fee?: number;
+  max_participants?: number;
+  prizes?: Array<{
+    id: string;
+    position: string;
+    title: string;
+    description: string;
+    amount: number;
+    currency: string;
+    type: 'cash' | 'non-cash';
+  }>;
+  judges?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    bio: string;
+    expertise: string[];
+    avatar?: string;
+    status?: 'pending' | 'accepted' | 'declined';
+  }>;
+  schedule?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    date: string;
+    location?: string;
+    type: 'opening' | 'workshop' | 'presentation' | 'break' | 'judging' | 'awards' | 'closing' | 'other';
+    speakers?: string[];
+    isRequired: boolean;
+  }>;
+  tags?: string[];
+  social_links?: Array<{ platform: string; url: string }>;
 }
 
 export default function ClientHackathonsPage() {
@@ -27,43 +63,68 @@ export default function ClientHackathonsPage() {
 
   const router = useRouter();
 
-  // Get user email from session/localStorage
+  // Get user email from authentication system
   useEffect(() => {
-    const getUserEmail = () => {
-      if (typeof window !== 'undefined') {
-        const sessionEmail = sessionStorage.getItem('userEmail');
-        if (sessionEmail) return sessionEmail;
+    const checkAuth = async () => {
+      try {
+        // Try the session endpoint first
+        const response = await fetch('/api/auth/session')
+        const data = await response.json()
 
-        const localEmail = localStorage.getItem('userEmail');
-        if (localEmail) return localEmail;
+        console.log('🔐 Session Response Received:', data);
 
-        // For development - in production, this should come from auth system
-        return 'client@example.com';
+        if (data.success && data.session) {
+          console.log('✅ Session successful - Setting user email:', data.session.email);
+          setUserEmail(data.session.email);
+        } else {
+          // Fallback to /api/auth/me
+          console.log('🔄 Session failed, trying /api/auth/me...');
+          const meResponse = await fetch('/api/auth/me')
+          const meData = await meResponse.json()
+
+          console.log('🔐 Me Response Received:', meData);
+
+          if (meData.success && meData.session) {
+            console.log('✅ Me successful - Setting user email:', meData.session.email);
+            setUserEmail(meData.session.email);
+          } else {
+            // Fallback to localStorage like in preview page
+            console.log('🔄 Both auth methods failed, trying localStorage...');
+            const localEmail = localStorage.getItem('userEmail') || 'test@example.com';
+            console.log('✅ Using localStorage email:', localEmail);
+            setUserEmail(localEmail);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking authentication:', error)
+        // Fallback to localStorage like in preview page
+        const localEmail = localStorage.getItem('userEmail') || 'test@example.com';
+        console.log('✅ Using localStorage fallback email:', localEmail);
+        setUserEmail(localEmail);
       }
-      return 'client@example.com';
-    };
+    }
 
-    const email = getUserEmail();
-    setUserEmail(email);
+    checkAuth()
   }, []);
 
   // Load user's hackathons
   const loadUserHackathons = useCallback(async () => {
-    if (!userEmail) return;
+    if (!userEmail) {
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
       setError(null);
 
-      // Get all hackathons first (this would normally be filtered by user in the canister)
-      // HackathonCanister.listHackathons() is available but for now we use mock data below
+      console.log('🚀 Loading hackathons for user:', userEmail);
 
-      // Since we don't have a direct method to get hackathons by creator in the canister,
-      // we'll need to create an API route for this. For now, we'll simulate with mock data
-      const mockUserHackathons = await fetchUserHackathonsFromApi(email);
+      const userHackathons = await fetchUserHackathonsFromApi(userEmail);
 
-      setHackathons(mockUserHackathons);
-      setFilteredHackathons(mockUserHackathons);
+      setHackathons(userHackathons);
+      setFilteredHackathons(userHackathons);
+      console.log(`✅ Loaded ${userHackathons.length} hackathons for ${userEmail}`);
     } catch (err) {
       console.error('Error loading hackathons:', err);
       setError('Failed to load hackathons');
@@ -72,71 +133,77 @@ export default function ClientHackathonsPage() {
     }
   }, [userEmail]);
 
-  // Mock function to fetch user hackathons from API (replace with actual API call)
+  // Function to fetch user hackathons from API
   const fetchUserHackathonsFromApi = async (email: string): Promise<HackathonWithActions[]> => {
     try {
-      // Create a mock API call since we don't have the actual endpoint
-      const response = await fetch('/api/hackathons/user');
-      if (response.ok) {
-        const data = await response.json();
-        return data.hackathons || [];
+      console.log('🔍 Fetching hackathons for user:', email);
+
+      const response = await fetch(`/api/hackathons/user?userEmail=${encodeURIComponent(email)}`);
+
+      if (!response.ok) {
+        console.error('❌ API response not ok:', response.status, response.statusText);
+        return [];
       }
 
-      // Return mock data for development
-      return [
-        {
-          hackathon_id: "hack_1",
-          title: "Web Innovation Challenge 2025",
-          tagline: "Build the Future of Web",
-          description: "Join us for an exciting web development challenge where creativity meets technology. Build innovative web applications using modern frameworks and tools.",
-          theme: "Technology",
-          mode: { Online: null },
-          location: "Virtual",
-          start_date: "2025-02-01T09:00:00Z",
-          end_date: "2025-02-03T21:00:00Z",
-          registration_start: "2025-01-15T00:00:00Z",
-          registration_end: "2025-01-31T23:59:59Z",
-          min_team_size: 2,
-          max_team_size: 4,
-          prize_pool: "$5,000",
-          rules: "Teams must use modern web technologies. Projects will be judged on innovation, technical complexity, and presentation.",
-          status: { Upcoming: null },
-          created_at: "2025-01-10T10:00:00Z",
-          updated_at: "2025-01-10T10:00:00Z",
-          isOwner: true,
-          canEdit: true,
-          canDelete: true,
-          participantCount: 0,
-          teamsCount: 0
-        },
-        {
-          hackathon_id: "hack_2",
-          title: "Mobile App Development Sprint",
-          tagline: "Create Amazing Mobile Experiences",
-          description: "Design and develop mobile applications that solve real-world problems. Focus on user experience and innovative features.",
-          theme: "Mobile",
-          mode: { Hybrid: null },
-          location: "San Francisco, CA",
-          start_date: "2025-03-15T10:00:00Z",
-          end_date: "2025-03-16T18:00:00Z",
-          registration_start: "2025-02-01T00:00:00Z",
-          registration_end: "2025-03-10T23:59:59Z",
-          min_team_size: 1,
-          max_team_size: 3,
-          prize_pool: "$3,000",
-          rules: "Individual and team participation allowed. Apps must be functional and demonstrate technical skills.",
-          status: { Ongoing: null },
-          created_at: "2025-01-05T14:30:00Z",
-          updated_at: "2025-01-05T14:30:00Z",
-          isOwner: true,
-          canEdit: true,
-          canDelete: true,
-          participantCount: 8,
-          teamsCount: 3
-        }
-      ];
+      const data = await response.json();
+      console.log('📊 Hackathons API response:', data);
+
+      if (data.success && data.hackathons) {
+        console.log(`✅ Found ${data.hackathons.length} hackathons for user ${email}`);
+
+        // Transform API data to match frontend interface
+        const transformedHackathons = data.hackathons.map((hackathon: any) => {
+          const additionalData = hackathon.additional_data || hackathon;
+
+          return {
+            hackathon_id: hackathon.hackathon_id,
+            title: hackathon.title || 'Untitled Hackathon',
+            tagline: hackathon.tagline || 'Created hackathon',
+            description: hackathon.description || 'Hackathon created through the platform',
+            theme: hackathon.theme || additionalData?.tags?.[0] || 'General',
+            mode: hackathon.mode || { Online: null },
+            location: hackathon.location || additionalData?.location || 'Virtual',
+            start_date: hackathon.start_date || new Date().toISOString(),
+            end_date: hackathon.end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            registration_start: hackathon.registration_start || new Date().toISOString(),
+            registration_end: hackathon.registration_end || new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
+            min_team_size: hackathon.min_team_size || additionalData?.minTeamSize || 1,
+            max_team_size: hackathon.max_team_size || additionalData?.maxTeamSize || 4,
+            prize_pool: hackathon.prize_pool || additionalData?.prizes?.reduce((total: number, prize: any) => {
+              return total + (prize.type === 'cash' ? prize.amount : 0);
+            }, 0).toString() || '0',
+            rules: hackathon.rules || '',
+            status: hackathon.status || { Upcoming: null },
+            created_at: new Date(hackathon.created_at / 1000000).toISOString(),
+            updated_at: new Date(hackathon.updated_at / 1000000).toISOString(),
+
+            // Additional data from API response
+            banner_image: additionalData?.banner_image || '',
+            registration_fee: additionalData?.registration_fee || 0,
+            max_participants: additionalData?.max_participants || 100,
+            prizes: additionalData?.prizes || [],
+            judges: additionalData?.judges || [],
+            schedule: additionalData?.schedule || [],
+            tags: additionalData?.tags || [],
+            social_links: additionalData?.social_links || [],
+            organizer_email: additionalData?.organizer_email || email,
+
+            // UI-specific fields
+            isOwner: true,
+            canEdit: true,
+            canDelete: true,
+            participantCount: 0, // This would need to be implemented in the API
+            teamsCount: 0 // This would need to be implemented in the API
+          };
+        });
+
+        return transformedHackathons;
+      } else {
+        console.warn('⚠️ No hackathons found or API returned error:', data.error);
+        return [];
+      }
     } catch (error) {
-      console.error('API error:', error);
+      console.error('❌ Error fetching hackathons from API:', error);
       return [];
     }
   };
@@ -192,7 +259,57 @@ export default function ClientHackathonsPage() {
 
   // Handle hackathon actions
   const handleEditHackathon = (hackathonId: string) => {
-    router.push(`/client/hackathons/${hackathonId}/edit`);
+    // Find the hackathon data
+    const hackathon = hackathons.find(h => h.hackathon_id === hackathonId);
+    if (!hackathon) {
+      console.error('Hackathon not found:', hackathonId);
+      alert('Hackathon not found');
+      return;
+    }
+
+    // Navigate to create-hackathon page with pre-filled data
+    const editData = {
+      // Basic Information
+      title: hackathon.title,
+      tagline: hackathon.tagline,
+      description: hackathon.description,
+      theme: hackathon.theme,
+      bannerImage: hackathon.banner_image,
+
+      // Event Details
+      mode: Object.keys(hackathon.mode)[0] as 'Online' | 'Offline' | 'Hybrid',
+      location: hackathon.location,
+      startDate: hackathon.start_date,
+      endDate: hackathon.end_date,
+      registrationStart: hackathon.registration_start,
+      registrationEnd: hackathon.registration_end,
+
+      // Participation Settings
+      maxParticipants: hackathon.max_participants,
+      minTeamSize: hackathon.min_team_size,
+      maxTeamSize: hackathon.max_team_size,
+      registrationFee: hackathon.registration_fee,
+
+      // Content
+      prizes: hackathon.prizes || [],
+      judges: hackathon.judges || [],
+      schedule: hackathon.schedule || [],
+      rules: hackathon.rules,
+
+      // Additional Details
+      tags: hackathon.tags || [],
+      socialLinks: hackathon.social_links || [{ platform: 'x.com', url: '' }],
+
+      // Status & Metadata
+      status: 'published' as const,
+      publishedAt: new Date(hackathon.created_at).toISOString(),
+      createdAt: Date.now() * 1000000,
+      updatedAt: Date.now() * 1000000
+    };
+
+    // Encode the data and navigate to edit page
+    const encodedData = encodeURIComponent(JSON.stringify(editData));
+    router.push(`/client/create-hackathon?edit=${hackathonId}&data=${encodedData}`);
   };
 
   const handleViewHackathon = (hackathonId: string) => {
@@ -205,7 +322,23 @@ export default function ClientHackathonsPage() {
     }
 
     try {
-      await HackathonCanister.deleteHackathon(hackathonId);
+      console.log('🗑️ Deleting hackathon:', hackathonId);
+
+      // Call the API to delete the hackathon
+      const response = await fetch(`/api/hackathons/${hackathonId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete hackathon');
+      }
+
+      const result = await response.json();
+      console.log('✅ Hackathon deleted successfully:', result);
 
       // Update local state
       setHackathons(prev => prev.filter(h => h.hackathon_id !== hackathonId));
@@ -236,21 +369,26 @@ export default function ClientHackathonsPage() {
         nextStatus = 'upcoming';
       }
 
+      const newStatus = nextStatus === 'upcoming' ? { Upcoming: null, Ongoing: null, Completed: null, Cancelled: null } :
+                       nextStatus === 'ongoing' ? { Upcoming: null, Ongoing: null, Completed: null, Cancelled: null } :
+                       nextStatus === 'completed' ? { Upcoming: null, Ongoing: null, Completed: null, Cancelled: null } :
+                       { Upcoming: null, Ongoing: null, Completed: null, Cancelled: null };
+
       await HackathonCanister.updateHackathon(hackathonId, {
         ...hackathon,
-        status: { [nextStatus]: null },
+        status: newStatus,
         updated_at: new Date().toISOString()
       });
 
       // Update local state
       setHackathons(prev => prev.map(h =>
         h.hackathon_id === hackathonId
-          ? { ...h, status: { [nextStatus]: null }, updated_at: new Date().toISOString() }
+          ? { ...h, status: newStatus, updated_at: new Date().toISOString() }
           : h
       ));
       setFilteredHackathons(prev => prev.map(h =>
         h.hackathon_id === hackathonId
-          ? { ...h, status: { [nextStatus]: null }, updated_at: new Date().toISOString() }
+          ? { ...h, status: newStatus, updated_at: new Date().toISOString() }
           : h
       ));
 
@@ -381,8 +519,35 @@ export default function ClientHackathonsPage() {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-6">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <span className="ml-3 text-gray-600">Loading hackathons...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Authentication Required State */}
+        {!loading && !userEmail && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-yellow-400 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Authentication Required</h3>
+            <p className="text-gray-500 mb-4">
+              Please log in to view and manage your hackathons.
+            </p>
+            <Link
+              href="/login"
+              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              Log In to Continue
+            </Link>
+          </div>
+        )}
+
         {/* Error State */}
-        {error && (
+        {error && userEmail && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex">
               <AlertCircle className="w-5 h-5 text-red-600 mr-3" />
@@ -394,18 +559,8 @@ export default function ClientHackathonsPage() {
           </div>
         )}
 
-        {/* Loading State */}
-        {loading && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-6">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-3 text-gray-600">Loading hackathons...</span>
-            </div>
-          </div>
-        )}
-
         {/* Empty State */}
-        {!loading && !error && filteredHackathons.length === 0 && (
+        {!loading && !error && userEmail && filteredHackathons.length === 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No hackathons found</h3>
@@ -425,7 +580,7 @@ export default function ClientHackathonsPage() {
         )}
 
         {/* Hackathons Grid */}
-        {!loading && !error && filteredHackathons.length > 0 && (
+        {!loading && !error && userEmail && filteredHackathons.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredHackathons.map((hackathon) => {
               const statusInfo = getStatusInfo(hackathon);
@@ -435,6 +590,13 @@ export default function ClientHackathonsPage() {
                 <div key={hackathon.hackathon_id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
                   {/* Header */}
                   <div className="relative h-48 bg-gradient-to-r from-purple-500 to-pink-500 p-4">
+                    {hackathon.banner_image && (
+                      <img
+                        src={hackathon.banner_image}
+                        alt={hackathon.title}
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    )}
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-2">
@@ -446,7 +608,7 @@ export default function ClientHackathonsPage() {
                         <h3 className="text-lg font-bold text-white line-clamp-2">
                           {hackathon.title}
                         </h3>
-                        <p className="text-white/80 text-sm line-clamp-2 mt-1">
+                        <p className="text-white/80 text-sm line-clamp-1 mt-1">
                           {hackathon.tagline}
                         </p>
                       </div>
@@ -523,12 +685,21 @@ export default function ClientHackathonsPage() {
                       </div>
                     </div>
 
-                    {/* Participants and Teams */}
+                    {/* Event Stats */}
                     <div className="flex items-center justify-between text-sm text-gray-600 pt-2 border-t border-gray-200">
                       <div className="flex items-center space-x-4">
-                        <span>{hackathon.participantCount || 0} participants</span>
-                        <span>•</span>
-                        <span>{hackathon.teamsCount || 0} teams</span>
+                        <span className="flex items-center">
+                          <Trophy className="w-3 h-3 mr-1" />
+                          {hackathon.prizes?.length || 0} prizes
+                        </span>
+                        <span className="flex items-center">
+                          <UserCheck className="w-3 h-3 mr-1" />
+                          {hackathon.judges?.length || 0} judges
+                        </span>
+                        <span className="flex items-center">
+                          <Clock className="w-3 h-3 mr-1" />
+                          {hackathon.schedule?.length || 0} events
+                        </span>
                       </div>
                     </div>
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
+import { getMarketplaceActor, handleApiError, validateMarketplaceConfig, serializeBigInts } from '@/lib/ic-marketplace-agent';
 import { getStagesByBooking, createDefaultStages, getStageById } from '@/lib/stage-storage';
 import { getEnhancedBookingData } from '@/lib/booking-utils';
 
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
     if ('ok' in result) {
       return NextResponse.json({
         success: true,
-        data: result.ok,
+        data: serializeBigInts(result.ok),
         count: result.ok.length
       });
     } else {

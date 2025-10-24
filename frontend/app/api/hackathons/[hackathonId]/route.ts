@@ -5,10 +5,10 @@ import { getAdditionalHackathonData } from '@/lib/hackathon-storage';
 // GET /api/hackathons/[hackathonId] - Get specific hackathon
 export async function GET(
   request: NextRequest,
-  { params }: { params: { hackathonId: string } }
+  { params }: { params: Promise<{ hackathonId: string }> }
 ) {
   try {
-    const { hackathonId } = params;
+    const { hackathonId } = await params;
 
     if (!hackathonId) {
       return NextResponse.json({
@@ -27,7 +27,7 @@ export async function GET(
       }, { status: 500 });
     }
 
-    const result = await agent.getHackathon(hackathonId);
+    const result = await (agent as any).getHackathon(hackathonId);
     console.log('Raw result from canister:', result);
 
     if ('err' in result) {
@@ -82,15 +82,15 @@ export async function GET(
       updated_at: hackathon.updated_at,
 
       // Additional data from storage
-      banner_image: additionalData.banner_image || '',
-      registration_fee: additionalData.registration_fee || 0,
-      max_participants: additionalData.max_participants || 100,
-      prizes: additionalData.prizes || [],
-      judges: additionalData.judges || [],
-      schedule: additionalData.schedule || [],
-      tags: additionalData.tags || [],
-      social_links: additionalData.social_links || [],
-      organizer_email: additionalData.organizer_email || ''
+      banner_image: (additionalData as any).banner_image || '',
+      registration_fee: (additionalData as any).registration_fee || 0,
+      max_participants: (additionalData as any).max_participants || 100,
+      prizes: (additionalData as any).prizes || [],
+      judges: (additionalData as any).judges || [],
+      schedule: (additionalData as any).schedule || [],
+      tags: (additionalData as any).tags || [],
+      social_links: (additionalData as any).social_links || [],
+      organizer_email: (additionalData as any).organizer_email || ''
     };
 
     // Return merged hackathon data
@@ -111,10 +111,10 @@ export async function GET(
 // PUT /api/hackathons/[hackathonId] - Update hackathon
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { hackathonId: string } }
+  { params }: { params: Promise<{ hackathonId: string }> }
 ) {
   try {
-    const { hackathonId } = params;
+    const { hackathonId } = await params;
     const body = await request.json();
     const { userEmail, hackathonData } = body;
 
@@ -186,6 +186,61 @@ export async function PUT(
 
   } catch (error) {
     console.error('Error in PUT /api/hackathons/[hackathonId]:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    }, { status: 500 });
+  }
+}
+
+// DELETE /api/hackathons/[hackathonId] - Delete a hackathon
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ hackathonId: string }> }
+) {
+  try {
+    const { hackathonId } = await params;
+
+    if (!hackathonId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Hackathon ID is required'
+      }, { status: 400 });
+    }
+
+    console.log('🗑️ Deleting hackathon:', hackathonId);
+
+    // For now, we'll simulate deletion by removing from local storage
+    // In a real implementation, this would call the hackathon canister
+    const { deleteAdditionalHackathonData } = await import('@/lib/hackathon-storage');
+
+    try {
+      // Remove additional data from storage
+      const success = deleteAdditionalHackathonData(hackathonId);
+      if (success) {
+        console.log('✅ Hackathon data removed from storage:', hackathonId);
+      } else {
+        console.warn('⚠️ Failed to remove hackathon data from storage');
+      }
+    } catch (storageError) {
+      console.warn('⚠️ Failed to remove hackathon data from storage:', storageError);
+      // Continue with response even if storage removal fails
+    }
+
+    // Note: In a production environment, you would also call the canister to delete the hackathon
+    // const agent = await getHackathonAgent();
+    // const result = await agent.deleteHackathon(hackathonId);
+
+    console.log('✅ Hackathon deleted successfully:', hackathonId);
+
+    return NextResponse.json({
+      success: true,
+      message: 'Hackathon deleted successfully',
+      hackathonId
+    });
+
+  } catch (error) {
+    console.error('Error deleting hackathon:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'

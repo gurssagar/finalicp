@@ -1,65 +1,52 @@
-import Link from 'next/link';
-import { getCurrentSession } from '@/lib/actions/auth';
-import { redirect } from 'next/navigation';
+"use client"
+import Navbar from "../components/Navbar";
+import Hero from "../components/Hero";
+import Logos from "../components/Logos";
+import OrganisedProcess from "../components/Section3";
+import Sect10 from "../components/Sect10";
+import Vision from "../components/Vision";
+import Sect2 from "../components/Sect2";
+import Sect4 from "../components/Sect4";
+import Sect6 from "../components/Sect6";
+import Sect8 from "../components/Sect8";
+import SpecializedServices from "../components/Section5";
+import FAQSection from "../components/Section7";
+import { Footer } from "../components/Footer";
+import WhyChooseICPWork from "../components/Section9";
+import BackToTop from "../components/BackToTop";
 
-export default async function Home() {
-  const session = await getCurrentSession();
-  
-  if (session) {
-    redirect('/dashboard');
-  }
-
+function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            Welcome to Our Platform
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            A comprehensive user management system with authentication, profile management, 
-            and secure file uploads powered by Next.js and Internet Computer.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/signup"
-              className="bg-indigo-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-            >
-              Get Started
-            </Link>
-            <Link
-              href="/login"
-              className="bg-white text-indigo-600 px-8 py-3 rounded-lg font-semibold border border-indigo-600 hover:bg-indigo-50 transition-colors"
-            >
-              Sign In
-            </Link>
-          </div>
-        </div>
-        
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-4">Secure Authentication</h3>
-            <p className="text-gray-600">
-              JWT-based sessions, OTP email verification, and secure password reset functionality.
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-4">Profile Management</h3>
-            <p className="text-gray-600">
-              Complete CRUD operations for user profiles with experience and education tracking.
-            </p>
-          </div>
-          
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <h3 className="text-xl font-semibold mb-4">File Uploads</h3>
-            <p className="text-gray-600">
-              Secure profile image and resume uploads with AWS S3 integration.
-            </p>
-          </div>
-        </div>
+    <>
+      <Navbar />
+      <div id="home">
+        <Hero />
       </div>
-    </div>
+      <Logos />
+      <Sect2 />
+      <div id="how-it-works">
+        <OrganisedProcess />
+      </div>
+      <div id="features">
+        <Sect4 />
+      </div>
+      <div id="use-cases">
+        <SpecializedServices />
+      </div>
+      <Sect6 />
+      <div id="faq">
+        <FAQSection />
+      </div>
+      <Sect8 />
+      <div id="why-choose-us">
+        <WhyChooseICPWork />
+      </div>
+      <Sect10 />
+      <Vision />
+      <Footer />
+      <BackToTop />
+    </>
   );
 }
+
+export default Home;

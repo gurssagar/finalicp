@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useUserContext } from '@/contexts/UserContext';
 import {
   ChevronLeft,
   Shield,
@@ -62,6 +63,7 @@ interface UpsellItem {
 export default function PaymentPage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
+  const { profile } = useUserContext();
   const [service, setService] = useState<Service | null>(null);
   const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
   const [selectedUpsells, setSelectedUpsells] = useState<UpsellItem[]>([]);
@@ -260,7 +262,7 @@ export default function PaymentPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           packageId: selectedPackage.package_id,
-          clientId: 'client@example.com', // This should come from auth context
+          clientId: profile.email,
           paymentMethod,
           totalAmount: calculateTotal(),
           upsells: selectedUpsells.map(u => ({
@@ -269,7 +271,24 @@ export default function PaymentPage() {
             price: u.price
           })),
           promoCode: promoApplied?.code,
-          specialInstructions
+          specialInstructions,
+          serviceData: {
+            serviceId: service?.service_id,
+            freelancerEmail: service?.freelancer_email,
+            title: service?.title,
+            mainCategory: (service as any)?.main_category,
+            subCategory: (service as any)?.sub_category,
+            description: service?.description,
+            whatsIncluded: (service as any)?.whats_included
+          },
+          packageData: {
+            title: selectedPackage.title,
+            description: selectedPackage.description,
+            deliveryDays: selectedPackage.delivery_days,
+            deliveryTimeline: (selectedPackage as any).delivery_timeline,
+            revisionsIncluded: selectedPackage.revisions_included,
+            features: selectedPackage.features
+          }
         })
       });
 

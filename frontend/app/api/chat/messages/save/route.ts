@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     const messageTimestamp = timestamp || new Date().toISOString();
 
     // Save message to canister
+    console.log(`[ChatMessage] Attempting to save message: ${from} -> ${to}`);
     const messageId = await chatStorageApi.saveMessage(
       from,
       to,
@@ -65,7 +66,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (messageId) {
-      console.log(`[ChatMessage] Message saved: ${from} -> ${to} (${messageId})`);
+      console.log(`[ChatMessage] Message saved successfully: ${from} -> ${to} (${messageId})`);
 
       return NextResponse.json({
         success: true,
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
         }
       });
     } else {
+      console.error(`[ChatMessage] Failed to save message: ${from} -> ${to}`);
       return NextResponse.json({
         success: false,
         error: 'Failed to save message to canister'

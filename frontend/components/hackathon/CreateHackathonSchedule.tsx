@@ -13,6 +13,7 @@ import {
   BookOpen,
   Presentation,
   Award,
+  X,
   DoorOpen,
   ChevronUp,
   ChevronDown,

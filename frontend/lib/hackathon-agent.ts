@@ -150,7 +150,7 @@ export async function getHackathonAgent(): Promise<_SERVICE> {
     });
   }
 
-  return hackathonActor;
+  return hackathonActor!;
 }
 
 // Helper function to create a real actor with IDL
@@ -160,7 +160,7 @@ export async function createHackathonActor<T>(
 ): Promise<T> {
   const agent = await getHackathonAgent();
   const principal = Principal.fromText(canisterId);
-  return Actor.createActor(idlFactory, { agent, canisterId: principal });
+  return Actor.createActor(idlFactory, { agent: agent as any, canisterId: principal });
 }
 
 // Environment variables validation

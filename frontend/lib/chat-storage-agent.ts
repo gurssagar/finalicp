@@ -24,7 +24,7 @@ let chatStorageActor: any = null;
 
 function getChatStorageActor() {
   if (!chatStorageActor) {
-    const canisterId = process.env.NEXT_PUBLIC_CHAT_STORAGE_CANISTER_ID || '';
+    const canisterId = process.env.NEXT_PUBLIC_CHAT_STORAGE_CANISTER_ID || 'u6s2n-gx777-77774-qaaba-cai';
 
     // Create actor using the agent
     const { Actor, HttpAgent } = require('@dfinity/agent');
@@ -44,11 +44,20 @@ function getChatStorageActor() {
       });
     }
 
-    // Import the generated IDL factory - disabled for now since chat storage canister is not deployed
-    // const { idlFactory } = require('/home/neoweave/Documents/github/finalicp/frontend/lib/declarations/chat_storage/chat_storage.did.js');
-    const idlFactory = null;
-
-    chatStorageActor = null; // Disabled for now - chat storage canister not deployed
+    try {
+      // Import the actual IDL factory
+      const { idlFactory } = require('./declarations/chat_storage/chat_storage.did.js');
+      
+      // Create actor with the proper IDL
+      chatStorageActor = Actor.createActor(idlFactory, {
+        agent,
+        canisterId: canisterId,
+      });
+      console.log('[ChatStorage] Chat storage canister actor created successfully with IDL');
+    } catch (error) {
+      console.warn('[ChatStorage] Failed to create chat storage actor with IDL, using fallback:', error);
+      chatStorageActor = null;
+    }
   }
 
   return chatStorageActor;
@@ -96,22 +105,52 @@ export const chatStorageApi = {
   ): Promise<string | null> {
     try {
       const actor = getChatStorageActor();
+      
+      if (!actor) {
+        throw new Error('Chat storage actor not available');
+      }
 
-      // The canister only supports 5 parameters: from, to, text, messageType, timestamp
-      // Additional parameters (fileUrl, fileName, fileSize, replyTo) are not yet supported
-      const result = await actor.saveMessage(
-        from,
-        to,
-        text,
-        messageType,
-        timestamp || new Date().toISOString()
-      );
+      console.log(`[ChatStorage] Attempting to save message: ${from} -> ${to}`);
 
-      if ('ok' in result) {
-        return result.ok;
+      // Use saveMessageWithFile if file parameters are provided
+      if (fileUrl && fileName && fileSize) {
+        console.log(`[ChatStorage] Using saveMessageWithFile for file message`);
+        const result = await actor.saveMessageWithFile(
+          from,
+          to,
+          text,
+          messageType,
+          timestamp || new Date().toISOString(),
+          fileUrl,
+          fileName,
+          fileSize
+        );
+
+        if ('ok' in result) {
+          console.log(`[ChatStorage] File message saved to canister: ${from} -> ${to} (${result.ok})`);
+          return result.ok;
+        } else {
+          console.error('Error saving file message to canister:', result.err);
+          throw new Error(`Canister error: ${JSON.stringify(result.err)}`);
+        }
       } else {
-        console.error('Error saving message:', result.err);
-        return null;
+        // Use regular saveMessage for text messages
+        console.log(`[ChatStorage] Using saveMessage for text message`);
+        const result = await actor.saveMessage(
+          from,
+          to,
+          text,
+          messageType,
+          timestamp || new Date().toISOString()
+        );
+
+        if ('ok' in result) {
+          console.log(`[ChatStorage] Text message saved to canister: ${from} -> ${to} (${result.ok})`);
+          return result.ok;
+        } else {
+          console.error('Error saving text message to canister:', result.err);
+          throw new Error(`Canister error: ${JSON.stringify(result.err)}`);
+        }
       }
     } catch (error) {
       console.error('Error saving message to canister, using fallback:', error);
@@ -132,21 +171,33 @@ export const chatStorageApi = {
   ): Promise<ChatMessage[]> {
     try {
       const actor = getChatStorageActor();
-      const result = await actor.getChatHistory(userEmail, contactEmail, limit, offset);
+      
+      if (!actor) {
+        console.warn('[ChatStorage] Chat storage actor not available, returning empty history');
+        return [];
+      }
+
+      console.log(`[ChatStorage] Getting chat history: ${userEmail} <-> ${contactEmail} (limit: ${limit}, offset: ${offset})`);
+      const result = await actor.getChatHistory(userEmail, contactEmail, BigInt(limit), BigInt(offset));
 
       if ('ok' in result) {
+        console.log(`[ChatStorage] Retrieved ${result.ok.length} messages from canister`);
         return result.ok.map((msg: any) => ({
           id: msg.id,
           from: msg.from,
           to: msg.to,
           text: msg.text,
           timestamp: msg.timestamp,
-          delivered: msg.delivered,
-          read: msg.read,
-          messageType: msg.messageType,
+          delivered: msg.delivered || true,
+          read: msg.read || false,
+          messageType: msg.messageType || 'text',
+          fileUrl: msg.fileUrl,
+          fileName: msg.fileName,
+          fileSize: msg.fileSize,
+          replyTo: msg.replyTo,
         }));
       } else {
-        console.error('Error getting chat history:', result.err);
+        console.error('Error getting chat history from canister:', result.err);
         return [];
       }
     } catch (error) {
@@ -159,9 +210,17 @@ export const chatStorageApi = {
   async getRecentChats(userEmail: string, limit: number = 20): Promise<Array<{contact: string, lastMessage: ChatMessage}>> {
     try {
       const actor = getChatStorageActor();
-      const result = await actor.getRecentChats(userEmail, limit);
+      
+      if (!actor) {
+        console.warn('[ChatStorage] Chat storage actor not available, returning empty recent chats');
+        return [];
+      }
+
+      console.log(`[ChatStorage] Getting recent chats for: ${userEmail} (limit: ${limit})`);
+      const result = await actor.getRecentChats(userEmail, BigInt(limit));
 
       if ('ok' in result) {
+        console.log(`[ChatStorage] Retrieved ${result.ok.length} recent chats from canister`);
         return result.ok.map(([contact, message]: [string, any]) => ({
           contact,
           lastMessage: {
@@ -173,10 +232,14 @@ export const chatStorageApi = {
             delivered: message.delivered,
             read: message.read,
             messageType: message.messageType,
+            fileUrl: message.fileUrl,
+            fileName: message.fileName,
+            fileSize: message.fileSize,
+            replyTo: message.replyTo,
           },
         }));
       } else {
-        console.error('Error getting recent chats:', result.err);
+        console.error('Error getting recent chats from canister:', result.err);
         return [];
       }
     } catch (error) {

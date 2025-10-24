@@ -44,20 +44,8 @@ export default function PaymentConfirmPage() {
         // Fetch real booking data from enhanced storage using paymentId
         console.log('🔍 Fetching booking data for paymentId:', paymentId);
 
-        // First, try to get the booking from enhanced payment storage
-        const response = await fetch(`/api/payment/booking-details?paymentId=${paymentId}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.booking) {
-            console.log('✅ Found booking data:', data.booking);
-            setBookingData(data.booking);
-            return;
-          }
-        }
-
-        // If not found in enhanced storage, try to find it in the marketplace bookings API
-        console.log('🔄 Checking marketplace bookings...');
+        // First, try to find booking in the marketplace bookings API (enhanced with payment integration)
+        console.log('🔄 Checking marketplace bookings (with payment integration)...');
 
         // Get current user session to identify user bookings
         const sessionResponse = await fetch('/api/auth/session');
@@ -75,6 +63,8 @@ export default function PaymentConfirmPage() {
           if (bookingsResponse.ok) {
             const bookingsData = await bookingsResponse.json();
             if (bookingsData.success) {
+              console.log('📊 Found bookings data:', bookingsData);
+
               // Look for booking with matching payment_id or booking_id
               const matchingBooking = bookingsData.data.find((booking: any) =>
                 booking.payment_id === paymentId || booking.booking_id === bookingId
@@ -99,6 +89,19 @@ export default function PaymentConfirmPage() {
                 return;
               }
             }
+          }
+        }
+
+        // If not found in marketplace, try to get the booking from payment booking details
+        console.log('🔄 Checking payment booking details...');
+        const response = await fetch(`/api/payment/booking-details?paymentId=${paymentId}`);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.booking) {
+            console.log('✅ Found booking data in payment details:', data.booking);
+            setBookingData(data.booking);
+            return;
           }
         }
 

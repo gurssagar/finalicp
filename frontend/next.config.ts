@@ -1,16 +1,29 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Disable Turbopack for stability (can be re-enabled later)
+  experimental: {
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
+  },
+  
+  // Add transpilePackages for better compatibility
+  transpilePackages: ['@dfinity/agent', '@dfinity/principal', '@dfinity/candid'],
+  
   images: {
     remotePatterns: [
-     
-          {
-            protocol: 'https',
-            hostname: 'uploadthingy.s3.us-west-1.amazonaws.com',
-            port: '',
-            pathname: '/**',
-          },
-       
+      {
+        protocol: 'https',
+        hostname: 'uploadthingy.s3.us-west-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'via.placeholder.com',
@@ -37,6 +50,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
@@ -51,6 +65,12 @@ const nextConfig: NextConfig = {
         process: false,
       };
     }
+    
+    // Add module resolution fixes for React Server Components
+    config.resolve.alias = {
+      ...config.resolve.alias,
+    };
+    
     return config;
   },
 };

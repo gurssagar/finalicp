@@ -152,6 +152,17 @@ export function updateAdditionalServiceData(serviceId: string, updates: Partial<
   }
 }
 
+// Get all services from storage
+export function getAllServicesFromStorage(): AdditionalServiceData[] {
+  try {
+    const storage = loadStorage();
+    return storage.services;
+  } catch (error) {
+    console.error('Error getting all services from storage:', error);
+    return [];
+  }
+}
+
 // Delete additional service data
 export function deleteAdditionalServiceData(serviceId: string): boolean {
   try {

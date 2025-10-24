@@ -17,10 +17,12 @@ export interface ChatMessage {
 }
 
 export interface SocketMessage {
+  id?: string
   text: string
   timestamp?: string
   to: string
   from: string
+  messageType?: string
 }
 
 export interface OnlineUser {
@@ -42,6 +44,7 @@ class SocketService {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
+  private isConnecting = false
 
   // Initialize socket connection
   connect(userEmail: string): Promise<boolean> {
@@ -50,11 +53,29 @@ class SocketService {
 
       // Don't reconnect if already connected
       if (this.socket?.connected) {
+        console.log(`[Socket] Already connected as ${userEmail}`)
         resolve(true)
         return
       }
 
+      // Prevent multiple connection attempts
+      if (this.isConnecting) {
+        console.log(`[Socket] Connection already in progress for ${userEmail}`)
+        resolve(false)
+        return
+      }
+
+      this.isConnecting = true
+
+      // Disconnect existing socket if any
+      if (this.socket) {
+        console.log(`[Socket] Disconnecting existing socket before reconnecting`)
+        this.socket.disconnect()
+        this.socket = null
+      }
+
       try {
+        console.log(`[Socket] Creating new connection for ${userEmail}`)
         this.socket = io(SOCKET_URL, {
           auth: {
             username: userEmail
@@ -70,6 +91,7 @@ class SocketService {
           console.log(`[Socket] Connected as ${userEmail}`)
           this.connectionStatus = { connected: true }
           this.reconnectAttempts = 0
+          this.isConnecting = false
           this.emit('connectionStatus', this.connectionStatus)
           resolve(true)
         })
@@ -77,6 +99,7 @@ class SocketService {
         this.socket.on('connect_error', (error) => {
           console.error('[Socket] Connection error:', error)
           this.connectionStatus = { connected: false, error: error.message }
+          this.isConnecting = false
           this.emit('connectionStatus', this.connectionStatus)
           resolve(false)
         })
@@ -84,6 +107,7 @@ class SocketService {
       } catch (error) {
         console.error('[Socket] Failed to create socket:', error)
         this.connectionStatus = { connected: false, error: 'Failed to create socket' }
+        this.isConnecting = false
         this.emit('connectionStatus', this.connectionStatus)
         resolve(false)
       }
@@ -143,8 +167,13 @@ class SocketService {
       console.log(`[Socket] Reconnecting... attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`)
 
       setTimeout(() => {
-        if (!this.socket?.connected && this.userEmail) {
+        // Only reconnect if we're still disconnected and have a user email
+        if (!this.socket?.connected && this.userEmail && !this.connectionStatus.connected) {
+          console.log(`[Socket] Attempting reconnection for ${this.userEmail}`)
           this.connect(this.userEmail)
+        } else if (this.socket?.connected) {
+          console.log(`[Socket] Already reconnected, stopping reconnection attempts`)
+          this.reconnectAttempts = 0
         }
       }, delay)
     } else {

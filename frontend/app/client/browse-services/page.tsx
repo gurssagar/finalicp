@@ -65,11 +65,11 @@ export default function BrowseServices() {
                 service={{
                   id: service.service_id,
                   title: service.title,
-                  image: service.cover_image_url ||
+                  image: service.portfolio_images[0]||
                     (service.portfolio_images && service.portfolio_images.length > 0
                       ? service.portfolio_images[0]
                       : "/default-service.svg"),
-                  seller: `Freelancer ${service.freelancer_email ? service.freelancer_email.split('@')[0] : 'Unknown'}`,
+                  seller: ` ${service.freelancer_email}`,
                   rating: service.rating_avg,
                   reviews: `${service.total_orders}+`,
                   deliveryTimeline: service.delivery_timeline,

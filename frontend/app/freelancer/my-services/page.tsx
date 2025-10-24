@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/Header'
-import { Footer } from '@/components/footer'
+import { Footer } from '@/components/Footer'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -77,19 +77,33 @@ export default function MyServices() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me')
+        // Try the session endpoint first
+        const response = await fetch('/api/auth/session')
         const data = await response.json()
         
-        console.log('🔐 Auth Response Received:', data);
+        console.log('🔐 Session Response Received:', data);
 
         if (data.success && data.session) {
-          console.log('✅ Auth successful - Setting user data:', data.session);
+          console.log('✅ Session successful - Setting user data:', data.session);
           setUserId(data.session.userId)
           setUserEmail(data.session.email)
         } else {
-          console.log('❌ Auth failed - Setting user data to null');
-          setUserId(null)
-          setUserEmail(null)
+          // Fallback to /api/auth/me
+          console.log('🔄 Session failed, trying /api/auth/me...');
+          const meResponse = await fetch('/api/auth/me')
+          const meData = await meResponse.json()
+          
+          console.log('🔐 Me Response Received:', meData);
+
+          if (meData.success && meData.session) {
+            console.log('✅ Me successful - Setting user data:', meData.session);
+            setUserId(meData.session.userId)
+            setUserEmail(meData.session.email)
+          } else {
+            console.log('❌ Both auth methods failed - Setting user data to null');
+            setUserId(null)
+            setUserEmail(null)
+          }
         }
       } catch (error) {
         console.error('Error checking authentication:', error)
@@ -309,12 +323,21 @@ export default function MyServices() {
         'Are you sure you want to delete this service? This action cannot be undone.',
       )
     ) {
+      console.log('🗑️ Delete Service - Current user data:', { userId, userEmail });
+      
       if (!userId || !userEmail) {
+        console.error('❌ Delete Service - Missing user data:', { userId, userEmail });
         alert('You must be logged in to delete a service.')
         return
       }
 
       try {
+        console.log('🚀 Delete Service - Making API call:', {
+          serviceId,
+          userEmail,
+          userId
+        });
+
         // Make actual API call to delete from canister
         const response = await fetch(`/api/marketplace/services/${serviceId}`, {
           method: 'DELETE',
@@ -328,6 +351,7 @@ export default function MyServices() {
         })
 
         const result = await response.json()
+        console.log('📡 Delete Service - API Response:', result);
 
         if (result.success) {
           // Remove from local state
@@ -336,10 +360,11 @@ export default function MyServices() {
           refetch()
           alert('Service deleted successfully!')
         } else {
+          console.error('❌ Delete Service - API Error:', result.error);
           alert('Failed to delete service: ' + (result.error || 'Unknown error'))
         }
       } catch (error) {
-        console.error('Error deleting service:', error)
+        console.error('❌ Delete Service - Network Error:', error)
         alert('Failed to delete service. Please try again.')
       }
     }

@@ -165,6 +165,37 @@ export async function POST(request: NextRequest) {
     const serviceId = serviceResult.ok;
     console.log('Service created successfully with ID:', serviceId);
 
+    // Create packages if provided
+    let createdPackages = [];
+    if (serviceData.packages && serviceData.packages.length > 0) {
+      console.log('Creating packages for service:', serviceId);
+      
+      for (const pkg of serviceData.packages) {
+        try {
+          const packageResult = await actor.createPackage(
+            serviceId,
+            pkg.tier,
+            pkg.title,
+            pkg.description,
+            BigInt(pkg.price_e8s),
+            BigInt(pkg.delivery_days),
+            pkg.delivery_timeline,
+            pkg.features,
+            BigInt(pkg.revisions_included)
+          );
+
+          if ('ok' in packageResult) {
+            createdPackages.push({
+              package_id: packageResult.ok,
+              ...pkg
+            });
+          }
+        } catch (packageError) {
+          console.error('Failed to create package:', packageError);
+        }
+      }
+    }
+
     // Store additional data in our storage system since canister doesn't support it
     const additionalServiceData = {
       service_id: serviceId,
@@ -191,38 +222,6 @@ export async function POST(request: NextRequest) {
       // The core service data is already saved in the canister
     }
 
-    // Create packages if provided
-    let createdPackages = [];
-    if (serviceData.packages && serviceData.packages.length > 0) {
-      console.log('Creating packages for service:', serviceId);
-
-      for (const pkg of serviceData.packages) {
-        try {
-          const packageResult = await actor.createPackage(
-            serviceId,
-            pkg.title || 'Package Title',
-            pkg.description || 'Package description',
-            BigInt(pkg.price_e8s || 100000000),
-            pkg.delivery_days || 1,
-            pkg.delivery_timeline || `${pkg.delivery_days || 1} days`,
-            pkg.revisions_included || 1,
-            pkg.features || []
-          );
-
-          if ('ok' in packageResult) {
-            createdPackages.push({
-              package_id: packageResult.ok,
-              ...pkg
-            });
-            console.log('Package created successfully:', packageResult.ok);
-          } else {
-            console.error('Package creation failed:', packageResult.err);
-          }
-        } catch (error) {
-          console.error('Error creating package:', error);
-        }
-      }
-    }
 
     // Return comprehensive success response
     return NextResponse.json({

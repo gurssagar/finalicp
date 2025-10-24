@@ -55,21 +55,21 @@ export async function GET(
     }
 
     // Load packages from additional data
-    let packages = additionalData.packages || [];
+    let packages = (additionalData as any).packages || [];
 
     // Merge canister service data with additional data
     const mergedService = {
       service_id: service.service_id,
       freelancer_id: service.freelancer_id,
-      freelancer_email: additionalData.freelancer_email || service.freelancer_id,
+      freelancer_email: (additionalData as any).freelancer_email || service.freelancer_id,
       title: service.title,
       main_category: service.main_category,
       sub_category: service.sub_category,
       description: service.description,
-      description_format: additionalData.description_format || 'markdown',
+      description_format: (additionalData as any).description_format || 'markdown',
       whats_included: service.whats_included,
-      cover_image_url: additionalData.cover_image_url || service.cover_image_url || '',
-      portfolio_images: additionalData.portfolio_images || service.portfolio_images || [],
+      cover_image_url: (additionalData as any).cover_image_url || service.cover_image_url || '',
+      portfolio_images: (additionalData as any).portfolio_images || service.portfolio_images || [],
       status: service.status.Active ? 'Active' : 'Paused',
       rating_avg: Number(service.total_rating || 0),
       total_orders: Number(service.review_count || 0),
@@ -83,10 +83,10 @@ export async function GET(
       min_delivery_days: Number(service.delivery_time_days || 7),
       max_delivery_days: Number(service.delivery_time_days || 7),
       delivery_timeline: `${Number(service.delivery_time_days || 7)} days`,
-      tier_mode: additionalData.tier_mode || '3tier',
+      tier_mode: (additionalData as any).tier_mode || '3tier',
       packages: packages,
-      client_questions: additionalData.client_questions || [],
-      faqs: additionalData.faqs || [],
+      client_questions: (additionalData as any).client_questions || [],
+      faqs: (additionalData as any).faqs || [],
       similarServices: [] // Empty array for now
     };
 

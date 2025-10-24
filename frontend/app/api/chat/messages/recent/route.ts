@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get messages between the two users
-    const messages = await chatStorageApi.getMessagesBetweenUsers(userEmail, contactEmail, limit);
+    const messages = await (chatStorageApi as any).getMessagesBetweenUsers(userEmail, contactEmail, limit);
 
     return NextResponse.json({
       success: true,

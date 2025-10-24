@@ -1,7 +1,7 @@
 "use client"
 import React, { useEffect } from 'react'
 import { Header } from '@/components/Header'
-import { Footer } from '@/components/footer'
+import { Footer } from '@/components/Footer'
 import {useParams} from 'next/navigation'
 import { CheckCircle } from 'lucide-react'
 export function VerificationComplete() {

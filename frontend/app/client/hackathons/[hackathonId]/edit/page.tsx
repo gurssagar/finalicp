@@ -17,7 +17,7 @@ import {
   Edit,
   Trash2
 } from 'lucide-react';
-import { getHackathonCanister } from '@/lib/hackathon-canister';
+import { HackathonCanister } from '@/lib/hackathon-canister';
 import { Hackathon, CreateHackathonRequest } from '@/lib/hackathon-agent';
 
 interface EditHackathonPageProps {
@@ -42,7 +42,7 @@ export default function EditHackathonPage({ params }: EditHackathonPageProps) {
     tagline: '',
     description: '',
     theme: '',
-    mode: { Online: null },
+    mode: { Online: null, Offline: null, Hybrid: null },
     location: '',
     start_date: '',
     end_date: '',
@@ -56,23 +56,38 @@ export default function EditHackathonPage({ params }: EditHackathonPageProps) {
 
   const [userEmail, setUserEmail] = useState<string>('');
 
-  // Get user email from session/localStorage
+  // Get user email from session
   useEffect(() => {
-    const getUserEmail = () => {
-      if (typeof window !== 'undefined') {
-        const sessionEmail = sessionStorage.getItem('userEmail');
-        if (sessionEmail) return sessionEmail;
-
-        const localEmail = localStorage.getItem('userEmail');
-        if (localEmail) return localEmail;
-
-        return 'client@example.com';
+    const getUserEmail = async () => {
+      try {
+        // Try to get session from API first
+        const sessionResponse = await fetch('/api/auth/session');
+        const sessionData = await sessionResponse.json();
+        
+        if (sessionData.success && sessionData.session) {
+          console.log('✅ Got user email from session:', sessionData.session.email);
+          return sessionData.session.email;
+        } else {
+          // Fallback to /api/auth/me
+          const meResponse = await fetch('/api/auth/me');
+          const meData = await meResponse.json();
+          
+          if (meData.success && meData.session) {
+            console.log('✅ Got user email from /api/auth/me:', meData.session.email);
+            return meData.session.email;
+          } else {
+            throw new Error('No session found');
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user session:', error);
+        return 'client@example.com'; // Fallback
       }
-      return 'client@example.com';
     };
 
-    const email = getUserEmail();
-    setUserEmail(email);
+    getUserEmail().then(email => {
+      setUserEmail(email);
+    });
   }, []);
 
   // Load hackathon data
@@ -83,8 +98,8 @@ export default function EditHackathonPage({ params }: EditHackathonPageProps) {
       setLoading(true);
       setError(null);
 
-      const agent = await getHackathonCanister();
-      const hackathonData = await agent.getHackathon(hackathonId);
+      const agent = await HackathonCanister;
+      const hackathonData = await agent.getHackathonById(hackathonId);
 
       if (!hackathonData) {
         setError('Hackathon not found');
@@ -136,7 +151,7 @@ export default function EditHackathonPage({ params }: EditHackathonPageProps) {
     } else if (name === 'mode') {
       setFormData(prev => ({
         ...prev,
-        mode: { [value]: null }
+        mode: { [value]: null } as any
       }));
     } else {
       setFormData(prev => ({
@@ -198,7 +213,7 @@ export default function EditHackathonPage({ params }: EditHackathonPageProps) {
       setError(null);
       setSuccess(null);
 
-      const agent = await getHackathonCanister();
+      const agent = await HackathonCanister;
 
       // Convert dates to ISO format
       const updateData = {
@@ -209,7 +224,7 @@ export default function EditHackathonPage({ params }: EditHackathonPageProps) {
         registration_end: new Date(formData.registration_end).toISOString()
       };
 
-      const result = await agent.updateHackathon(hackathonId, updateData);
+      const result = await agent.updateHackathon(hackathonId, updateData as any);
 
       if (result) {
         setSuccess('Hackathon updated successfully!');

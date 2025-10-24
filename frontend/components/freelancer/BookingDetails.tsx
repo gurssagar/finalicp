@@ -206,11 +206,12 @@ export function BookingDetails({ booking }: BookingDetailsProps) {
             </h4>
             <div className="space-y-2">
               {booking.upsells.map((upsell) => {
-                const Icon = getUpsellIcon(upsell.category);
                 return (
                   <div key={upsell.id} className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <Icon className="text-green-600" size={16} />
+                      <div className="text-green-600">
+                        {getUpsellIcon(upsell.category)}
+                      </div>
                       <div>
                         <h5 className="font-medium text-green-900 text-sm">{upsell.name}</h5>
                         <p className="text-xs text-green-700">{upsell.category}</p>

@@ -10,7 +10,7 @@ export function MessageInput({
   onTypingIndicator
 }: MessageInputProps) {
   const [message, setMessage] = useState('');
-  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+  const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Handle typing indicator
   const handleTyping = (value: string) => {

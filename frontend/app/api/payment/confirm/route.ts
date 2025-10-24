@@ -58,6 +58,7 @@ interface PaymentConfirmationRequest {
 interface PaymentSession {
   paymentId: string;
   packageId: string;
+  serviceId: string;
   clientId: string;
   paymentMethod: string;
   totalAmount: number;
@@ -73,17 +74,49 @@ interface PaymentSession {
   status: string;
   createdAt: string;
   expiresAt: string;
+  serviceData?: {
+    freelancerEmail?: string;
+    title?: string;
+    mainCategory?: string;
+    subCategory?: string;
+    description?: string;
+    whatsIncluded?: string;
+  };
+  packageData?: {
+    title?: string;
+    description?: string;
+    deliveryDays?: number;
+    deliveryTimeline?: string;
+    revisionsIncluded?: number;
+    features?: string[];
+  };
 }
 
-// In-memory payment session storage (for development only)
-const paymentSessions: Record<string, PaymentSession> = {};
+// Shared payment session storage
+const PAYMENT_SESSIONS_FILE = '/tmp/payment-sessions.json';
 
 function getPaymentSessions(): Record<string, PaymentSession> {
-  return paymentSessions;
+  try {
+    const fs = require('fs');
+    if (fs.existsSync(PAYMENT_SESSIONS_FILE)) {
+      const data = fs.readFileSync(PAYMENT_SESSIONS_FILE, 'utf8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Error reading payment sessions:', error);
+  }
+  return {};
 }
 
 function savePaymentSession(paymentId: string, session: PaymentSession): void {
-  paymentSessions[paymentId] = session;
+  try {
+    const fs = require('fs');
+    let sessions = getPaymentSessions();
+    sessions[paymentId] = session;
+    fs.writeFileSync(PAYMENT_SESSIONS_FILE, JSON.stringify(sessions), 'utf8');
+  } catch (error) {
+    console.error('Error saving payment session:', error);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -109,10 +142,25 @@ export async function POST(request: NextRequest) {
     const paymentSession = paymentSessions[paymentId];
     if (!paymentSession) {
       console.error('❌ Payment session not found:', paymentId);
+      console.log('Available sessions:', Object.keys(paymentSessions));
       return NextResponse.json({
         success: false,
         error: 'Payment session not found or expired'
       }, { status: 404 });
+    }
+
+    // Check if session has expired
+    const currentTime = new Date();
+    const expirationTime = new Date(paymentSession.expiresAt);
+    if (currentTime > expirationTime) {
+      console.error('❌ Payment session expired:', paymentId, 'expired at:', paymentSession.expiresAt);
+      // Clean up expired session
+      delete paymentSessions[paymentId];
+      savePaymentSession(paymentId, paymentSession); // This will update the file without the expired session
+      return NextResponse.json({
+        success: false,
+        error: 'Payment session expired'
+      }, { status: 410 });
     }
 
     // Verify payment details match
@@ -152,32 +200,42 @@ export async function POST(request: NextRequest) {
 
       console.log('🔍 Looking for package:', paymentSession.packageId);
 
-      // Create service and package data from payment session
-      // Since we're working with canister directly, we'll create the data from the payment session
+      // Use actual service and package data from payment session
+      const sessionServiceData = paymentSession.serviceData || {};
+      const sessionPackageData = paymentSession.packageData || {};
+
+      // Create service data from payment session with fallbacks
       const serviceData = {
         service_id: paymentSession.serviceId,
-        freelancer_email: 'freelancer@example.com', // Default freelancer email
-        title: 'Web Development Service',
-        main_category: 'Web Development',
-        sub_category: 'Frontend Development',
-        description: 'Professional web development services with modern technologies and best practices.',
-        whats_included: 'Complete web development solution including design, development, testing, and deployment.',
-        delivery_time_days: 7,
-        starting_from_e8s: 100000000, // 1 ICP
-        tags: ['web', 'development', 'modern']
+        freelancer_email: sessionServiceData.freelancerEmail || paymentSession.clientId, // Use client as freelancer if not specified
+        title: sessionServiceData.title || 'Professional Service',
+        main_category: sessionServiceData.mainCategory || 'Professional Services',
+        sub_category: sessionServiceData.subCategory || 'General',
+        description: sessionServiceData.description || 'Professional services delivered with quality and expertise.',
+        whats_included: sessionServiceData.whatsIncluded || 'Quality service delivery',
+        delivery_time_days: sessionPackageData.deliveryDays || 7,
+        starting_from_e8s: Math.floor(amount * 100000000), // Use actual payment amount
+        tags: ['professional', 'quality', 'reliable']
       };
 
+      // Create package data from payment session with fallbacks
       const packageData = {
         package_id: paymentSession.packageId,
         service_id: paymentSession.serviceId,
-        title: 'Standard Package',
-        description: 'Complete service package with professional delivery and quality assurance.',
-        delivery_days: 7,
-        price_e8s: 100000000, // 1 ICP
-        delivery_timeline: '7 days delivery',
-        revisions_included: 1,
-        features: ['Professional delivery', 'Quality assurance', 'Support included']
+        title: sessionPackageData.title || 'Standard Package',
+        description: sessionPackageData.description || 'Professional service package with quality delivery.',
+        delivery_days: sessionPackageData.deliveryDays || 7,
+        price_e8s: Math.floor(amount * 100000000), // Use actual payment amount
+        delivery_timeline: sessionPackageData.deliveryTimeline || `${sessionPackageData.deliveryDays || 7} days delivery`,
+        revisions_included: sessionPackageData.revisionsIncluded || 1,
+        features: sessionPackageData.features || ['Professional delivery', 'Quality assurance']
       };
+
+      // Debug logging for package data
+      console.log('📦 Package data validation:');
+      console.log('  - sessionPackageData:', sessionPackageData);
+      console.log('  - deliveryDays from session:', sessionPackageData.deliveryDays);
+      console.log('  - final delivery_days:', packageData.delivery_days);
 
       console.log('✅ Service data created:', serviceData.title);
       console.log('✅ Package data created:', packageData.title);
@@ -190,7 +248,18 @@ export async function POST(request: NextRequest) {
       console.log('🛠️ Service:', serviceData);
 
       const currentTime = Date.now();
-      const deliveryDeadline = currentTime + (packageData.delivery_days * 24 * 60 * 60 * 1000);
+      
+      // Ensure delivery days is at least 1 day
+      const deliveryDays = Math.max(packageData.delivery_days || 1, 1);
+      const deliveryDeadline = currentTime + (deliveryDays * 24 * 60 * 60 * 1000);
+      
+      // Debug logging for delivery deadline calculation
+      console.log('🕐 Delivery deadline calculation:');
+      console.log('  - Current time:', currentTime, new Date(currentTime).toISOString());
+      console.log('  - Package delivery days (original):', packageData.delivery_days);
+      console.log('  - Package delivery days (adjusted):', deliveryDays);
+      console.log('  - Calculated deadline:', deliveryDeadline, new Date(deliveryDeadline).toISOString());
+      console.log('  - Days difference:', (deliveryDeadline - currentTime) / (24 * 60 * 60 * 1000));
 
       // Enhanced booking data with all payment details
       const bookingData = {
@@ -201,10 +270,10 @@ export async function POST(request: NextRequest) {
         service_id: serviceData.service_id,
         service_title: serviceData.title,
         package_id: paymentSession.packageId,
-        package_tier: packageData.tier,
+        package_tier: (packageData as any).tier || 'basic',
         package_title: packageData.title,
         package_description: packageData.description,
-        package_delivery_days: packageData.delivery_days,
+        package_delivery_days: deliveryDays,
         package_revisions: packageData.revisions_included,
         package_features: packageData.features || [],
 
@@ -248,7 +317,7 @@ export async function POST(request: NextRequest) {
         delivery_deadline_readable: new Date(deliveryDeadline).toISOString(),
 
         // Time tracking calculations
-        delivery_days: packageData.delivery_days,
+        delivery_days: deliveryDays,
         time_remaining_hours: Math.floor((deliveryDeadline - currentTime) / (60 * 60 * 1000))
       };
 
@@ -272,6 +341,72 @@ export async function POST(request: NextRequest) {
         throw new Error(`Failed to create booking in canister: ${canisterResult.error}`);
       }
       console.log('✅ Booking created in canister:', canisterResult.bookingId);
+
+      // Save booking data via marketplace bookings API for better data management
+      let marketplaceBookingResult = null;
+      try {
+        console.log('💾 Saving booking data via marketplace API...');
+
+        // Prepare booking data for marketplace API
+        const marketplaceBookingData = {
+          clientId: bookingData.client_id,
+          packageId: bookingData.package_id,
+          specialInstructions: bookingData.special_instructions,
+          paymentMethod: bookingData.payment_method,
+          totalAmount: bookingData.total_amount_e8s / 100000000, // Convert to ICP
+          upsells: bookingData.upsells,
+          promoCode: bookingData.promo_code,
+          paymentId: bookingData.payment_id,
+          transactionId: bookingData.transaction_id,
+          // Additional booking details for comprehensive storage
+          serviceId: bookingData.service_id,
+          serviceTitle: bookingData.service_title,
+          freelancerId: bookingData.freelancer_id,
+          packageTitle: bookingData.package_title,
+          packageDescription: bookingData.package_description,
+          deliveryDays: bookingData.package_delivery_days,
+          createdFromPayment: true, // Flag to indicate this was created from payment
+        };
+
+        const bookingResponse = await fetchWithTimeout(
+          `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/marketplace/bookings`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(marketplaceBookingData),
+          },
+          10000 // 10 second timeout
+        );
+
+        if (bookingResponse.ok) {
+          const bookingApiData = await bookingResponse.json();
+          marketplaceBookingResult = {
+            success: true,
+            bookingData: bookingApiData,
+            message: 'Booking saved via marketplace API'
+          };
+          console.log('✅ Booking saved via marketplace API:', bookingApiData);
+        } else {
+          const errorText = await bookingResponse.text();
+          console.warn('⚠️ Failed to save booking via marketplace API:', errorText);
+          marketplaceBookingResult = {
+            success: false,
+            error: 'Failed to save booking via marketplace API',
+            details: errorText,
+            bookingStillSuccessful: true
+          };
+        }
+      } catch (bookingApiError) {
+        console.warn('⚠️ Error saving booking via marketplace API:', bookingApiError);
+        marketplaceBookingResult = {
+          success: false,
+          error: 'Error saving booking via marketplace API',
+          details: bookingApiError instanceof Error ? bookingApiError.message : 'Unknown error',
+          bookingStillSuccessful: true
+        };
+      }
 
       // Initiate chat after successful booking (async, non-blocking)
       let chatInitiationResult = null;
@@ -381,6 +516,7 @@ export async function POST(request: NextRequest) {
           confirmedAt: new Date().toISOString()
         },
         booking: bookingData,
+        marketplaceBooking: marketplaceBookingResult,
         chat: chatInitiationResult,
         service: {
           title: serviceData.title,

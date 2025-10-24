@@ -39,13 +39,30 @@ interface PaymentRequest {
   }>;
   promoCode?: string;
   specialInstructions?: string;
+  serviceData?: {
+    serviceId?: string;
+    freelancerEmail?: string;
+    title?: string;
+    mainCategory?: string;
+    subCategory?: string;
+    description?: string;
+    whatsIncluded?: string;
+  };
+  packageData?: {
+    title?: string;
+    description?: string;
+    deliveryDays?: number;
+    deliveryTimeline?: string;
+    revisionsIncluded?: number;
+    features?: string[];
+  };
 }
 
 // Mock payment processing for demonstration
 export async function POST(request: NextRequest) {
   try {
     const body: PaymentRequest = await request.json();
-    const { packageId, clientId, paymentMethod, totalAmount, upsells, promoCode, specialInstructions } = body;
+    const { packageId, clientId, paymentMethod, totalAmount, upsells, promoCode, specialInstructions, serviceData, packageData } = body;
 
     // Validate required fields
     if (!packageId || !clientId || !paymentMethod || totalAmount <= 0) {
@@ -67,7 +84,7 @@ export async function POST(request: NextRequest) {
     const paymentSession = {
       paymentId,
       packageId,
-      serviceId: `SVC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Generate service ID
+      serviceId: serviceData?.serviceId || `SVC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       clientId,
       paymentMethod,
       totalAmount,
@@ -79,6 +96,23 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       createdAt: timestamp,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
+      // Store service and package data for use in confirmation
+      serviceData: serviceData || {
+        freelancerEmail: 'freelancer@example.com',
+        title: 'Web Development Service',
+        mainCategory: 'Web Development',
+        subCategory: 'Frontend Development',
+        description: 'Professional web development services with modern technologies and best practices.',
+        whatsIncluded: 'Complete web development solution including design, development, testing, and deployment.'
+      },
+      packageData: packageData || {
+        title: 'Standard Package',
+        description: 'Complete service package with professional delivery and quality assurance.',
+        deliveryDays: 7,
+        deliveryTimeline: '7 days delivery',
+        revisionsIncluded: 1,
+        features: ['Professional delivery', 'Quality assurance', 'Support included']
+      }
     };
 
     // Generate payment method specific details

@@ -29,6 +29,75 @@ export function ClientChatConversation({
   const [socketConnected, setSocketConnected] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
+  // Load chat history from canister
+  const loadChatHistory = async () => {
+    try {
+      setLoading(true)
+      console.log(`[ClientChat] Loading chat history: ${userEmail} <-> ${chatId}`)
+
+      // Try Socket.IO first for real-time history
+      if (socketService.isConnected()) {
+        const socketHistory = await socketService.getChatHistory(chatId, 50, 0)
+        if (socketHistory && socketHistory.length > 0) {
+          console.log(`[ClientChat] Loaded ${socketHistory.length} messages from Socket.IO`)
+          const formattedMessages = socketHistory.map(msg => ({
+            id: msg.id,
+            from: msg.from,
+            to: msg.to,
+            text: msg.text,
+            timestamp: msg.timestamp,
+            delivered: msg.delivered,
+            read: msg.read,
+            messageType: msg.messageType || 'text',
+            fileUrl: msg.fileUrl,
+            fileName: msg.fileName,
+            fileSize: msg.fileSize,
+            replyTo: msg.replyTo
+          }))
+          
+          // Sort messages by timestamp (oldest first)
+          const sortedMessages = formattedMessages.sort((a, b) => {
+            const timestampA = new Date(a.timestamp).getTime()
+            const timestampB = new Date(b.timestamp).getTime()
+            return timestampA - timestampB // Oldest first
+          })
+          
+          console.log(`[ClientChat] Socket.IO messages sorted by timestamp: ${sortedMessages.length} messages`)
+          setMessages(sortedMessages)
+          setLoading(false)
+          return
+        }
+      }
+
+      // Fallback to API if Socket.IO doesn't have history
+      console.log(`[ClientChat] Loading chat history from API: ${userEmail} <-> ${chatId}`)
+      const response = await fetch(
+        `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
+      )
+      const data = await response.json()
+
+      if (data.success) {
+        console.log(`[ClientChat] Loaded ${data.messages?.length || 0} messages from API`)
+        
+        // Ensure messages are sorted by timestamp (oldest first)
+        const sortedMessages = (data.messages || []).sort((a: any, b: any) => {
+          const timestampA = new Date(a.timestamp).getTime()
+          const timestampB = new Date(b.timestamp).getTime()
+          return timestampA - timestampB // Oldest first
+        })
+        
+        console.log(`[ClientChat] Messages sorted by timestamp: ${sortedMessages.length} messages`)
+        setMessages(sortedMessages)
+      } else {
+        console.warn('[ClientChat] Failed to load chat history from API:', data.error)
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Initialize Socket.IO and load chat history when chatId changes
   useEffect(() => {
     if (!chatId || !userEmail) return
@@ -50,53 +119,14 @@ export function ClientChatConversation({
       }
     }
 
-    // Load chat history from canister
-    const loadChatHistory = async () => {
-      try {
-        setLoading(true)
-
-        // Try Socket.IO first for real-time history
-        if (socketService.isConnected()) {
-          const socketHistory = await socketService.getChatHistory(chatId, 50, 0)
-          if (socketHistory && socketHistory.length > 0) {
-            const formattedMessages = socketHistory.map(msg => ({
-              id: msg.id,
-              from: msg.from,
-              to: msg.to,
-              text: msg.text,
-              timestamp: msg.timestamp,
-              delivered: msg.delivered,
-              read: msg.read,
-              messageType: msg.messageType || 'text',
-              fileUrl: msg.fileUrl,
-              fileName: msg.fileName,
-              fileSize: msg.fileSize,
-              replyTo: msg.replyTo
-            }))
-            setMessages(formattedMessages)
-            setLoading(false)
-            return
-          }
-        }
-
-        // Fallback to API if Socket.IO doesn't have history
-        const response = await fetch(
-          `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
-        )
-        const data = await response.json()
-
-        if (data.success) {
-          setMessages(data.messages || [])
-        }
-      } catch (error) {
-        console.error('Error loading chat history:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     initializeSocket()
     loadChatHistory()
+
+    // Auto-refresh chat history when chatId or userEmail changes
+    const refreshChatHistory = () => {
+      console.log('[ClientChat] Auto-refreshing chat history due to chatId/userEmail change')
+      loadChatHistory()
+    }
 
     // Cleanup on unmount
     return () => {
@@ -209,6 +239,39 @@ export function ClientChatConversation({
     }
   }, [chatId, userEmail])
 
+  // Auto-refresh chat history when chatId or userEmail changes
+  useEffect(() => {
+    if (chatId && userEmail) {
+      console.log('[ClientChat] Auto-refreshing chat history due to chatId/userEmail change')
+      loadChatHistory()
+    }
+  }, [chatId, userEmail])
+
+  // Refresh chat history when page becomes visible (user returns to tab)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && chatId && userEmail) {
+        console.log('[ClientChat] Page became visible, refreshing chat history')
+        loadChatHistory()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [chatId, userEmail])
+
+  // Periodic refresh of chat history (every 30 seconds)
+  useEffect(() => {
+    if (!chatId || !userEmail) return
+
+    const interval = setInterval(() => {
+      console.log('[ClientChat] Periodic chat history refresh')
+      loadChatHistory()
+    }, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [chatId, userEmail])
+
   // Send message via Socket.IO with enhanced features
   const sendMessage = async (text: string, options?: {
     messageType?: string;
@@ -221,8 +284,12 @@ export function ClientChatConversation({
       throw new Error('Missing required information to send message')
     }
 
+    // Use the chatId directly as the recipient email (from URL params)
+    const recipientEmail = chatId
+    console.log(`[DEBUG] Sending message: from=${userEmail}, to=${recipientEmail}, text=${text.trim()}`)
+
     const messageData = {
-      to: chatId,
+      to: recipientEmail,
       text: text.trim(),
       timestamp: new Date().toISOString(),
       messageType: options?.messageType || 'text',
@@ -241,14 +308,22 @@ export function ClientChatConversation({
           const optimisticMessage: Message = {
             id: `socket-${Date.now()}`,
             from: userEmail,
-            to: chatId,
+            to: recipientEmail,
             text: text.trim(),
             timestamp: result.timestamp || messageData.timestamp,
             delivered: true,
             read: false,
             messageType: options?.messageType || 'text'
           }
-          setMessages(prev => [...prev, optimisticMessage])
+          setMessages(prev => {
+            const newMessages = [...prev, optimisticMessage]
+            // Sort messages by timestamp to maintain order
+            return newMessages.sort((a, b) => {
+              const timestampA = new Date(a.timestamp).getTime()
+              const timestampB = new Date(b.timestamp).getTime()
+              return timestampA - timestampB // Oldest first
+            })
+          })
           return // Success, no need to try storage
         }
         console.warn('[ClientChat] Socket send failed, falling back to storage')
@@ -264,7 +339,7 @@ export function ClientChatConversation({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           from: userEmail,
-          to: chatId,
+          to: recipientEmail,
           text: text.trim(),
           messageType: options?.messageType || 'text',
           timestamp: messageData.timestamp,
@@ -277,19 +352,29 @@ export function ClientChatConversation({
 
       const data = await response.json()
       if (response.ok && data.success) {
+        console.log(`[ClientChat] Message saved to canister: ${data.data?.messageId || data.messageId}`)
         const storedMessage: Message = {
-          id: data.messageId || `storage-${Date.now()}`,
+          id: data.data?.messageId || data.messageId || `storage-${Date.now()}`,
           from: userEmail,
-          to: chatId,
+          to: recipientEmail,
           text: text.trim(),
           timestamp: messageData.timestamp,
           delivered: true,
           read: false,
           messageType: options?.messageType || 'text'
         }
-        setMessages(prev => [...prev, storedMessage])
+        setMessages(prev => {
+          const newMessages = [...prev, storedMessage]
+          // Sort messages by timestamp to maintain order
+          return newMessages.sort((a, b) => {
+            const timestampA = new Date(a.timestamp).getTime()
+            const timestampB = new Date(b.timestamp).getTime()
+            return timestampA - timestampB // Oldest first
+          })
+        })
         return // Success
       } else {
+        console.error('[ClientChat] Failed to save message to canister:', data.error)
         throw new Error(data.error || 'Failed to send message')
       }
     } catch (error) {

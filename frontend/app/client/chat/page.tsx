@@ -10,73 +10,67 @@ export default function ChatPage() {
   const [activeTab, setActiveTab] = useState<'chats' | 'teams'>('chats')
   const [userEmail, setUserEmail] = useState<string>('')
 
-  // Load user email from URL params, session storage, or auth context
+  // Load user email from server session
   useEffect(() => {
-    const getUserEmail = () => {
-      // First check if coming from booking with a freelancer
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search)
-        const withParam = urlParams.get('with')
-
-        if (withParam) {
-          return withParam // This is the freelancer's email for chat
-        }
-
-        // Check session storage for logged-in user
-        const sessionEmail = sessionStorage.getItem('userEmail')
-        if (sessionEmail) {
-          return sessionEmail
-        }
-
-        // Check localStorage for persistence
-        const localEmail = localStorage.getItem('userEmail')
-        if (localEmail) {
-          return localEmail
-        }
-      }
-
-      // Fallback for development - this should be replaced with real auth
-      return 'client@example.com'
-    }
-
-    const userEmail = getUserEmail()
-    setUserEmail(userEmail)
-
-    // Check if we should pre-select a chat from URL params
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search)
-      const withParam = urlParams.get('with')
-
-      if (withParam) {
-        setSelectedChatId(withParam)
-      }
-    }
-
-    // Also authenticate with the canister
-    const authenticateWithCanister = async () => {
+    const fetchUserSession = async () => {
       try {
-        const response = await fetch('/api/chat/auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: userEmail,
-            displayName: 'Client User'
-          })
-        })
+        const response = await fetch('/api/auth/session')
         const data = await response.json()
-        console.log('Authentication result:', data)
+
+        if (data.success && data.session) {
+          setUserEmail(data.session.email)
+          
+          // Check if we should pre-select a chat from URL params
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search)
+            const withParam = urlParams.get('with')
+
+            if (withParam) {
+              setSelectedChatId(withParam)
+              console.log(`[DEBUG] Chat URL param: with=${withParam}, userEmail=${data.session.email}`)
+            }
+          }
+
+          // Authenticate with the canister
+          const authenticateWithCanister = async () => {
+            try {
+              const response = await fetch('/api/chat/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: data.session.email,
+                  displayName: 'Client User'
+                })
+              })
+              const authData = await response.json()
+              console.log('Authentication result:', authData)
+            } catch (error) {
+              console.error('Authentication error:', error)
+            }
+          }
+
+          authenticateWithCanister()
+        } else {
+          console.warn('[ClientChat] No user session found')
+        }
       } catch (error) {
-        console.error('Authentication error:', error)
+        console.error('Error fetching user session:', error)
+        console.warn('[ClientChat] No user email available for authentication')
       }
     }
 
-    if (userEmail) {
-      authenticateWithCanister()
-    }
+    fetchUserSession()
   }, [])
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId)
+
+    // Update URL with the 'with' parameter
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('with', chatId)
+      window.history.replaceState({}, '', url.toString())
+    }
   }
 
   const handleTabChange = (tab: 'chats' | 'teams') => {

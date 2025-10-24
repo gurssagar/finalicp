@@ -1,10 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
 import { getMarketplaceConfig, validateMarketplaceConfig } from '@/lib/marketplace-config';
+
+// Helper function to get freelancer email from canister service data
+async function getFreelancerEmailFromService(actor: any, serviceId: string): Promise<string | null> {
+  try {
+    // Get service data from canister only
+    const serviceResult = await actor.getService(serviceId);
+    if ('ok' in serviceResult) {
+      const serviceData = serviceResult.ok;
+      
+      // Check if service has freelancer_email field
+      if (serviceData.freelancer_email) {
+        console.log('✅ Found freelancer email from canister:', serviceData.freelancer_email);
+        return serviceData.freelancer_email;
+      }
+      
+      // If canister service data has freelancer_id, use that
+      if (serviceData.freelancer_id && serviceData.freelancer_id.includes('@')) {
+        console.log('✅ Using freelancer_id from canister:', serviceData.freelancer_id);
+        return serviceData.freelancer_id;
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Failed to fetch service data from canister:', error);
+  }
+  
+  console.log('ℹ️ No freelancer email found in canister for service:', serviceId);
+  return null;
+}
+
 import {
   transformCanisterBookings,
-  convertStatusFilter,
-  createMockBooking
+  convertStatusFilter
 } from '@/lib/booking-transformer';
 import { emailsMatch } from '@/lib/email-matching';
 import { getBookingsForClientFromCanister, getBookingsForFreelancerFromCanister } from '@/lib/booking-utils';
@@ -66,15 +95,15 @@ export async function GET(request: NextRequest) {
 
     let bookings: any[] = [];
   let realBookingsCount = 0;
-  let mockBookingsCount = 0;
   let dataSource = 'unknown';
 
+  // Get marketplace actor
+  const actor = await getMarketplaceActor();
+  
   try {
     // Try to get real data from marketplace canister
     console.log('🔍 Attempting to fetch bookings from marketplace canister...');
     validateMarketplaceConfig();
-
-    const actor = await getMarketplaceActor();
 
     // Call marketplace canister based on user type
     const result = userType === 'client' 
@@ -117,31 +146,49 @@ export async function GET(request: NextRequest) {
         
         if (canisterBookings.length > 0) {
           // Transform canister bookings to match expected format
-          const transformedBookings = canisterBookings.map(booking => ({
-            booking_id: booking.booking_id,
-            client_id: booking.client_id,
-            freelancer_id: booking.freelancer_id,
-            package_id: booking.package_id,
-            service_id: booking.service_id,
-            status: booking.status,
-            total_amount_e8s: Number(booking.total_amount_e8s),
-            escrow_amount_e8s: Math.floor(Number(booking.total_amount_e8s) * 0.95),
-            payment_status: booking.payment_status || 'Completed',
-            client_notes: booking.description || '',
-            service_title: booking.title || 'Service',
-            freelancer_name: booking.freelancer_id.split('@')[0],
-            package_title: 'Package', // Will be enhanced with service data
-            package_tier: 'basic',
-            payment_method: 'icp',
-            payment_id: booking.booking_id,
-            transaction_id: `txn_${booking.booking_id}`,
-            created_at: Number(booking.created_at),
-            updated_at: Number(booking.updated_at),
-            ledger_deposit_block: null,
-            delivery_deadline: Number(booking.deadline),
-            special_instructions: booking.description || '',
-            upsells: [],
-            promo_code: undefined
+          const transformedBookings = await Promise.all(canisterBookings.map(async (booking) => {
+            const totalAmountE8s = Number(booking.total_amount_e8s);
+            const totalAmountDollars = (totalAmountE8s / 100000000) * 10; // Convert e8s to dollars (assuming $10 per ICP)
+            const escrowAmountE8s = Math.floor(totalAmountE8s * 0.95);
+            const escrowAmountDollars = (escrowAmountE8s / 100000000) * 10;
+            
+            // Get freelancer email from canister service data
+            const freelancerEmail = await getFreelancerEmailFromService(actor, booking.service_id);
+            console.log(`[DEBUG] Original freelancer_id: ${booking.freelancer_id}, Service result: ${freelancerEmail}`);
+            
+            // Use the email from canister or the original freelancer_id
+            const finalFreelancerEmail = freelancerEmail || booking.freelancer_id;
+            console.log(`[DEBUG] Final freelancer email: ${finalFreelancerEmail}`);
+            
+            return {
+              booking_id: booking.booking_id,
+              client_id: booking.client_id,
+              freelancer_id: finalFreelancerEmail,
+              freelancer_email: finalFreelancerEmail, // Add explicit freelancer_email field
+              package_id: booking.package_id,
+              service_id: booking.service_id,
+              status: booking.status,
+              total_amount_e8s: totalAmountE8s,
+              total_amount_dollars: totalAmountDollars,
+              escrow_amount_e8s: escrowAmountE8s,
+              escrow_amount_dollars: escrowAmountDollars,
+              payment_status: booking.payment_status || 'Completed',
+              client_notes: booking.description || '',
+              service_title: booking.title || 'Service',
+              freelancer_name: finalFreelancerEmail.split('@')[0],
+              package_title: 'Package', // Will be enhanced with service data
+              package_tier: 'basic',
+              payment_method: 'icp',
+              payment_id: booking.booking_id,
+              transaction_id: `txn_${booking.booking_id}`,
+              created_at: Number(booking.created_at),
+              updated_at: Number(booking.updated_at),
+              ledger_deposit_block: null,
+              delivery_deadline: Number(booking.deadline), // Use canister deadline only
+              special_instructions: booking.description || '',
+              upsells: [],
+              promo_code: undefined
+            };
           }));
 
           bookings = transformedBookings;
@@ -158,31 +205,49 @@ export async function GET(request: NextRequest) {
         
         if (canisterBookings.length > 0) {
           // Transform canister bookings to match expected format
-          const transformedBookings = canisterBookings.map(booking => ({
-            booking_id: booking.booking_id,
-            client_id: booking.client_id,
-            freelancer_id: booking.freelancer_id,
-            package_id: booking.package_id,
-            service_id: booking.service_id,
-            status: booking.status,
-            total_amount_e8s: Number(booking.total_amount_e8s),
-            escrow_amount_e8s: Math.floor(Number(booking.total_amount_e8s) * 0.95),
-            payment_status: booking.payment_status || 'Completed',
-            client_notes: booking.description || '',
-            service_title: booking.title || 'Service',
-            freelancer_name: booking.freelancer_id.split('@')[0],
-            package_title: 'Package', // Will be enhanced with service data
-            package_tier: 'basic',
-            payment_method: 'icp',
-            payment_id: booking.booking_id,
-            transaction_id: `txn_${booking.booking_id}`,
-            created_at: Number(booking.created_at),
-            updated_at: Number(booking.updated_at),
-            ledger_deposit_block: null,
-            delivery_deadline: Number(booking.deadline),
-            special_instructions: booking.description || '',
-            upsells: [],
-            promo_code: undefined
+          const transformedBookings = await Promise.all(canisterBookings.map(async (booking) => {
+            const totalAmountE8s = Number(booking.total_amount_e8s);
+            const totalAmountDollars = (totalAmountE8s / 100000000) * 10; // Convert e8s to dollars (assuming $10 per ICP)
+            const escrowAmountE8s = Math.floor(totalAmountE8s * 0.95);
+            const escrowAmountDollars = (escrowAmountE8s / 100000000) * 10;
+            
+            // Get freelancer email from canister service data
+            const freelancerEmail = await getFreelancerEmailFromService(actor, booking.service_id);
+            console.log(`[DEBUG] Original freelancer_id: ${booking.freelancer_id}, Service result: ${freelancerEmail}`);
+            
+            // Use the email from canister or the original freelancer_id
+            const finalFreelancerEmail = freelancerEmail || booking.freelancer_id;
+            console.log(`[DEBUG] Final freelancer email: ${finalFreelancerEmail}`);
+            
+            return {
+              booking_id: booking.booking_id,
+              client_id: booking.client_id,
+              freelancer_id: finalFreelancerEmail,
+              freelancer_email: finalFreelancerEmail, // Add explicit freelancer_email field
+              package_id: booking.package_id,
+              service_id: booking.service_id,
+              status: booking.status,
+              total_amount_e8s: totalAmountE8s,
+              total_amount_dollars: totalAmountDollars,
+              escrow_amount_e8s: escrowAmountE8s,
+              escrow_amount_dollars: escrowAmountDollars,
+              payment_status: booking.payment_status || 'Completed',
+              client_notes: booking.description || '',
+              service_title: booking.title || 'Service',
+              freelancer_name: finalFreelancerEmail.split('@')[0],
+              package_title: 'Package', // Will be enhanced with service data
+              package_tier: 'basic',
+              payment_method: 'icp',
+              payment_id: booking.booking_id,
+              transaction_id: `txn_${booking.booking_id}`,
+              created_at: Number(booking.created_at),
+              updated_at: Number(booking.updated_at),
+              ledger_deposit_block: null,
+              delivery_deadline: Number(booking.deadline), // Use canister deadline only
+              special_instructions: booking.description || '',
+              upsells: [],
+              promo_code: undefined
+            };
           }));
 
           bookings = transformedBookings;
@@ -199,30 +264,18 @@ export async function GET(request: NextRequest) {
     }
 
 
-    // Fallback 2: Create mock data only for development/demo with specific conditions
+    // No fallbacks - return empty list if no bookings found in canister
     if (bookings.length === 0) {
-      // Only create mock data if the user looks like a test/demo user
-      const isTestUser = userId.includes('test@') || userId.includes('demo@') || userId.includes('example@');
-
-      if (isTestUser) {
-        console.log('📝 Test user detected, creating mock booking for demonstration');
-        const mockBooking = createMockBooking(userId);
-        bookings = [mockBooking];
-        mockBookingsCount = 1;
-        dataSource = 'mock';
-      } else {
-        console.log(`📝 No real bookings found for user ${userId} and not a test user - returning empty list`);
-      }
+      console.log(`📝 No bookings found for user ${userId} in canister - returning empty list`);
     }
   }
 
-  console.log(`📊 Final result: ${bookings.length} bookings (Real: ${realBookingsCount}, Mock: ${mockBookingsCount}, Source: ${dataSource})`);
+  console.log(`📊 Final result: ${bookings.length} bookings (Real: ${realBookingsCount}, Source: ${dataSource})`);
 
   return NextResponse.json({
     success: true,
     data: bookings,
     realBookingsCount,
-    mockBookingsCount,
     dataSource,
     canisterAvailable: dataSource === 'canister',
     environmentConfigured: getMarketplaceConfig().isConfigured

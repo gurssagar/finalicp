@@ -189,7 +189,7 @@ export async function getBookingsForFreelancerFromCanister(freelancerId: string,
   try {
     console.log('🔍 Getting bookings for freelancer from canister:', freelancerId);
     const actor = await getMarketplaceActor();
-    
+
     // Convert status filter to canister format
     let statusVariant: [] | [{ [key: string]: null }] = [];
     if (statusFilter) {
@@ -201,9 +201,9 @@ export async function getBookingsForFreelancerFromCanister(freelancerId: string,
         case 'Cancelled': statusVariant = [{ Cancelled: null }]; break;
       }
     }
-    
+
     const result = await actor.listBookingsForFreelancer(freelancerId, statusVariant, BigInt(limit), BigInt(offset));
-    
+
     if ('ok' in result) {
       console.log('✅ Retrieved bookings from canister:', result.ok.length, 'bookings for freelancer:', freelancerId);
       return result.ok;
@@ -214,5 +214,19 @@ export async function getBookingsForFreelancerFromCanister(freelancerId: string,
   } catch (error) {
     console.error('❌ Error getting bookings for freelancer from canister:', error);
     return [];
+  }
+}
+
+// Get enhanced booking data by booking ID
+export function getEnhancedBookingData(bookingId: string): any {
+  try {
+    // This would typically fetch from the canister or database
+    // For now, return null to indicate that the booking should be fetched from the canister
+    // The calling code should handle the null case appropriately
+    console.log('🔍 getEnhancedBookingData called for booking:', bookingId);
+    return null; // Let the calling code handle fetching from canister
+  } catch (error) {
+    console.error('❌ Error getting enhanced booking data:', error);
+    return null;
   }
 }

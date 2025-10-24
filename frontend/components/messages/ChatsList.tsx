@@ -163,7 +163,7 @@ export function ChatsList({
 
   // Convert booking contacts to display format (simplified user info only)
   const displayBookingContacts = filteredBookingContacts.map(contact => {
-    const clientProfile = contact.profile
+    const clientProfile = (contact as any).profile
 
     // Use real client profile data if available
     const displayName = clientProfile?.displayName || contact.name
@@ -178,7 +178,7 @@ export function ChatsList({
       lastMessage: 'Click to start conversation',
       time: '',
       unread: 0,
-      type: 'client' as const,
+      type: 'chat' as const,
       profile: clientProfile ? {
         location: clientProfile.location,
         bio: clientProfile.bio
@@ -268,7 +268,7 @@ export function ChatsList({
                   {chat.unread}
                 </div>
               )}
-              {chat.type === 'client' && (
+              {chat.type === 'chat' && (chat as any).profile && (
                 <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-green-500 text-white text-xs rounded-full flex items-center justify-center">
                   👤
                 </div>
@@ -284,9 +284,9 @@ export function ChatsList({
               <p className="text-sm text-gray-500 truncate">
                 {chat.lastMessage}
               </p>
-              {chat.type === 'client' && chat.profile && chat.profile.location && (
+              {chat.type === 'chat' && (chat as any).profile && (chat as any).profile.location && (
                 <p className="text-xs text-gray-400 mt-1">
-                  📍 {chat.profile.location}
+                  📍 {(chat as any).profile.location}
                 </p>
               )}
             </div>

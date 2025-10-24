@@ -71,7 +71,7 @@ export async function signupAction(formData: FormData) {
     const validatedData = signupSchema.parse(rawData);
 
     // Check rate limiting
-    const ip = getClientIP();
+    const ip = await getClientIP();
     const rateLimit = checkOTPRateLimit(validatedData.email);
     if (!rateLimit.allowed) {
       return {
@@ -165,7 +165,7 @@ export async function loginAction(formData: FormData) {
     const validatedData = loginSchema.parse(rawData);
 
     // Check rate limiting
-    const ip = getClientIP();
+    const ip = await getClientIP();
     const rateLimit = checkLoginRateLimit(ip);
     if (!rateLimit.allowed) {
       return {

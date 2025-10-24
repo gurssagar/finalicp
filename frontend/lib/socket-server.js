@@ -83,6 +83,20 @@ io.use((socket, next) => {
     return next(new Error("Invalid username"));
   }
 
+  // Reject test/placeholder emails
+  const testEmailPatterns = [
+    'client@example.com',
+    'freelancer@example.com',
+    'test@example.com',
+    'admin@example.com',
+    'user@example.com',
+    'demo@example.com'
+  ];
+
+  if (testEmailPatterns.includes(username.toLowerCase().trim())) {
+    return next(new Error("Test email not allowed"));
+  }
+
   socket.data.username = username.trim();
   console.log(`[Auth] User ${username} attempting connection`);
   next();

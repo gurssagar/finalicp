@@ -4,7 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Eye, Star, Clock, Package, Users, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Header } from '@/components/Header';
-import { Footer } from '@/components/footer';
+import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';

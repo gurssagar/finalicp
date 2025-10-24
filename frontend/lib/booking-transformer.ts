@@ -117,6 +117,15 @@ function convertBigIntToNumber(value: bigint): number {
   return Number(value);
 }
 
+// Convert e8s (ICP smallest unit) to dollars
+function convertE8sToDollars(e8s: number): number {
+  // 1 ICP = 100,000,000 e8s
+  // Assuming 1 ICP = $10 (this should be fetched from a price API in production)
+  const icpPrice = 10; // USD per ICP
+  const icpAmount = e8s / 100000000;
+  return icpAmount * icpPrice;
+}
+
 function convertBigIntTimestamp(timestamp: bigint): number {
   try {
     // Convert BigInt to Number safely
@@ -128,7 +137,18 @@ function convertBigIntTimestamp(timestamp: bigint): number {
       return Date.now();
     }
 
-    const milliseconds = timestampAsNumber * 1000000; // Convert to milliseconds
+    // Check if timestamp is already in milliseconds (if it's a large number)
+    let milliseconds: number;
+    if (timestampAsNumber > 1000000000000) {
+      // Already in milliseconds
+      milliseconds = timestampAsNumber;
+    } else if (timestampAsNumber > 1000000000) {
+      // In seconds, convert to milliseconds
+      milliseconds = timestampAsNumber * 1000;
+    } else {
+      // In nanoseconds, convert to milliseconds
+      milliseconds = timestampAsNumber / 1000000;
+    }
 
     // Handle zero timestamp (returns 1/1/1970) by using current time as fallback
     if (milliseconds === 0) {
@@ -143,13 +163,13 @@ function convertBigIntTimestamp(timestamp: bigint): number {
 
     if (milliseconds < tenYearsAgo || milliseconds > tenYearsFromNow) {
       console.warn('⚠️ Timestamp out of reasonable range, using current time:', {
-        timestamp: milliseconds,
-        readable: new Date(milliseconds).toISOString()
+        originalTimestamp: timestampAsNumber,
+        convertedMilliseconds: milliseconds
       });
       return Date.now();
     }
 
-    return milliseconds;
+    return Math.floor(milliseconds);
   } catch (error) {
     console.error('❌ Error converting BigInt timestamp:', error);
     return Date.now();
@@ -159,6 +179,9 @@ function convertBigIntTimestamp(timestamp: bigint): number {
 // Transform canister booking data to frontend booking interface
 export function transformCanisterBooking(canisterBooking: CanisterBooking): Booking {
   try {
+    const totalAmountE8s = convertBigIntToNumber(canisterBooking.total_amount_e8s);
+    const totalAmountDollars = convertE8sToDollars(totalAmountE8s);
+    
     const transformedBooking: Booking = {
       booking_id: canisterBooking.booking_id,
       client_id: canisterBooking.client_id,
@@ -166,8 +189,10 @@ export function transformCanisterBooking(canisterBooking: CanisterBooking): Book
       package_id: canisterBooking.package_id,
       service_id: canisterBooking.service_id,
       status: transformCanisterStatus(canisterBooking.status),
-      total_amount_e8s: convertBigIntToNumber(canisterBooking.total_amount_e8s),
-      escrow_amount_e8s: Math.floor(convertBigIntToNumber(canisterBooking.total_amount_e8s) * 0.95), // 95% escrow
+      total_amount_e8s: totalAmountE8s,
+      total_amount_dollars: totalAmountDollars,
+      escrow_amount_e8s: Math.floor(totalAmountE8s * 0.95), // 95% escrow
+      escrow_amount_dollars: convertE8sToDollars(Math.floor(totalAmountE8s * 0.95)),
       payment_status: transformCanisterPaymentStatus(canisterBooking.payment_status),
       client_notes: canisterBooking.description || canisterBooking.requirements.join(' '),
       created_at: convertBigIntTimestamp(canisterBooking.created_at),
@@ -229,10 +254,13 @@ export function createMockBooking(userId: string): Booking {
     booking_id: `mock-${timestamp}`,
     client_id: userId,
     freelancer_id: 'demo-freelancer@example.com',
+    package_id: 'demo-package-1',
     service_id: 'demo-service-1',
     status: 'Pending',
     total_amount_e8s: 100000000, // 1 ICP
+    total_amount_dollars: 10, // $10
     escrow_amount_e8s: 95000000, // 0.95 ICP
+    escrow_amount_dollars: 9.5, // $9.50
     payment_status: 'Pending',
     client_notes: 'Demo booking for testing purposes',
     created_at: timestamp,
