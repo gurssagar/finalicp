@@ -172,6 +172,86 @@
       "created_at": 1761129320161000000,
       "updated_at": 1761129320161000000,
       "packages": []
+    },
+    {
+      "service_id": "SVC_LMNOPQRSTUVWXYZ0",
+      "freelancer_email": "akfrjyt@concu.net",
+      "cover_image_url": "",
+      "portfolio_images": [
+        "https://s3.tebi.io/icp-work/portfolio/1761389280550-aw6p9f.png"
+      ],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "packages": [],
+      "client_questions": [],
+      "faqs": [
+        {
+          "id": "oks3n6z",
+          "question": "asjdjasmnd",
+          "answer": "d as dasjdjiaskjdakmsdmasd asd as d asd a s"
+        }
+      ],
+      "created_at": 1761389308792000000,
+      "updated_at": 1761389308792000000
+    },
+    {
+      "service_id": "SVC_QRSTUVWXYZ012345",
+      "freelancer_email": "akfrjyt@concu.net",
+      "cover_image_url": "",
+      "portfolio_images": [
+        "https://s3.tebi.io/icp-work/portfolio/1761391850513-lonel6.png",
+        "https://s3.tebi.io/icp-work/portfolio/1761391850523-rvv4ah.png"
+      ],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "packages": [
+        {
+          "package_id": "package-1761392400817-basic",
+          "tier": "Basic",
+          "title": "dasmdasm dnmasmdnaskndkasmdnasnmdansmnms",
+          "description": "asdansdas da sd as d as da sd as ",
+          "price_e8s": 2832838200000000,
+          "delivery_days": 3,
+          "delivery_timeline": "1-3 days",
+          "features": [],
+          "revisions_included": 1,
+          "status": "Available"
+        },
+        {
+          "package_id": "package-1761392400817-advanced",
+          "tier": "Advanced",
+          "title": "adbnadasnda sdas dashjdhjasdnbasndasd as d",
+          "description": "asdnmasnmdanmsd ma das d as das d a",
+          "price_e8s": 2327300000000,
+          "delivery_days": 7,
+          "delivery_timeline": "1 week",
+          "features": [],
+          "revisions_included": 2,
+          "status": "Available"
+        },
+        {
+          "package_id": "package-1761392400817-premium",
+          "tier": "Premium",
+          "title": "dasdhasd asd as das d as dashjdahjsdna da sd as da sd ",
+          "description": "asdnmasdnmasnmd asd as da sd aas sd asd",
+          "price_e8s": 232737200000000,
+          "delivery_days": 7,
+          "delivery_timeline": "1 week",
+          "features": [],
+          "revisions_included": 3,
+          "status": "Available"
+        }
+      ],
+      "client_questions": [],
+      "faqs": [
+        {
+          "id": "hh7pih4",
+          "question": "dasjdas da sd as d as d asd sa",
+          "answer": "asd sadnmasdanmsdnmasnmdas da sd as d as"
+        }
+      ],
+      "created_at": 1761392407057000000,
+      "updated_at": 1761392407057000000
     }
   ]
 }

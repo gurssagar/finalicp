@@ -4,12 +4,18 @@ import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { useRouter } from 'next/navigation'
 import { CheckCircle } from 'lucide-react'
+import { useUserContext } from '@/contexts/UserContext'
 export function VerificationComplete() {
   const navigate = useRouter()
-  useEffect(() => {
+  const { currentRole } = useUserContext();
+  useEffect(() => { 
     // Redirect to workspace after 5 seconds
     const timer = setTimeout(() => {
-      navigate.push("/dashboard");
+      if (currentRole === 'freelancer') {
+        navigate.push("/freelancer/dashboard");
+      } else {
+        navigate.push("/client/dashboard");
+      }
     }, 5000)
     return () => clearTimeout(timer)
   }, [navigate])

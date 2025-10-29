@@ -16,7 +16,7 @@ const getTebiConfig = () => {
 // Initialize S3 client for Tebi
 const getS3Client = () => {
   const tebiConfig = getTebiConfig()
-  
+
   return new AWS.S3({
     accessKeyId: tebiConfig.accessKeyId,
     secretAccessKey: tebiConfig.secretAccessKey,
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const tebiConfig = getTebiConfig();
-    
+
     // Check if Tebi S3 is properly configured
     if (!tebiConfig.accessKeyId || !tebiConfig.secretAccessKey || !tebiConfig.bucket || !tebiConfig.endpoint) {
       console.error('Tebi S3 configuration missing:', {
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
         endpoint: tebiConfig.endpoint,
         region: tebiConfig.region
       });
-      
+
       return NextResponse.json({
         success: false,
         error: 'Tebi S3 is not configured. Please check your environment variables.'
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     // Convert File to Buffer for AWS SDK v2
     const fileBuffer = await file.arrayBuffer();
-    
+
     // Prepare upload parameters
     const uploadParams = {
       Bucket: tebiConfig.bucket,

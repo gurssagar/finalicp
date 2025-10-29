@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor, handleApiError, validateMarketplaceConfig } from '@/lib/ic-marketplace-agent';
+import { getSession } from '@/lib/auth';
 
 // GET /api/marketplace/services - List services from canister with filters
 export async function GET(request: NextRequest) {
@@ -103,14 +104,26 @@ export async function GET(request: NextRequest) {
 // POST /api/marketplace/services - Create new service
 export async function POST(request: NextRequest) {
   try {
+    // Get logged-in user session for authentication
+    const session = await getSession();
+    let authenticatedUserEmail = '';
+
+    if (session && session.email) {
+      authenticatedUserEmail = session.email;
+      console.log('🔐 Authenticated freelancer:', authenticatedUserEmail);
+    }
+
     const body = await request.json();
     const { userEmail, serviceData } = body;
 
-    if (!userEmail) {
+    // Use authenticated email if available, otherwise use provided userEmail
+    const effectiveUserEmail = authenticatedUserEmail || userEmail;
+
+    if (!effectiveUserEmail) {
       return NextResponse.json({
         success: false,
-        error: 'User email is required'
-      }, { status: 400 });
+        error: 'User email is required. Please log in.'
+      }, { status: 401 });
     }
 
     if (!serviceData) {
@@ -141,9 +154,16 @@ export async function POST(request: NextRequest) {
       startingFromE8s = BigInt(Math.min(...prices));
     }
 
-    // Create service using canister with all the form data
+    // Generate service ID
+    const serviceId = `SVC_${Date.now()}_${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    
+    // Create service using canister with freelancer email
     const actor = await getMarketplaceActor();
-    const serviceResult = await actor.createService(
+    console.log('🔧 Creating service with freelancer:', effectiveUserEmail);
+    
+    const serviceResult = await actor.createServiceForBooking(
+      serviceId,
+      effectiveUserEmail,  // ✅ Pass the authenticated freelancer email here!
       serviceData.title || 'Service Title',
       serviceData.main_category || 'General',
       serviceData.sub_category || 'General',
@@ -162,7 +182,8 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    const serviceId = serviceResult.ok;
+    // Service ID is already set above
+    console.log('✅ Service created with freelancer:', effectiveUserEmail);
     console.log('Service created successfully with ID:', serviceId);
 
     // Create packages if provided
@@ -172,26 +193,40 @@ export async function POST(request: NextRequest) {
       
       for (const pkg of serviceData.packages) {
         try {
+          console.log('Creating package:', {
+            serviceId,
+            title: pkg.title,
+            price_e8s: pkg.price_e8s,
+            delivery_days: pkg.delivery_days,
+            revisions: pkg.revisions_included,
+            features: pkg.features
+          });
+
           const packageResult = await actor.createPackage(
             serviceId,
-            pkg.tier,
             pkg.title,
             pkg.description,
             BigInt(pkg.price_e8s),
             BigInt(pkg.delivery_days),
             pkg.delivery_timeline,
-            pkg.features,
-            BigInt(pkg.revisions_included)
+            BigInt(pkg.revisions_included),
+            pkg.features || []
           );
+
+          console.log('Package creation result:', packageResult);
 
           if ('ok' in packageResult) {
             createdPackages.push({
               package_id: packageResult.ok,
               ...pkg
             });
+            console.log('✅ Package created successfully:', packageResult.ok);
+          } else {
+            console.error('❌ Package creation returned error:', packageResult);
           }
         } catch (packageError) {
-          console.error('Failed to create package:', packageError);
+          console.error('Failed to create package - exception thrown:', packageError);
+          console.error('Package error details:', JSON.stringify(packageError, null, 2));
         }
       }
     }
@@ -239,9 +274,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating service:', error);
+    console.error('Error type:', typeof error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
+    
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error occurred'
+      error: error instanceof Error ? error.message : (typeof error === 'string' ? error : JSON.stringify(error) || 'Unknown error occurred')
     }, { status: 500 });
   }
 }

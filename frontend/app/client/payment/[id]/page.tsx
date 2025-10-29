@@ -226,7 +226,7 @@ export default function PaymentPage() {
   };
 
   // Timeout utility for API calls
-  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 10000) => {
+  const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number = 60000) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 

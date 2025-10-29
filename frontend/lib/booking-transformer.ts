@@ -177,15 +177,66 @@ function convertBigIntTimestamp(timestamp: bigint): number {
 }
 
 // Transform canister booking data to frontend booking interface
-export function transformCanisterBooking(canisterBooking: CanisterBooking): Booking {
+export async function transformCanisterBooking(canisterBooking: CanisterBooking): Promise<Booking> {
   try {
     const totalAmountE8s = convertBigIntToNumber(canisterBooking.total_amount_e8s);
     const totalAmountDollars = convertE8sToDollars(totalAmountE8s);
     
+    // Fetch service data to get the correct freelancer
+    let freelancerId = canisterBooking.freelancer_id;
+    let freelancerName = canisterBooking.freelancer_id;
+    
+    // If freelancer_id is 'anonymous', try to get the real freelancer from service
+    if (freelancerId === 'anonymous' && canisterBooking.service_id) {
+      try {
+        const { getMarketplaceActor } = await import('@/lib/ic-marketplace-agent');
+        const actor = await getMarketplaceActor();
+        const serviceResult = await actor.getService(canisterBooking.service_id);
+        
+        if (serviceResult && serviceResult.length > 0) {
+          const service = serviceResult[0];
+          freelancerId = service.freelancer_id;
+          console.log('✅ Found real freelancer for booking:', freelancerId);
+        } else {
+          // Try to get from local storage
+          const { getAdditionalServiceData } = await import('@/lib/service-storage');
+          const additionalData = getAdditionalServiceData(canisterBooking.service_id);
+          if (additionalData?.freelancer_email) {
+            freelancerId = additionalData.freelancer_email;
+            console.log('✅ Found freelancer from local storage:', freelancerId);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching freelancer for booking:', error);
+      }
+    }
+    
+    // Try to get freelancer name from profile
+    if (freelancerId && freelancerId !== 'anonymous' && freelancerId.includes('@')) {
+      try {
+        const profileResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/user/profile?email=${encodeURIComponent(freelancerId)}`, {
+          next: { revalidate: 300 } // Cache for 5 minutes
+        });
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          if (profileData.success && profileData.user?.profile) {
+            freelancerName = `${profileData.user.profile.firstName || ''} ${profileData.user.profile.lastName || ''}`.trim() || freelancerId;
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error fetching freelancer name:', error);
+      }
+    }
+    
+    // Default to email username if still anonymous
+    if (freelancerName === 'anonymous' || !freelancerName) {
+      freelancerName = freelancerId.includes('@') ? freelancerId.split('@')[0] : freelancerId;
+    }
+    
     const transformedBooking: Booking = {
       booking_id: canisterBooking.booking_id,
       client_id: canisterBooking.client_id,
-      freelancer_id: canisterBooking.freelancer_id,
+      freelancer_id: freelancerId,
       package_id: canisterBooking.package_id,
       service_id: canisterBooking.service_id,
       status: transformCanisterStatus(canisterBooking.status),
@@ -204,9 +255,9 @@ export function transformCanisterBooking(canisterBooking: CanisterBooking): Book
       package_tier: 'basic',
       delivery_deadline: convertBigIntTimestamp(canisterBooking.deadline),
 
-      // Additional fields (set to defaults for now)
+      // Additional fields with fetched data
       special_instructions: canisterBooking.requirements.join(' '),
-      freelancer_name: canisterBooking.freelancer_id.split('@')[0], // Extract name from email
+      freelancer_name: freelancerName,
 
       // Set default values for fields not in canister
       ledger_deposit_block: null,
@@ -225,8 +276,8 @@ export function transformCanisterBooking(canisterBooking: CanisterBooking): Book
 }
 
 // Transform an array of canister bookings
-export function transformCanisterBookings(canisterBookings: CanisterBooking[]): Booking[] {
-  return canisterBookings.map(transformCanisterBooking);
+export async function transformCanisterBookings(canisterBookings: CanisterBooking[]): Promise<Booking[]> {
+  return await Promise.all(canisterBookings.map(booking => transformCanisterBooking(booking)));
 }
 
 // Convert UI status filter to canister status filter

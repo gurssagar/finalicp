@@ -5,8 +5,9 @@ import { Footer } from '@/components/Footer'
 import { ProgressStepper } from '@/components/progress-stepper'
 import { ProfilePreview } from '@/components/ProfilePreview'
 import { useRouter } from 'next/navigation'
-import { User, Globe } from 'lucide-react'
+import { User, Globe, Wallet } from 'lucide-react'
 import { useOnboardingSession as useOnboarding } from '@/hooks/useOnboardingSession'
+import ConnectWallet from '@/components/wallet/ConnectWallet'
 
 export function ProfileSetup() {
   const navigate = useRouter()
@@ -322,6 +323,22 @@ export function ProfileSetup() {
                         placeholder="https://twitter.com/yourusername"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* Wallet Connection */}
+                <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                  <h2 className="text-lg font-semibold text-[#161616] mb-4 flex items-center">
+                    <Wallet size={20} className="mr-2 text-purple-600" />
+                    Wallet Connection
+                  </h2>
+
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Connect your Plug wallet to enable secure escrow payments and receive funds from completed projects.
+                    </p>
+
+                    <ConnectWallet />
                   </div>
                 </div>
 

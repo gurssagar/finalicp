@@ -28,6 +28,20 @@ const idlFactory = ({ IDL }: any) => {
     createServiceForBooking: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
     updateService: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat, IDL.Nat64, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
     deleteService: IDL.Func([IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
+    // Match exact canister return type and order
+    getPackagesByServiceId: IDL.Func([IDL.Text], [IDL.Vec(IDL.Record({
+      delivery_timeline: IDL.Text,
+      features: IDL.Vec(IDL.Text),
+      revisions: IDL.Nat,
+      name: IDL.Text,
+      description: IDL.Text,
+      created_at: IDL.Int,
+      service_id: IDL.Text,
+      is_active: IDL.Bool,
+      price_e8s: IDL.Nat64,
+      delivery_time_days: IDL.Nat,
+      package_id: IDL.Text
+    }))], ['query']),
     getService: IDL.Func([IDL.Text], [IDL.Opt(IDL.Record({
       service_id: IDL.Text,
       freelancer_id: IDL.Text,

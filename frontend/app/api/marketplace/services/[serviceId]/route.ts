@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateMarketplaceConfig, getMarketplaceActor, handleApiError } from '@/lib/ic-marketplace-agent';
+import { getSession } from '@/lib/auth';
 
 // GET /api/marketplace/services/[serviceId] - Get service by ID
 export async function GET(
@@ -70,7 +71,7 @@ export async function GET(
       whats_included: service.whats_included,
       cover_image_url: (additionalData as any).cover_image_url || service.cover_image_url || '',
       portfolio_images: (additionalData as any).portfolio_images || service.portfolio_images || [],
-      status: service.status.Active ? 'Active' : 'Paused',
+      status: service.status && 'Active' in service.status ? 'Active' : (service.status && 'Paused' in service.status ? 'Paused' : 'Deleted'),
       rating_avg: Number(service.total_rating || 0),
       total_orders: Number(service.review_count || 0),
       created_at: Number(service.created_at) / 1000000, // Convert from nanoseconds to milliseconds
@@ -187,19 +188,36 @@ export async function DELETE(
       }, { status: 503 });
     }
 
+    // Get logged-in user from session
+    const session = await getSession();
+    let authenticatedEmail = '';
+    let authenticatedUserId = '';
+
+    if (session && session.email && session.userId) {
+      authenticatedEmail = session.email;
+      authenticatedUserId = session.userId;
+      console.log('🔐 Authenticated user deleting service:', authenticatedEmail);
+    }
+
     const { serviceId } = await params;
     const body = await request.json();
     const { userEmail, userId } = body;
 
-    if (!userEmail || !userId) {
+    // Use authenticated user data if available, otherwise fall back to body
+    const effectiveEmail = authenticatedEmail || userEmail;
+    const effectiveUserId = authenticatedUserId || userId;
+
+    if (!effectiveEmail || !effectiveUserId) {
       return NextResponse.json({
         success: false,
-        error: 'User email and ID are required'
-      }, { status: 400 });
+        error: 'User email and ID are required. Please log in.'
+      }, { status: 401 });
     }
 
+    console.log('🗑️ Deleting service:', serviceId, 'for user:', effectiveEmail);
+
     const actor = await getMarketplaceActor();
-    const result = await actor.deleteService(userId, serviceId);
+    const result = await actor.deleteService(serviceId);
 
     if ('ok' in result) {
       return NextResponse.json({

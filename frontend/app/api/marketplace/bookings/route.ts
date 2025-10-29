@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
 import { getMarketplaceConfig, validateMarketplaceConfig } from '@/lib/marketplace-config';
+import { getSession } from '@/lib/auth';
 
 // Helper function to get freelancer email from canister service data
 async function getFreelancerEmailFromService(actor: any, serviceId: string): Promise<string | null> {
@@ -37,6 +38,7 @@ import {
 } from '@/lib/booking-transformer';
 import { emailsMatch } from '@/lib/email-matching';
 import { getBookingsForClientFromCanister, getBookingsForFreelancerFromCanister } from '@/lib/booking-utils';
+import { enrichBookings } from '@/lib/booking-enrichment';
 
 // Helper function to map payment booking status to marketplace status
 function mapBookingStatus(paymentStatus: string): string {
@@ -123,11 +125,19 @@ export async function GET(request: NextRequest) {
     if ('ok' in result) {
       console.log('✅ Successfully fetched bookings from canister');
       const canisterBookings = result.ok;
-      bookings = transformCanisterBookings(canisterBookings);
+      
+      // Transform canister bookings
+      let transformedBookings = await transformCanisterBookings(canisterBookings);
+      
+      // Enrich bookings with additional data
+      console.log('🔧 Enriching bookings with package details, user names, and payment data...');
+      bookings = await enrichBookings(transformedBookings);
+      
       realBookingsCount = canisterBookings.length;
       dataSource = 'canister';
 
       console.log(`📊 Retrieved ${realBookingsCount} real bookings from marketplace canister for user ${userId}`);
+      console.log(`✅ Enriched ${bookings.length} bookings with complete data`);
     } else {
       throw new Error(`Canister error: ${result.err}`);
     }
@@ -191,10 +201,14 @@ export async function GET(request: NextRequest) {
             };
           }));
 
-          bookings = transformedBookings;
+          // Enrich the transformed bookings
+          console.log('🔧 Enriching fallback bookings...');
+          bookings = await enrichBookings(transformedBookings);
+          
           realBookingsCount = transformedBookings.length;
           dataSource = 'canister';
           console.log(`📊 Retrieved ${realBookingsCount} bookings from canister for user ${userId} (${userType})`);
+          console.log(`✅ Enriched ${bookings.length} fallback bookings`);
           console.log(`📋 Booking IDs found:`, transformedBookings.map(b => b.booking_id));
         } else {
           console.log(`❌ No bookings found for user ${userId} (${userType}) in canister`);
@@ -250,10 +264,14 @@ export async function GET(request: NextRequest) {
             };
           }));
 
-          bookings = transformedBookings;
+          // Enrich the transformed bookings
+          console.log('🔧 Enriching freelancer fallback bookings...');
+          bookings = await enrichBookings(transformedBookings);
+          
           realBookingsCount = transformedBookings.length;
           dataSource = 'canister';
           console.log(`📊 Retrieved ${realBookingsCount} bookings from canister for freelancer ${userId}`);
+          console.log(`✅ Enriched ${bookings.length} freelancer fallback bookings`);
           console.log(`📋 Booking IDs found:`, transformedBookings.map(b => b.booking_id));
         } else {
           console.log(`❌ No bookings found for freelancer ${userId} in canister`);
@@ -295,6 +313,17 @@ export async function POST(request: NextRequest) {
   console.log('🚀 POST /api/marketplace/bookings called');
 
   try {
+    // Get logged-in user session
+    const session = await getSession();
+    let userEmail = '';
+    let userId = '';
+
+    if (session && session.email && session.userId) {
+      userEmail = session.email;
+      userId = session.userId;
+      console.log('🔐 User authenticated:', userEmail);
+    }
+
     const body = await request.json();
     const {
       clientId,
@@ -307,8 +336,14 @@ export async function POST(request: NextRequest) {
       paymentId,
       transactionId
     } = body;
+
+    // Use logged-in user email if available, otherwise fall back to clientId from body
+    const effectiveClientId = userEmail || clientId;
+    const effectiveUserId = userId || clientId;
+
     console.log('📝 Request body:', {
-      clientId,
+      clientId: effectiveClientId,
+      userId: effectiveUserId,
       packageId,
       specialInstructions,
       paymentMethod,
@@ -319,11 +354,11 @@ export async function POST(request: NextRequest) {
       transactionId
     });
 
-    if (!clientId) {
+    if (!effectiveClientId) {
       return NextResponse.json({
         success: false,
-        error: 'Client ID is required'
-      }, { status: 400 });
+        error: 'User email is required. Please log in.'
+      }, { status: 401 });
     }
 
     if (!packageId) {

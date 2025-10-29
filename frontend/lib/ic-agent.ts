@@ -1,6 +1,7 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 import { idlFactory } from './declarations/user/user.did.js';
+import { idlFactory as escrowIdlFactory } from './declarations/escrow/escrow.did.js';
 
 // Type imports from generated declarations
 type _SERVICE = any;
@@ -63,9 +64,11 @@ export interface OTPData {
 // IC Agent configuration
 const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST || 'http://localhost:4943';
 const USER_CANISTER_ID = process.env.NEXT_PUBLIC_USER_CANISTER_ID || '';
+const ESCROW_CANISTER_ID = process.env.NEXT_PUBLIC_ESCROW_CANISTER_ID || '';
 
 let agent: HttpAgent | null = null;
 let userActor: _SERVICE | null = null;
+let escrowActor: _SERVICE | null = null;
 
 export async function getICAgent(): Promise<HttpAgent> {
   if (!agent) {
@@ -177,6 +180,57 @@ export async function getUserActor(): Promise<_SERVICE> {
   return userActor;
 }
 
+export async function getEscrowActor(): Promise<_SERVICE> {
+  if (!escrowActor) {
+    // Validate canister ID before attempting connection
+    if (!ESCROW_CANISTER_ID) {
+      throw new Error('ESCROW_CANISTER_ID environment variable is not configured');
+    }
+
+    try {
+      console.log('Creating escrow actor with canister ID:', ESCROW_CANISTER_ID);
+
+      // Add timeout to actor creation
+      const actorPromise = new Promise<_SERVICE>((resolve, reject) => {
+        try {
+          const principal = Principal.fromText(ESCROW_CANISTER_ID);
+          getICAgent()
+            .then(agent => {
+              const actor = Actor.createActor(escrowIdlFactory, {
+                agent,
+                canisterId: principal,
+              });
+              console.log('Escrow actor created successfully');
+              resolve(actor);
+            })
+            .catch(reject);
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Escrow actor creation timed out')), 15000);
+      });
+
+      escrowActor = await Promise.race([actorPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('Failed to create escrow actor:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // More specific error messages
+      if (errorMessage.includes('Cannot convert text to Principal')) {
+        throw new Error(`Invalid canister ID format: ${ESCROW_CANISTER_ID}. Please check your environment configuration.`);
+      } else if (errorMessage.includes('timed out')) {
+        throw new Error(`Escrow actor creation timed out. The backend service may be temporarily unavailable.`);
+      } else {
+        throw new Error(`Failed to connect to escrow canister: ${errorMessage}`);
+      }
+    }
+  }
+  return escrowActor;
+}
+
 // Helper function to create a real actor with IDL
 export async function createActorWithIDL<T>(
   canisterId: string,
@@ -191,6 +245,9 @@ export async function createActorWithIDL<T>(
 export function validateICConfig(): void {
   if (!process.env.NEXT_PUBLIC_USER_CANISTER_ID) {
     throw new Error('NEXT_PUBLIC_USER_CANISTER_ID environment variable is required');
+  }
+  if (!process.env.NEXT_PUBLIC_ESCROW_CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_ESCROW_CANISTER_ID environment variable is required');
   }
 }
 

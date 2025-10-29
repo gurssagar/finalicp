@@ -204,10 +204,43 @@ export async function POST(request: NextRequest) {
       const sessionServiceData = paymentSession.serviceData || {};
       const sessionPackageData = paymentSession.packageData || {};
 
+      // Fetch the actual service data from the marketplace to get the correct freelancer info
+      let actualFreelancerEmail = sessionServiceData.freelancerEmail;
+      
+      if (!actualFreelancerEmail && paymentSession.serviceId) {
+        try {
+          console.log('🔍 Fetching service data to get freelancer email for service:', paymentSession.serviceId);
+          const actor = await getMarketplaceActor();
+          const serviceResult = await actor.getService(paymentSession.serviceId);
+          
+          if (serviceResult && serviceResult.length > 0) {
+            const canisterService = serviceResult[0];
+            actualFreelancerEmail = canisterService.freelancer_id;
+            console.log('✅ Found freelancer from canister:', actualFreelancerEmail);
+          } else {
+            console.warn('⚠️ Service not found in canister, checking local storage...');
+            // Try to get from service storage as fallback
+            const { getAdditionalServiceData } = await import('@/lib/service-storage');
+            const additionalData = getAdditionalServiceData(paymentSession.serviceId);
+            if (additionalData?.freelancer_email) {
+              actualFreelancerEmail = additionalData.freelancer_email;
+              console.log('✅ Found freelancer from local storage:', actualFreelancerEmail);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error fetching service data:', error);
+        }
+      }
+
+      // If still no freelancer email found, throw an error instead of using client email
+      if (!actualFreelancerEmail) {
+        throw new Error('Freelancer information not found for this service. Please contact support.');
+      }
+
       // Create service data from payment session with fallbacks
       const serviceData = {
         service_id: paymentSession.serviceId,
-        freelancer_email: sessionServiceData.freelancerEmail || paymentSession.clientId, // Use client as freelancer if not specified
+        freelancer_email: actualFreelancerEmail,
         title: sessionServiceData.title || 'Professional Service',
         main_category: sessionServiceData.mainCategory || 'Professional Services',
         sub_category: sessionServiceData.subCategory || 'General',
@@ -261,12 +294,66 @@ export async function POST(request: NextRequest) {
       console.log('  - Calculated deadline:', deliveryDeadline, new Date(deliveryDeadline).toISOString());
       console.log('  - Days difference:', (deliveryDeadline - currentTime) / (24 * 60 * 60 * 1000));
 
+      // Fetch freelancer and client names in parallel with timeout
+      console.log('👤 Fetching user names in parallel...');
+      let freelancerName = serviceData.freelancer_email;
+      let clientName = paymentSession.clientId;
+
+      try {
+        const userFetchPromises = await Promise.allSettled([
+          // Freelancer name fetch with 3 second timeout
+          Promise.race([
+            fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/user/profile?email=${encodeURIComponent(serviceData.freelancer_email)}`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Freelancer fetch timeout')), 3000))
+          ]),
+          // Client name fetch with 3 second timeout  
+          Promise.race([
+            fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/user/profile?email=${encodeURIComponent(paymentSession.clientId)}`),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Client fetch timeout')), 3000))
+          ])
+        ]);
+
+        // Process freelancer result
+        if (userFetchPromises[0].status === 'fulfilled') {
+          const freelancerResponse = userFetchPromises[0].value as Response;
+          if (freelancerResponse.ok) {
+            const userData = await freelancerResponse.json();
+            if (userData.success && userData.user?.profile) {
+              freelancerName = `${userData.user.profile.firstName || ''} ${userData.user.profile.lastName || ''}`.trim() || serviceData.freelancer_email;
+              console.log('✅ Freelancer name found:', freelancerName);
+            }
+          }
+        } else {
+          console.warn('⚠️ Freelancer name fetch failed, using email:', userFetchPromises[0].reason);
+        }
+
+        // Process client result
+        if (userFetchPromises[1].status === 'fulfilled') {
+          const clientResponse = userFetchPromises[1].value as Response;
+          if (clientResponse.ok) {
+            const clientData = await clientResponse.json();
+            if (clientData.success && clientData.user?.profile) {
+              clientName = `${clientData.user.profile.firstName || ''} ${clientData.user.profile.lastName || ''}`.trim() || paymentSession.clientId;
+              console.log('✅ Client name found:', clientName);
+            }
+          }
+        } else {
+          console.warn('⚠️ Client name fetch failed, using email:', userFetchPromises[1].reason);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching user names (non-blocking):', error);
+        // Continue with emails as names - don't block booking creation
+      }
+
       // Enhanced booking data with all payment details
       const bookingData = {
         booking_id: bookingId,
         client_id: paymentSession.clientId,
+        client_name: clientName,
+        client_email: paymentSession.clientId,
         freelancer_id: serviceData.freelancer_email,
-        freelancer_email: serviceData.freelancer_email, // Add explicit freelancer_email field
+        freelancer_email: serviceData.freelancer_email,
+        freelancer_name: freelancerName,
         service_id: serviceData.service_id,
         service_title: serviceData.title,
         package_id: paymentSession.packageId,
@@ -321,21 +408,25 @@ export async function POST(request: NextRequest) {
         time_remaining_hours: Math.floor((deliveryDeadline - currentTime) / (60 * 60 * 1000))
       };
 
-      // Ensure service exists in canister first (pass package data for price)
-      const serviceResult = await ensureServiceExistsInCanister(serviceData, packageData);
+      // Run service and package checks in parallel for better performance
+      console.log('⚡ Running service and package checks in parallel...');
+      const [serviceResult, packageResult] = await Promise.all([
+        ensureServiceExistsInCanister(serviceData, packageData),
+        ensurePackageExistsInCanister(packageData, serviceData.service_id)
+      ]);
+
       if (!serviceResult.success) {
         throw new Error(`Failed to ensure service exists in canister: ${serviceResult.error}`);
       }
       console.log('✅ Service ensured in canister:', serviceResult.serviceId);
 
-      // Ensure package exists in canister
-      const packageResult = await ensurePackageExistsInCanister(packageData, serviceData.service_id);
       if (!packageResult.success) {
         throw new Error(`Failed to ensure package exists in canister: ${packageResult.error}`);
       }
       console.log('✅ Package ensured in canister:', packageResult.packageId);
 
       // Create booking in canister
+      console.log('📝 Creating booking in canister...');
       const canisterResult = await createBookingInCanister(bookingData);
       if (!canisterResult.success) {
         throw new Error(`Failed to create booking in canister: ${canisterResult.error}`);
@@ -377,7 +468,7 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify(marketplaceBookingData),
           },
-          10000 // 10 second timeout
+          20000 // 20 second timeout (increased for canister operations)
         );
 
         if (bookingResponse.ok) {
@@ -459,7 +550,7 @@ export async function POST(request: NextRequest) {
                   }
                 }),
               },
-              8000 // 8 second timeout for chat initiation
+              15000 // 15 second timeout for chat initiation (increased)
             );
 
             if (chatResponse.ok) {

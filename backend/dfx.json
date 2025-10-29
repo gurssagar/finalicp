@@ -34,6 +34,10 @@
     "chat_storage": {
       "type": "motoko",
       "main": "canisters/simple_chat.mo"
+    },
+    "escrow": {
+      "type": "motoko",
+      "main": "canisters/escrow.mo"
     }
   }
 }
