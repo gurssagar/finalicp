@@ -323,31 +323,16 @@ export default function MyServices() {
         'Are you sure you want to delete this service? This action cannot be undone.',
       )
     ) {
-      console.log('🗑️ Delete Service - Current user data:', { userId, userEmail });
-      
-      if (!userId || !userEmail) {
-        console.error('❌ Delete Service - Missing user data:', { userId, userEmail });
-        alert('You must be logged in to delete a service.')
-        return
-      }
+      console.log('🗑️ Delete Service - Initiating deletion for service:', serviceId);
 
       try {
-        console.log('🚀 Delete Service - Making API call:', {
-          serviceId,
-          userEmail,
-          userId
-        });
-
-        // Make actual API call to delete from canister
+        // Make API call to delete from canister
+        // The API will automatically get user info from the session
         const response = await fetch(`/api/marketplace/services/${serviceId}`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userEmail: userEmail,
-            userId: userId
-          })
+          }
         })
 
         const result = await response.json()

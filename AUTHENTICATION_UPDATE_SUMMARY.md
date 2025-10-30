@@ -246,3 +246,4 @@ If you have existing bookings or services with "anonymous" as the user ID, you m
 **Next Action**: Deploy and test the updated canister
 
 
+

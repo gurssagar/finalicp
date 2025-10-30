@@ -188,33 +188,25 @@ export async function DELETE(
       }, { status: 503 });
     }
 
-    // Get logged-in user from session
+    // Get logged-in user from session - REQUIRED for security
     const session = await getSession();
-    let authenticatedEmail = '';
-    let authenticatedUserId = '';
-
-    if (session && session.email && session.userId) {
-      authenticatedEmail = session.email;
-      authenticatedUserId = session.userId;
-      console.log('🔐 Authenticated user deleting service:', authenticatedEmail);
-    }
-
-    const { serviceId } = await params;
-    const body = await request.json();
-    const { userEmail, userId } = body;
-
-    // Use authenticated user data if available, otherwise fall back to body
-    const effectiveEmail = authenticatedEmail || userEmail;
-    const effectiveUserId = authenticatedUserId || userId;
-
-    if (!effectiveEmail || !effectiveUserId) {
+    
+    if (!session || !session.email || !session.userId) {
+      console.error('❌ Delete service failed: User not authenticated');
       return NextResponse.json({
         success: false,
-        error: 'User email and ID are required. Please log in.'
+        error: 'You must be logged in to delete a service. Please log in and try again.'
       }, { status: 401 });
     }
 
-    console.log('🗑️ Deleting service:', serviceId, 'for user:', effectiveEmail);
+    const authenticatedEmail = session.email;
+    const authenticatedUserId = session.userId;
+    
+    console.log('🔐 Authenticated user deleting service:', authenticatedEmail);
+
+    const { serviceId } = await params;
+
+    console.log('🗑️ Deleting service:', serviceId, 'for user:', authenticatedEmail);
 
     const actor = await getMarketplaceActor();
     const result = await actor.deleteService(serviceId);

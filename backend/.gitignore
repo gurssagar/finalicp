@@ -1,6 +1,5 @@
 # DFX build artifacts
 .dfbuild/
-canisters/
 *.dfx
 *.wasm
 *.did

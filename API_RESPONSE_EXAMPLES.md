@@ -463,3 +463,4 @@ curl -X POST http://localhost:3000/api/marketplace/bookings \
 **Note**: All authenticated endpoints now require a valid session cookie (`sid`) or will return a 401 error.
 
 
+
