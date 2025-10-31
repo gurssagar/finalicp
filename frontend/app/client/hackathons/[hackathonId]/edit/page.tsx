@@ -21,13 +21,13 @@ import { HackathonCanister } from '@/lib/hackathon-canister';
 import { Hackathon, CreateHackathonRequest } from '@/lib/hackathon-agent';
 
 interface EditHackathonPageProps {
-  params: {
+  params: Promise<{
     hackathonId: string;
-  };
+  }>;
 }
 
-export default function EditHackathonPage({ params }: EditHackathonPageProps) {
-  const { hackathonId } = params;
+export default async function EditHackathonPage({ params }: EditHackathonPageProps) {
+  const { hackathonId } = await params;
   const router = useRouter();
 
   const [hackathon, setHackathon] = useState<Hackathon | null>(null);

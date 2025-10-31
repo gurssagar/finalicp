@@ -37,6 +37,9 @@ interface OnboardingSessionData {
 
 const SESSION_KEY = 'onboarding_session_data';
 
+// Helper function to check if we're in the browser
+const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
+
 const defaultProfile: ProfileData = {
   firstName: '',
   lastName: '',
@@ -78,6 +81,10 @@ export const onboardingSession = {
   // Load data from session storage
   load: (): OnboardingSessionData => {
     try {
+      if (!isBrowser()) {
+        console.log('🔄 Server-side: using default session data');
+        return defaultSessionData;
+      }
       console.log('🔄 Loading onboarding session data...');
       const sessionData = sessionStorage.getItem(SESSION_KEY);
       if (sessionData) {
@@ -97,6 +104,10 @@ export const onboardingSession = {
   // Save data to session storage
   save: (data: Partial<OnboardingSessionData>): void => {
     try {
+      if (!isBrowser()) {
+        console.log('🔄 Server-side: skipping session storage save');
+        return;
+      }
       const currentData = onboardingSession.load();
       const newData = { ...currentData, ...data };
       console.log('💾 Saving session data:', newData);
@@ -183,6 +194,10 @@ export const onboardingSession = {
 
   // Clear all session data
   clear: (): void => {
+    if (!isBrowser()) {
+      console.log('🔄 Server-side: skipping session storage clear');
+      return;
+    }
     console.log('🗑️ Clearing onboarding session data');
     sessionStorage.removeItem(SESSION_KEY);
   },

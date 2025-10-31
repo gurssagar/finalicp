@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronLeft, CreditCard, Wallet, Bitcoin, Shield, RefreshCw, Headphones } from 'lucide-react';
@@ -27,7 +27,7 @@ interface Package {
   revisions_included: number;
 }
 
-export default function PaymentCreatePage() {
+function PaymentCreateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [service, setService] = useState<Service | null>(null);
@@ -267,5 +267,17 @@ export default function PaymentCreatePage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentCreatePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    }>
+      <PaymentCreateContent />
+    </Suspense>
   );
 }

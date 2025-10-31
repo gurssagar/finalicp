@@ -2,8 +2,9 @@
 
 import { useSearchParams } from 'next/navigation';
 import OTPVerification from '@/components/auth1/OTPVerification';
+import { Suspense } from 'react';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email');
 
@@ -31,4 +32,12 @@ export default function VerifyEmailPage() {
   }
 
   return <OTPVerification email={email} />;
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div></div>}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
 }

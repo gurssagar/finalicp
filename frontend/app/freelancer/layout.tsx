@@ -4,9 +4,6 @@ import { Sidebar } from '@/components/Sidebar'
 import { Header1 } from '@/components/Header1'
 interface FreelancerLayoutProps {
   children: React.ReactNode
-  title?: string
-  showSearch?: boolean
-  showCreateButton?: boolean
 }
 
 export default function FreelancerLayout({

@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -22,7 +22,7 @@ interface BookingData {
   chat_initiated: boolean;
 }
 
-export default function PaymentConfirmPage() {
+function PaymentConfirmContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bookingData, setBookingData] = useState<BookingData | null>(null);
@@ -326,5 +326,17 @@ export default function PaymentConfirmPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentConfirmPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    }>
+      <PaymentConfirmContent />
+    </Suspense>
   );
 }

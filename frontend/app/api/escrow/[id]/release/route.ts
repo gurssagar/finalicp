@@ -58,7 +58,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       // Check escrow status
-      if (escrow.status !== { 'funded': null }) {
+      if (!('funded' in escrow.status)) {
         return NextResponse.json({
           success: false,
           error: 'Escrow must be funded before it can be released',
