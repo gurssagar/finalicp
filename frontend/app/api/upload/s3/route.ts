@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import AWS from 'aws-sdk'
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 
 // Tebi S3 Configuration
 const getTebiConfig = () => {
@@ -16,13 +16,14 @@ const getTebiConfig = () => {
 const getS3Client = () => {
   const tebiConfig = getTebiConfig()
 
-  return new AWS.S3({
-    accessKeyId: tebiConfig.accessKeyId,
-    secretAccessKey: tebiConfig.secretAccessKey,
+  return new S3Client({
+    credentials: {
+      accessKeyId: tebiConfig.accessKeyId,
+      secretAccessKey: tebiConfig.secretAccessKey,
+    },
     region: tebiConfig.region,
     endpoint: tebiConfig.endpoint,
-    s3ForcePathStyle: true, // Required for some S3-compatible services
-    signatureVersion: 'v4'
+    forcePathStyle: true, // Required for some S3-compatible services
   })
 }
 
@@ -90,7 +91,7 @@ export async function POST(request: NextRequest) {
     const randomString = Math.random().toString(36).substring(2, 8)
     const key = `${folder}/${timestamp}-${randomString}.${fileExtension}`
 
-    // Convert File to Buffer for AWS SDK v2
+    // Convert File to Buffer for AWS SDK v3
     const fileBuffer = await file.arrayBuffer()
 
     // Prepare upload parameters
@@ -109,7 +110,8 @@ export async function POST(request: NextRequest) {
     // Upload to Tebi S3
     console.log('Uploading to Tebi S3:', { bucket: tebiConfig.bucket, key, fileSize: file.size })
     const s3 = getS3Client()
-    const result = await s3.upload(uploadParams).promise()
+    const command = new PutObjectCommand(uploadParams)
+    await s3.send(command)
     console.log('Upload successful to Tebi S3')
 
     // Return the public URL

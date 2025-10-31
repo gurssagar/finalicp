@@ -26,8 +26,9 @@
     "test:ci": "npm run test:api && npm run test:integration && npm run test:performance"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.910.0",
-    "@aws-sdk/lib-storage": "^3.911.0",
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@aws-sdk/lib-storage": "^3.922.0",
+    "@aws-sdk/s3-request-presigner": "^3.922.0",
     "@dfinity/agent": "^0.20.0",
     "@dfinity/candid": "^0.20.0",
     "@dfinity/principal": "^0.20.0",
@@ -40,7 +41,6 @@
     "@uiw/react-markdown-preview": "^5.1.5",
     "@uiw/react-md-editor": "^4.0.8",
     "argon2": "^0.40.1",
-    "aws-sdk": "^2.1691.0",
     "axios": "^1.12.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

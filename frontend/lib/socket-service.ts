@@ -1,9 +1,17 @@
 'use client'
 
-import { io, Socket } from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 
 // Socket.IO configuration
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000'
+
+// Lazy load socket.io-client to avoid server-side import issues
+let io: any = null
+if (typeof window !== 'undefined') {
+  import('socket.io-client').then((module) => {
+    io = module.io
+  })
+}
 
 export interface ChatMessage {
   id: string
@@ -48,7 +56,7 @@ class SocketService {
 
   // Initialize socket connection
   connect(userEmail: string): Promise<boolean> {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       this.userEmail = userEmail
 
       // Don't reconnect if already connected
@@ -75,6 +83,16 @@ class SocketService {
       }
 
       try {
+        // Ensure io is loaded
+        if (!io && typeof window !== 'undefined') {
+          const module = await import('socket.io-client')
+          io = module.io
+        }
+
+        if (!io) {
+          throw new Error('Socket.io client not available')
+        }
+
         console.log(`[Socket] Creating new connection for ${userEmail}`)
         this.socket = io(SOCKET_URL, {
           auth: {
@@ -84,6 +102,10 @@ class SocketService {
           timeout: 10000,
           forceNew: true
         })
+
+        if (!this.socket) {
+          throw new Error('Failed to create socket')
+        }
 
         this.setupEventListeners()
 

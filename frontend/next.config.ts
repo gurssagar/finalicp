@@ -64,12 +64,15 @@ const nextConfig: NextConfig = {
         buffer: false,
         process: false,
       };
+      
+      // Exclude Node.js specific modules from client bundle
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'ws': false,
+        'bufferutil': false,
+        'utf-8-validate': false,
+      };
     }
-    
-    // Add module resolution fixes for React Server Components
-    config.resolve.alias = {
-      ...config.resolve.alias,
-    };
     
     return config;
   },

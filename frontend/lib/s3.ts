@@ -1,4 +1,5 @@
-import AWS from 'aws-sdk';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
 
 interface S3Config {
@@ -23,7 +24,7 @@ interface UploadResult {
 }
 
 class S3Service {
-  private s3: AWS.S3;
+  private s3: S3Client;
   private config: S3Config;
 
   constructor() {
@@ -34,9 +35,11 @@ class S3Service {
       bucket: process.env.AWS_S3_BUCKET || '',
     };
 
-    this.s3 = new AWS.S3({
-      accessKeyId: this.config.accessKeyId,
-      secretAccessKey: this.config.secretAccessKey,
+    this.s3 = new S3Client({
+      credentials: {
+        accessKeyId: this.config.accessKeyId,
+        secretAccessKey: this.config.secretAccessKey,
+      },
       region: this.config.region,
     });
   }
@@ -70,24 +73,28 @@ class S3Service {
 
       const key = this.generateKey(options.filename, options.folder);
       
-      const uploadParams: AWS.S3.PutObjectRequest = {
+      const uploadParams = {
         Bucket: this.config.bucket,
         Key: key,
         Body: options.file,
         ContentType: options.contentType,
-        ACL: 'public-read', // Make files publicly accessible
+        ACL: 'public-read' as const, // Make files publicly accessible
         Metadata: {
           'original-filename': options.filename,
           'upload-timestamp': new Date().toISOString(),
         },
       };
 
-      const result = await this.s3.upload(uploadParams).promise();
+      const command = new PutObjectCommand(uploadParams);
+      await this.s3.send(command);
+      
+      // Construct the URL manually
+      const url = `https://${this.config.bucket}.s3.${this.config.region}.amazonaws.com/${key}`;
       
       return {
         success: true,
-        url: result.Location,
-        key: result.Key,
+        url: url,
+        key: key,
       };
     } catch (error) {
       console.error('S3 upload error:', error);
@@ -163,12 +170,13 @@ class S3Service {
     try {
       this.validateConfig();
 
-      const deleteParams: AWS.S3.DeleteObjectRequest = {
+      const deleteParams = {
         Bucket: this.config.bucket,
         Key: key,
       };
 
-      await this.s3.deleteObject(deleteParams).promise();
+      const command = new DeleteObjectCommand(deleteParams);
+      await this.s3.send(command);
       return true;
     } catch (error) {
       console.error('S3 delete error:', error);
@@ -180,11 +188,12 @@ class S3Service {
     try {
       this.validateConfig();
 
-      const url = this.s3.getSignedUrl('getObject', {
+      const command = new GetObjectCommand({
         Bucket: this.config.bucket,
         Key: key,
-        Expires: expiresIn,
       });
+
+      const url = await getSignedUrl(this.s3, command, { expiresIn });
 
       return url;
     } catch (error) {

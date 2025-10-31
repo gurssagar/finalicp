@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/actions/auth';
-import AWS from 'aws-sdk';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 
 // Tebi S3 Configuration
 const getTebiConfig = () => {
@@ -17,13 +17,14 @@ const getTebiConfig = () => {
 const getS3Client = () => {
   const tebiConfig = getTebiConfig()
 
-  return new AWS.S3({
-    accessKeyId: tebiConfig.accessKeyId,
-    secretAccessKey: tebiConfig.secretAccessKey,
+  return new S3Client({
+    credentials: {
+      accessKeyId: tebiConfig.accessKeyId,
+      secretAccessKey: tebiConfig.secretAccessKey,
+    },
     region: tebiConfig.region,
     endpoint: tebiConfig.endpoint,
-    s3ForcePathStyle: true, // Required for some S3-compatible services
-    signatureVersion: 'v4'
+    forcePathStyle: true, // Required for some S3-compatible services
   })
 }
 
@@ -70,7 +71,8 @@ async function uploadToTebi(file: File, fileName: string): Promise<{ url: string
     // Upload to Tebi S3
     console.log('Uploading resume to Tebi S3:', { bucket: tebiConfig.bucket, key, fileSize: file.size });
     const s3 = getS3Client();
-    const result = await s3.upload(uploadParams).promise();
+    const command = new PutObjectCommand(uploadParams);
+    await s3.send(command);
     console.log('Resume upload successful to Tebi S3');
 
     // Return the public URL
