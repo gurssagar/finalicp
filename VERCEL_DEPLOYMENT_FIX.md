@@ -28,7 +28,15 @@
 - Required because `next.config.ts` needs TypeScript at build time
 - Vercel now installs TypeScript as part of production dependencies
 
-### 4. ✅ Configuration Improvements
+### 4. ✅ Tailwind CSS Not Found Error
+**Problem:** `Cannot find module 'tailwindcss'` during webpack build on Vercel.
+
+**Solution:**
+- Moved `tailwindcss`, `postcss`, and `autoprefixer` to `dependencies`
+- Required at build time for CSS processing
+- These tools are needed by Next.js webpack during the build process
+
+### 5. ✅ Configuration Improvements
 **Added:**
 - `vercel.json` configuration file with proper settings
 - Node.js version specification in `package.json` (engines field)
@@ -38,7 +46,9 @@
 
 1. **`frontend/package.json`**
    - Updated React versions (19 → 18.3.1)
-   - Moved TypeScript from devDependencies to dependencies
+   - Moved build-time dependencies to `dependencies`:
+     - TypeScript (required for `next.config.ts`)
+     - Tailwind CSS, PostCSS, Autoprefixer (required for CSS processing)
    - Added engines field for Node.js version control
 
 2. **`frontend/middleware.ts`**
@@ -101,9 +111,20 @@ After deployment, check:
 
 ## What Was The Problem?
 
-The `MIDDLEWARE_INVOCATION_FAILED` error was caused by:
-1. Explicit runtime declaration conflicting with Next.js 15's automatic Edge Runtime
-2. Potential unhandled errors in middleware execution
+### Root Cause Analysis
+
+1. **React Version Conflict:**
+   - `rc-geographic` requires React 18.x
+   - Project was using React 19, causing peer dependency errors
+
+2. **Middleware Error:**
+   - Explicit runtime declaration conflicting with Next.js 15's automatic Edge Runtime
+   - Potential unhandled errors in middleware execution
+
+3. **Missing Build Dependencies:**
+   - Vercel only installs `dependencies` by default, not `devDependencies`
+   - TypeScript, Tailwind CSS, PostCSS, and Autoprefixer are **required at build time**
+   - These must be in `dependencies` for Vercel deployments
 
 ## Testing Locally
 
@@ -125,7 +146,18 @@ Visit `http://localhost:3000` and test:
 - **React Version:** Now using React 18.3.1 (stable, compatible with all dependencies)
 - **Next.js Version:** 15.5.4 (latest)
 - **Middleware:** Runs on Edge Runtime by default in Next.js 15
-- **Build Time:** ~12-13 seconds locally
+- **Build Time:** ~5-6 seconds locally
+
+### Build Dependencies Now in Production
+
+The following packages were moved from `devDependencies` to `dependencies` because they're **required at build time on Vercel**:
+
+- `typescript` - Required for `next.config.ts`
+- `tailwindcss` - Required for CSS processing during build
+- `postcss` - Required by Next.js webpack for CSS
+- `autoprefixer` - Required for CSS vendor prefixing
+
+**Why?** Vercel's default behavior is to only install production dependencies (`dependencies`) during the build. Development dependencies (`devDependencies`) are skipped. Since these tools are needed to compile the application, they must be in `dependencies`.
 
 ## Support
 
