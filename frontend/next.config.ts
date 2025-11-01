@@ -1,18 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Disable Turbopack for stability (can be re-enabled later)
-  experimental: {
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
-  },
-  
   // Add transpilePackages for better compatibility
   transpilePackages: ['@dfinity/agent', '@dfinity/principal', '@dfinity/candid'],
   
