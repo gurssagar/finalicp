@@ -20,7 +20,15 @@
 - Improved matcher pattern to exclude more static files
 - Removed deprecated `experimental.turbo` config
 
-### 3. ✅ Configuration Improvements
+### 3. ✅ TypeScript Not Found Error
+**Problem:** `Cannot find module 'typescript'` during build on Vercel.
+
+**Solution:**
+- Moved TypeScript from `devDependencies` to `dependencies`
+- Required because `next.config.ts` needs TypeScript at build time
+- Vercel now installs TypeScript as part of production dependencies
+
+### 4. ✅ Configuration Improvements
 **Added:**
 - `vercel.json` configuration file with proper settings
 - Node.js version specification in `package.json` (engines field)
@@ -29,7 +37,8 @@
 ## Files Modified
 
 1. **`frontend/package.json`**
-   - Updated React versions
+   - Updated React versions (19 → 18.3.1)
+   - Moved TypeScript from devDependencies to dependencies
    - Added engines field for Node.js version control
 
 2. **`frontend/middleware.ts`**
