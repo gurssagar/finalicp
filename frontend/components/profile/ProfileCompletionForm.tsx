@@ -61,7 +61,7 @@ export default function ProfileCompletionForm() {
       if (result.success) {
         setSuccess('Profile completed successfully!');
         setTimeout(() => {
-          router.push('/dashboard');
+          router.push('/freelancer/dashboard');
         }, 1500);
       } else {
         setError(result.error || 'Failed to complete profile');
