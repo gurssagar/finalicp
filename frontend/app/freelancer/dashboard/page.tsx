@@ -1,82 +1,274 @@
 'use client'
-import React from 'react'
-import { Header1 } from '@/components/Header1'
+import React, { useState, useEffect } from 'react'
 import ProfileStatus from '@/components/ProfileStatus'
-import Link from 'next/link';
-import { BarChart2, Check, Clock, Plus } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { Check, Clock, Plus } from 'lucide-react'
+import { useBookings } from '@/hooks/useMarketplace'
+import { getCurrentSession } from '@/lib/actions/auth'
+
 export default function DashboardHome() {
-  const metrics = [
+  const router = useRouter()
+  const [userId, setUserId] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [metrics, setMetrics] = useState([
     {
       title: 'Total Earnings',
-      value: '$17,500.90',
-      change: '+12.5%',
+      value: '$0.00',
+      change: '+0%',
       subtitle: 'USD EQUIVALENT',
       icon: '$',
     },
     {
       title: 'Active Projects',
-      value: '5',
-      change: '+12.5%',
+      value: '0',
+      change: '+0%',
       subtitle: 'IN PROGRESS',
       icon: '📄',
     },
     {
       title: 'Completed',
-      value: '98.5%',
-      change: '+12.5%',
+      value: '0%',
+      change: '+0%',
       subtitle: 'PROJECTS FINISHED',
       icon: '✓',
     },
     {
       title: 'Success Rate',
-      value: '100%',
-      change: '+12.5%',
+      value: '0%',
+      change: '+0%',
       subtitle: 'CLIENT SATISFACTION',
       icon: '📈',
     },
-  ]
-  const recentProjects = [
-    {
-      id: 1,
-      title: 'Payment for DeFi Dashboard project',
-      amount: '+1250 ICP',
-      status: 'Completed',
-      from: 'client@example.com',
-      date: 'Jan 15, 2024 16:00',
-    },
-    {
-      id: 2,
-      title: 'Payment for DeFi Dashboard project',
-      amount: '+455 ICP',
-      status: 'Completed',
-      from: 'client@example.com',
-      date: 'Jan 15, 2024 16:00',
-    },
-    {
-      id: 3,
-      title: 'Payment for DeFi Dashboard project',
-      amount: '+1335 ICP',
-      status: 'Completed',
-      from: 'client@example.com',
-      date: 'Jan 15, 2024 16:00',
-    },
-    {
-      id: 4,
-      title: 'Payment for DeFi Dashboard project',
-      amount: '+1250 ICP',
-      status: 'Completed',
-      from: 'client@example.com',
-      date: 'Jan 15, 2024 16:00',
-    },
-  ]
+  ])
+  const [recentProjects, setRecentProjects] = useState<any[]>([])
+
+  // Get user session
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const session = await getCurrentSession()
+        if (session?.email) {
+          setUserId(session.email)
+        } else {
+          router.push('/login')
+        }
+      } catch (error) {
+        console.error('Error fetching session:', error)
+        router.push('/login')
+      }
+    }
+    fetchSession()
+  }, [router])
+
+  // Fetch bookings for freelancer
+  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings(
+    userId,
+    'freelancer'
+  )
+
+  // Log bookings data when it changes
+  useEffect(() => {
+    if (userId) {
+      console.log('🔍 Dashboard - Fetching bookings for freelancer:', userId)
+    }
+  }, [userId])
+
+  useEffect(() => {
+    console.log('📊 Dashboard - Bookings data received:', {
+      bookingsCount: bookings?.length || 0,
+      bookings: bookings,
+      loading: bookingsLoading,
+      error: bookingsError,
+      userId: userId
+    })
+    
+    if (bookingsError) {
+      console.error('❌ Dashboard - Error fetching bookings:', bookingsError)
+    }
+  }, [bookings, bookingsLoading, bookingsError, userId])
+
+  // Calculate metrics from bookings
+  useEffect(() => {
+    if (!bookings || bookings.length === 0) {
+      console.log('⚠️ Dashboard - No bookings found for freelancer:', userId)
+      setMetrics([
+        {
+          title: 'Total Earnings',
+          value: '$0.00',
+          change: '+0%',
+          subtitle: 'USD EQUIVALENT',
+          icon: '$',
+        },
+        {
+          title: 'Active Projects',
+          value: '0',
+          change: '+0%',
+          subtitle: 'IN PROGRESS',
+          icon: '📄',
+        },
+        {
+          title: 'Completed',
+          value: '0%',
+          change: '+0%',
+          subtitle: 'PROJECTS FINISHED',
+          icon: '✓',
+        },
+        {
+          title: 'Success Rate',
+          value: '0%',
+          change: '+0%',
+          subtitle: 'CLIENT SATISFACTION',
+          icon: '📈',
+        },
+      ])
+      setRecentProjects([])
+      setLoading(false)
+      return
+    }
+
+    console.log('📈 Dashboard - Calculating metrics from bookings:', {
+      totalBookings: bookings.length,
+      bookings: bookings.map(b => ({
+        booking_id: b.booking_id,
+        status: b.status,
+        total_amount_e8s: b.total_amount_e8s,
+        escrow_amount_e8s: b.escrow_amount_e8s,
+        client_id: b.client_id,
+        freelancer_id: b.freelancer_id,
+        created_at: b.created_at
+      }))
+    })
+
+    // Calculate statistics from bookings
+    let totalEarnings = 0
+    let activeProjects = 0
+    let completedProjects = 0
+    let totalProjects = 0
+
+    bookings.forEach(booking => {
+      // Convert e8s to ICP, then to USD (assuming $10 per ICP)
+      const amountE8s = Number(booking.total_amount_e8s || booking.escrow_amount_e8s || 0)
+      const amountICP = amountE8s / 100000000
+      const amountUSD = amountICP * 10 // Assuming $10 per ICP
+
+      // Total earnings (completed bookings only)
+      if (booking.status === 'Completed') {
+        totalEarnings += amountUSD
+        completedProjects++
+      }
+
+      // Active projects
+      if (booking.status === 'Active' || booking.status === 'InProgress') {
+        activeProjects++
+      }
+
+      // Count total projects (excluding cancelled)
+      if (booking.status !== 'Cancelled') {
+        totalProjects++
+      }
+    })
+
+    // Calculate completion rate
+    const completionRate = totalProjects > 0 
+      ? Math.round((completedProjects / totalProjects) * 100) 
+      : 0
+
+    // Success rate (completed vs total, excluding cancelled)
+    const cancelledCount = bookings.filter(b => b.status === 'Cancelled').length
+    const validProjects = totalProjects || 1 // Avoid division by zero
+    const successRate = Math.round((completedProjects / validProjects) * 100)
+
+    console.log('📊 Dashboard - Calculated metrics:', {
+      totalEarnings,
+      activeProjects,
+      completedProjects,
+      totalProjects,
+      cancelledCount,
+      completionRate,
+      successRate
+    })
+
+    // Update metrics
+    setMetrics([
+      {
+        title: 'Total Earnings',
+        value: `$${totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        change: '+0%', // TODO: Calculate from previous period
+        subtitle: 'USD EQUIVALENT',
+        icon: '$',
+      },
+      {
+        title: 'Active Projects',
+        value: activeProjects.toString(),
+        change: '+0%', // TODO: Calculate from previous period
+        subtitle: 'IN PROGRESS',
+        icon: '📄',
+      },
+      {
+        title: 'Completed',
+        value: `${completionRate}%`,
+        change: '+0%', // TODO: Calculate from previous period
+        subtitle: 'PROJECTS FINISHED',
+        icon: '✓',
+      },
+      {
+        title: 'Success Rate',
+        value: `${successRate}%`,
+        change: '+0%', // TODO: Calculate from previous period
+        subtitle: 'CLIENT SATISFACTION',
+        icon: '📈',
+      },
+    ])
+
+    // Transform recent bookings to recent projects
+    console.log('🔄 Dashboard - Transforming bookings to projects...')
+    const transformedProjects = bookings
+      .sort((a, b) => Number(b.created_at) - Number(a.created_at)) // Sort by most recent
+      .slice(0, 4) // Get top 4 most recent
+      .map(booking => {
+        const amountE8s = Number(booking.total_amount_e8s || booking.escrow_amount_e8s || 0)
+        const amountICP = amountE8s / 100000000
+        const createdDate = new Date(Number(booking.created_at) / 1000000)
+        
+        return {
+          id: booking.booking_id,
+          title: (booking as any).service_title || (booking as any).package_title || 'Project',
+          amount: `+${amountICP.toFixed(2)} ICP`,
+          status: booking.status === 'Completed' ? 'Completed' : 
+                  booking.status === 'Active' || booking.status === 'InProgress' ? 'Active' : 
+                  booking.status,
+          from: (booking as any).client_name || booking.client_id || 'client@example.com',
+          date: createdDate.toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }),
+        }
+      })
+
+    console.log('✅ Dashboard - Transformed projects:', transformedProjects)
+    console.log('✅ Dashboard - Final metrics:', metrics)
+    
+    setRecentProjects(transformedProjects)
+    setLoading(false)
+  }, [bookings])
+
+  // Show loading state
+  if (loading || bookingsLoading || !userId) {
+    return (
+      <div className="flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
+  }
   return (
-    <div className="flex min-h-screen bg-white">
-      {/* Sidebar */}
-     
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-       
-        <main className="flex-1 p-6">
+    <div className="p-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
             <div>
               <h1 className="text-2xl font-bold mb-1">Browse Projects</h1>
@@ -246,33 +438,53 @@ export default function DashboardHome() {
                 </button>
               </div>
               <div className="space-y-4">
-                {recentProjects.map((project) => (
-                  <div
-                    key={project.id}
-                    className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm flex"
-                  >
-                    <div className="mr-4 bg-green-500 rounded-lg w-12 h-12 flex items-center justify-center text-white">
-                      <Check size={20} />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium">{project.title}</h3>
-                      <div className="text-xs text-gray-500">
-                        From: {project.from}
+                {recentProjects.length > 0 ? (
+                  recentProjects.map((project) => (
+                    <div
+                      key={project.id}
+                      className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm flex"
+                    >
+                      <div className={`mr-4 rounded-lg w-12 h-12 flex items-center justify-center text-white ${
+                        project.status === 'Completed' ? 'bg-green-500' :
+                        project.status === 'Active' || project.status === 'InProgress' ? 'bg-blue-500' :
+                        'bg-gray-500'
+                      }`}>
+                        <Check size={20} />
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <div className="flex items-center text-green-500">
-                        <span>{project.amount}</span>
-                        <div className="ml-2 bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded">
-                          {project.status}
+                      <div className="flex-1">
+                        <h3 className="font-medium">{project.title}</h3>
+                        <div className="text-xs text-gray-500">
+                          From: {project.from}
                         </div>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {project.date}
+                      <div className="flex flex-col items-end">
+                        <div className="flex items-center text-green-500">
+                          <span>{project.amount}</span>
+                          <div className={`ml-2 text-xs px-2 py-0.5 rounded ${
+                            project.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                            project.status === 'Active' || project.status === 'InProgress' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {project.status}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {project.date}
+                        </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="bg-white border border-gray-100 rounded-lg p-8 text-center">
+                    <p className="text-gray-500">No projects yet. Start by creating a service!</p>
+                    <Link href="/freelancer/add-service">
+                      <button className="mt-4 flex items-center gap-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-lg mx-auto">
+                        <Plus size={16} />
+                        <span>Create Your First Service</span>
+                      </button>
+                    </Link>
                   </div>
-                ))}
+                )}
               </div>
             </div>
             <div>
@@ -339,8 +551,6 @@ export default function DashboardHome() {
               </div>
             </div>
           </div>
-        </main>
-      </div>
     </div>
   )
 }
