@@ -177,11 +177,33 @@ export function useUpdateService() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateService = useCallback(async (userEmail: string, serviceId: string, updates: UpdateServiceData) => {
+  const updateService = useCallback(async (userEmail: string, serviceId: string, updates: UpdateServiceData, userId?: string) => {
     setLoading(true);
     setError(null);
 
     try {
+      // If userId is not provided, try to get it from session
+      let effectiveUserId = userId;
+      if (!effectiveUserId) {
+        try {
+          const sessionResponse = await fetch('/api/auth/session');
+          const sessionData = await sessionResponse.json();
+          if (sessionData.success && sessionData.session?.userId) {
+            effectiveUserId = sessionData.session.userId;
+          } else if (sessionData.success && sessionData.session?.email) {
+            // Fallback: use email as userId if no userId in session
+            effectiveUserId = sessionData.session.email;
+          }
+        } catch (sessionError) {
+          console.warn('Could not fetch userId from session:', sessionError);
+        }
+      }
+
+      // If still no userId, use email as fallback
+      if (!effectiveUserId) {
+        effectiveUserId = userEmail;
+      }
+
       const response = await fetch(`/api/marketplace/services/${serviceId}`, {
         method: 'PUT',
         headers: {
@@ -189,6 +211,7 @@ export function useUpdateService() {
         },
         body: JSON.stringify({
           userEmail,
+          userId: effectiveUserId,
           updates,
         }),
       });

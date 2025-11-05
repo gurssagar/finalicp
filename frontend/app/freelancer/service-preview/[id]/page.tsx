@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Eye, Star, Clock, Package, Users, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -219,8 +218,6 @@ export default function ServicePreviewPage({}: ServicePreviewPageProps) {
 
   return (
     <div className="min-h-screen bg-white">
-      <Header />
-
       {/* Notification */}
       {notification && (
         <div className="fixed top-4 right-4 z-50 max-w-sm">
