@@ -15,13 +15,27 @@ export default function ServiceDetails() {
   const [loading, setLoading] = useState(true);
   const [bookingNotes, setBookingNotes] = useState('');
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [freelancerProfile, setFreelancerProfile] = useState<any>(null);
+  const [activeBookingsCount, setActiveBookingsCount] = useState<number>(0);
 
   // Fetch current user session
   useEffect(() => {
     const fetchUserSession = async () => {
       try {
         const response = await fetch('/api/auth/session');
-        const data = await response.json();
+        
+        if (!response.ok) {
+          console.warn('Session API returned error:', response.status);
+          return;
+        }
+
+        const text = await response.text();
+        if (!text || text.trim() === '') {
+          console.warn('Empty response from session API');
+          return;
+        }
+
+        const data = JSON.parse(text);
 
         if (data.success && data.session && data.session.email) {
           setCurrentUserEmail(data.session.email);
@@ -42,10 +56,30 @@ export default function ServiceDetails() {
     const fetchService = async () => {
       try {
         const response = await fetch(`/api/marketplace/services/${id}`);
-        const data = await response.json();
+        
+        if (!response.ok) {
+          console.error('Service API returned error:', response.status);
+          setLoading(false);
+          return;
+        }
+
+        const text = await response.text();
+        if (!text || text.trim() === '') {
+          console.error('Empty response from service API');
+          setLoading(false);
+          return;
+        }
+
+        const data = JSON.parse(text);
 
         if (data.success) {
           setService(data.data);
+          
+          // Fetch freelancer profile data
+          if (data.data.freelancer_email) {
+            fetchFreelancerProfile(data.data.freelancer_email);
+            fetchActiveBookingsCount(data.data.freelancer_email);
+          }
         } else {
           console.error('Failed to fetch service:', data.error);
         }
@@ -60,6 +94,106 @@ export default function ServiceDetails() {
       fetchService();
     }
   }, [id]);
+
+  // Fetch freelancer profile data
+  const fetchFreelancerProfile = async (email: string) => {
+    try {
+      const response = await fetch(`/api/user/profile?email=${encodeURIComponent(email)}`);
+      
+      if (!response.ok) {
+        console.warn('Profile API returned error:', response.status);
+        return;
+      }
+
+      const text = await response.text();
+      if (!text || text.trim() === '') {
+        console.warn('Empty response from profile API');
+        return;
+      }
+
+      const data = JSON.parse(text);
+
+      if (data.success && data.data) {
+        setFreelancerProfile(data.data);
+      } else {
+        console.warn('Failed to fetch freelancer profile:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching freelancer profile:', error);
+    }
+  };
+
+  // Fetch active bookings count for freelancer
+  const fetchActiveBookingsCount = async (freelancerEmail: string) => {
+    try {
+      // Use correct API parameters: user_id and user_type
+      const response = await fetch(
+        `/api/marketplace/bookings?user_id=${encodeURIComponent(freelancerEmail)}&user_type=freelancer&status=Active`
+      );
+      
+      if (!response.ok) {
+        console.warn('Bookings API returned error:', response.status);
+        // Try to fetch all bookings as fallback
+        try {
+          const allBookingsResponse = await fetch(
+            `/api/marketplace/bookings?user_id=${encodeURIComponent(freelancerEmail)}&user_type=freelancer`
+          );
+          
+          if (allBookingsResponse.ok) {
+            const text = await allBookingsResponse.text();
+            if (text && text.trim() !== '') {
+              const allBookingsData = JSON.parse(text);
+              if (allBookingsData.success && allBookingsData.data) {
+                const activeCount = allBookingsData.data.filter((b: any) => 
+                  b.status === 'Active' || b.status === 'InProgress' || b.status === 'Pending'
+                ).length;
+                setActiveBookingsCount(activeCount);
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error('Error in fallback bookings fetch:', fallbackError);
+        }
+        return;
+      }
+
+      const text = await response.text();
+      if (!text || text.trim() === '') {
+        console.warn('Empty response from bookings API');
+        return;
+      }
+
+      const data = JSON.parse(text);
+
+      if (data.success && data.data) {
+        setActiveBookingsCount(data.data.length || 0);
+      } else {
+        // If API fails, try to count from all bookings
+        try {
+          const allBookingsResponse = await fetch(
+            `/api/marketplace/bookings?user_id=${encodeURIComponent(freelancerEmail)}&user_type=freelancer`
+          );
+          
+          if (allBookingsResponse.ok) {
+            const fallbackText = await allBookingsResponse.text();
+            if (fallbackText && fallbackText.trim() !== '') {
+              const allBookingsData = JSON.parse(fallbackText);
+              if (allBookingsData.success && allBookingsData.data) {
+                const activeCount = allBookingsData.data.filter((b: any) => 
+                  b.status === 'Active' || b.status === 'InProgress' || b.status === 'Pending'
+                ).length;
+                setActiveBookingsCount(activeCount);
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.error('Error in fallback bookings fetch:', fallbackError);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching active bookings count:', error);
+    }
+  };
 
   // Packages are now embedded in service data, no separate fetch needed
 
@@ -157,15 +291,47 @@ export default function ServiceDetails() {
     );
   }
 
+  // Get joined year from service creation date (as proxy for user join date)
+  const getJoinedYear = () => {
+    if (service?.created_at) {
+      // created_at is in milliseconds, convert to year
+      const year = new Date(service.created_at).getFullYear();
+      return year.toString();
+    }
+    // Fallback to current year if no date available
+    return new Date().getFullYear().toString();
+  };
+
+  // Get profile image from freelancer profile or use default
+  const getProfileImage = () => {
+    if (freelancerProfile?.profileImage) {
+      return freelancerProfile.profileImage;
+    }
+    // Generate a default avatar based on email initial
+    const initial = service.freelancer_email ? service.freelancer_email.charAt(0).toUpperCase() : 'U';
+    return `https://ui-avatars.com/api/?name=${initial}&background=random&color=fff&size=300`;
+  };
+
+  // Get location from freelancer profile
+  const getLocation = () => {
+    if (freelancerProfile?.location) {
+      return freelancerProfile.location;
+    }
+    return 'Remote';
+  };
+
   // Prepare real service data for display
   const serviceData = {
     id: service.service_id,
     title: service.title,
     seller: {
-      name: `Freelancer ${service.freelancer_email ? service.freelancer_email.split('@')[0] : 'Unknown'}`,
-      location: 'Remote',
-      joinedYear: '2023',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=300&auto=format&fit=crop',
+      name: freelancerProfile?.displayName || 
+            (freelancerProfile?.firstName && freelancerProfile?.lastName 
+              ? `${freelancerProfile.firstName} ${freelancerProfile.lastName}`.trim()
+              : `Freelancer ${service.freelancer_email ? service.freelancer_email.split('@')[0] : 'Unknown'}`),
+      location: getLocation(),
+      joinedYear: getJoinedYear(),
+      avatar: getProfileImage(),
       rating: service.rating_avg,
       reviews: `${service.total_orders}+`
     },
@@ -304,7 +470,11 @@ export default function ServiceDetails() {
                     <span className="ml-1">{serviceData.seller.rating}</span>
                     <span className="ml-1">({serviceData.seller.reviews})</span>
                   </div>
-                  <span className="ml-2">1 contract in queue</span>
+                  {activeBookingsCount > 0 && (
+                    <span className="ml-2">
+                      {activeBookingsCount} {activeBookingsCount === 1 ? 'contract' : 'contracts'} in queue
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -530,17 +700,17 @@ export default function ServiceDetails() {
                 )}
               </div>
               <div className="space-y-4 border-t border-gray-200 pt-4">
-                <div className="flex justify-between">
-                  <span>Service</span>
-                  <span className="text-right text-sm text-gray-600 max-w-[60%]">
+                <div className="flex justify-between items-start gap-2">
+                  <span className="flex-shrink-0">Service</span>
+                  <span className="text-right text-sm text-gray-600 break-words">
                     {serviceData.title}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Description</span>
-                  <span className="text-right text-sm text-gray-600 max-w-[60%]">
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm font-medium">Description</span>
+                  <p className="text-sm text-gray-600 break-words whitespace-normal">
                     {serviceData.tiers[selectedTier as keyof typeof serviceData.tiers]?.description || 'Service package'}
-                  </span>
+                  </p>
                 </div>
                 <div className="flex justify-between">
                   <span>Delivery Timeline</span>
