@@ -67,8 +67,10 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    const userData = user[0];
+
     // Mark email as verified
-    const verifyResult = await userActor.verifyEmail(user[0].id);
+    const verifyResult = await userActor.verifyEmail(userData.id);
     if ('err' in verifyResult) {
       return NextResponse.json({
         success: false,
@@ -78,8 +80,8 @@ export async function POST(request: NextRequest) {
 
     // Send welcome email
     await emailService.sendWelcomeEmail(
-      user[0].email,
-      `${user[0].profile?.[0]?.firstName || 'User'} ${user[0].profile?.[0]?.lastName || ''}`
+      userData.email,
+      `${userData.profile?.[0]?.firstName || 'User'} ${userData.profile?.[0]?.lastName || ''}`
     );
 
     // Reset rate limits

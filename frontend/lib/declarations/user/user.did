@@ -9,7 +9,6 @@ type User =
    otpData: opt OTPData;
    passwordHash: PasswordHash;
    profile: opt ProfileData;
-   profileSubmitted: bool;
  };
 type Result_3 = 
  variant {

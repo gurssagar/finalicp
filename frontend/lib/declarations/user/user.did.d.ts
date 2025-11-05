@@ -59,7 +59,6 @@ export interface User {
   'createdAt' : bigint,
   'email' : Email,
   'isVerified' : boolean,
-  'profileSubmitted' : boolean,
   'passwordHash' : PasswordHash,
   'profile' : [] | [ProfileData],
 }

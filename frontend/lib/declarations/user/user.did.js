@@ -52,7 +52,6 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : IDL.Int,
     'email' : Email,
     'isVerified' : IDL.Bool,
-    'profileSubmitted' : IDL.Bool,
     'passwordHash' : PasswordHash,
     'profile' : IDL.Opt(ProfileData),
   });

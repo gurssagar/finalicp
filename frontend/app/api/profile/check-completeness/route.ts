@@ -132,7 +132,22 @@ export async function GET(request: NextRequest) {
 
       // Extract the user from the array result
       const userProfile = userResult[0];
-      const profileSubmitted = await actor.isProfileSubmitted(userProfile.id);
+      
+      // Try to get profile submitted status, but handle case where method doesn't exist
+      let profileSubmitted = false;
+      try {
+        profileSubmitted = await actor.isProfileSubmitted(userProfile.id);
+      } catch (error: any) {
+        // Method doesn't exist on deployed canister - default to false
+        // If profile exists, we can infer it's been submitted/active
+        if (error?.message?.includes('no update method') || error?.message?.includes('method not found')) {
+          console.warn('⚠️ isProfileSubmitted method not available on canister - using fallback');
+          profileSubmitted = userProfile.profile !== null && userProfile.profile.length > 0;
+        } else {
+          console.warn('⚠️ Error checking profile submission status:', error?.message || error);
+          profileSubmitted = false;
+        }
+      }
 
       console.log('📊 Extracted user profile:', userProfile);
       console.log('📊 Profile submitted status:', profileSubmitted);
