@@ -177,11 +177,33 @@ export function useUpdateService() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateService = useCallback(async (userEmail: string, serviceId: string, updates: UpdateServiceData) => {
+  const updateService = useCallback(async (userEmail: string, serviceId: string, updates: UpdateServiceData, userId?: string) => {
     setLoading(true);
     setError(null);
 
     try {
+      // If userId is not provided, try to get it from session
+      let effectiveUserId = userId;
+      if (!effectiveUserId) {
+        try {
+          const sessionResponse = await fetch('/api/auth/session');
+          const sessionData = await sessionResponse.json();
+          if (sessionData.success && sessionData.session?.userId) {
+            effectiveUserId = sessionData.session.userId;
+          } else if (sessionData.success && sessionData.session?.email) {
+            // Fallback: use email as userId if no userId in session
+            effectiveUserId = sessionData.session.email;
+          }
+        } catch (sessionError) {
+          console.warn('Could not fetch userId from session:', sessionError);
+        }
+      }
+
+      // If still no userId, use email as fallback
+      if (!effectiveUserId) {
+        effectiveUserId = userEmail;
+      }
+
       const response = await fetch(`/api/marketplace/services/${serviceId}`, {
         method: 'PUT',
         headers: {
@@ -189,6 +211,7 @@ export function useUpdateService() {
         },
         body: JSON.stringify({
           userEmail,
+          userId: effectiveUserId,
           updates,
         }),
       });
@@ -250,7 +273,7 @@ export function useDeleteService() {
   return { deleteService, loading, error };
 }
 
-export function useServicePackages(serviceId?: string) {
+export function useServicePackages(serviceId?: string, startingFromE8s?: number) {
   const [packages, setPackages] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -286,10 +309,36 @@ export function useServicePackages(serviceId?: string) {
   }, [fetchPackages]);
 
   const getMinPrice = useCallback(() => {
-    if (packages.length === 0) return 100; // Default fallback
-    const minPrice = Math.min(...packages.map(pkg => parseInt(pkg.price_e8s) / 100000000));
-    return minPrice;
-  }, [packages]);
+    // If packages are loaded, use the minimum package price
+    if (packages.length > 0) {
+      const prices = packages.map(pkg => {
+        // Handle both string and number formats
+        const priceE8s = typeof pkg.price_e8s === 'string' 
+          ? parseInt(pkg.price_e8s) 
+          : (typeof pkg.price_e8s === 'number' ? pkg.price_e8s : 0);
+        
+        // Convert e8s to USD: divide by 100000000 to get ICP, then multiply by 10 for USD (1 ICP = $10)
+        // OR if prices are stored as USD cents (multiply by 100), divide by 100
+        // Based on the codebase, it seems prices are in e8s, so we convert: e8s / 100000000 = ICP
+        // But if the price shows $12, and e8s is 1200000000, then 1200000000 / 100000000 = 12 ICP
+        // If 1 ICP = $1, then that's $12. Let's assume 1 ICP = $1 for now
+        const priceInICP = priceE8s / 100000000;
+        return priceInICP; // Assuming 1 ICP = $1 USD
+      });
+      const minPrice = Math.min(...prices);
+      console.log('getMinPrice from packages:', { prices, minPrice, packages });
+      return minPrice;
+    }
+    // If no packages but we have starting_from_e8s, use that
+    if (startingFromE8s) {
+      const priceInICP = startingFromE8s / 100000000;
+      console.log('getMinPrice from startingFromE8s:', { startingFromE8s, priceInICP });
+      return priceInICP; // Assuming 1 ICP = $1 USD
+    }
+    // Default fallback (should not happen in normal flow)
+    console.warn('getMinPrice: No packages and no startingFromE8s, returning 0');
+    return 0;
+  }, [packages, startingFromE8s]);
 
   return { packages, loading, error, refetch: fetchPackages, getMinPrice };
 }

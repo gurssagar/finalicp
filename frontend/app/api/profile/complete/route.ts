@@ -134,8 +134,13 @@ export async function POST(request: NextRequest) {
           console.error('Failed to auto-submit profile:', (markResult as any).err);
           // Continue anyway - profile is updated even if submission marking fails
         }
-      } catch (submitError) {
-        console.error('Auto-submission failed (profile still saved):', submitError);
+      } catch (submitError: any) {
+        // Method doesn't exist on deployed canister - that's okay, profile is still saved
+        if (submitError?.message?.includes('no update method') || submitError?.message?.includes('method not found')) {
+          console.warn('⚠️ markProfileAsSubmitted method not available on canister - profile is still saved');
+        } else {
+          console.error('Auto-submission failed (profile still saved):', submitError);
+        }
         // Continue anyway - the main profile data is saved
       }
 

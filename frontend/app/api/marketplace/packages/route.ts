@@ -49,25 +49,52 @@ export async function GET(request: NextRequest) {
       }, { status: 503 });
     }
 
-    // Get service from canister to extract package information
+    // Get packages directly from canister using getPackagesByServiceId
     const actor = await getMarketplaceActor();
-    const serviceResult = await actor.getService(serviceId);
+    
+    try {
+      // First verify service exists
+      const serviceResult = await actor.getService(serviceId);
+      
+      if ('err' in serviceResult) {
+        return NextResponse.json({
+          success: false,
+          error: handleApiError(serviceResult.err)
+        }, { status: 404 });
+      }
 
-    if ('err' in serviceResult) {
+      // Get packages using the dedicated method
+      const packages = await actor.getPackagesByServiceId(serviceId);
+      
+      // Transform packages to convert BigInt values and ensure proper formatting
+      const transformedPackages = packages.map((pkg: any) => ({
+        package_id: pkg.package_id,
+        service_id: pkg.service_id,
+        tier: pkg.tier,
+        title: pkg.title,
+        description: pkg.description,
+        price_e8s: typeof pkg.price_e8s === 'bigint' ? Number(pkg.price_e8s) : Number(pkg.price_e8s || 0),
+        delivery_days: typeof pkg.delivery_days === 'bigint' ? Number(pkg.delivery_days) : Number(pkg.delivery_days || 1),
+        delivery_timeline: pkg.delivery_timeline || `${Number(pkg.delivery_days || 1)} days`,
+        features: pkg.features || [],
+        revisions_included: typeof pkg.revisions_included === 'bigint' ? Number(pkg.revisions_included) : Number(pkg.revisions_included || 1),
+        status: pkg.status || 'Available',
+        created_at: typeof pkg.created_at === 'bigint' ? Number(pkg.created_at) : Number(pkg.created_at || 0),
+        updated_at: typeof pkg.updated_at === 'bigint' ? Number(pkg.updated_at) : Number(pkg.updated_at || 0)
+      }));
+
+      return NextResponse.json({
+        success: true,
+        data: transformedPackages,
+        count: transformedPackages.length
+      });
+    } catch (error) {
+      console.error('Error fetching packages:', error);
       return NextResponse.json({
         success: false,
-        error: handleApiError(serviceResult.err)
-      }, { status: 404 });
+        error: handleApiError(error)
+      }, { status: 500 });
     }
-
-    const service = serviceResult.ok;
-    const servicePackages = service.packages || [];
-
-    return NextResponse.json({
-      success: true,
-      data: servicePackages,
-      count: servicePackages.length
-    });
   } catch (error) {
     console.error('Error fetching packages:', error);
     return NextResponse.json({

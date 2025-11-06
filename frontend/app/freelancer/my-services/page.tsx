@@ -24,8 +24,28 @@ export default function MyServices() {
     if (!timestamp) return 'Date not set';
 
     try {
-      const date = new Date(typeof timestamp === 'number' ? timestamp : Number(timestamp));
-      if (isNaN(date.getTime())) return 'Invalid date';
+      let date: Date;
+      
+      if (typeof timestamp === 'number') {
+        // The API already converts from nanoseconds to milliseconds
+        // So timestamp should already be in milliseconds
+        // Nanoseconds are 16+ digits (> 1e15), milliseconds are 13 digits (e.g., 1704067200000)
+        // So we only convert if it's > 1e15 (still in nanoseconds)
+        if (timestamp > 1e15) {
+          // Still in nanoseconds, convert to milliseconds
+          date = new Date(timestamp / 1000000);
+        } else {
+          // Already in milliseconds, use directly
+          date = new Date(timestamp);
+        }
+      } else {
+        date = new Date(timestamp);
+      }
+      
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date from timestamp:', timestamp);
+        return 'Invalid date';
+      }
 
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
@@ -44,17 +64,45 @@ export default function MyServices() {
     try {
       // Handle both millisecond and nanosecond timestamps
       let date: Date;
+      let processedTimestamp: number;
 
       if (typeof timestamp === 'number') {
-        if (timestamp > 10000000000) { // Assume nanoseconds if very large number
-          date = new Date(Number(timestamp) / 1000000);
+        // The API already converts from nanoseconds to milliseconds
+        // So timestamp should already be in milliseconds
+        // Nanoseconds are 16+ digits (> 1e15), milliseconds are 13 digits (e.g., 1704067200000)
+        // So we only convert if it's > 1e15 (still in nanoseconds)
+        if (timestamp > 1e15) {
+          // Still in nanoseconds, convert to milliseconds
+          processedTimestamp = timestamp / 1000000;
+          date = new Date(processedTimestamp);
         } else {
+          // Already in milliseconds, use directly
+          processedTimestamp = timestamp;
           date = new Date(timestamp);
         }
       } else if (typeof timestamp === 'string') {
-        date = new Date(timestamp);
+        // If it's a formatted date string, parse it
+        const parsed = parseFloat(timestamp);
+        if (!isNaN(parsed)) {
+          // It's a number string, treat same as number
+          if (parsed > 1e15) {
+            processedTimestamp = parsed / 1000000;
+          } else {
+            processedTimestamp = parsed;
+          }
+          date = new Date(processedTimestamp);
+        } else {
+          // It's a date string, parse directly
+          date = new Date(timestamp);
+          processedTimestamp = date.getTime();
+        }
       } else {
         console.warn('Invalid timestamp format:', timestamp);
+        return 'Unknown';
+      }
+
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date from timestamp:', timestamp, 'processed:', processedTimestamp);
         return 'Unknown';
       }
 
@@ -62,6 +110,17 @@ export default function MyServices() {
       const diffMs = now.getTime() - date.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
+      console.log('🕐 Relative time calculation:', {
+        input: timestamp,
+        processed: processedTimestamp,
+        date: date.toISOString(),
+        now: now.toISOString(),
+        diffMs,
+        diffDays,
+        years: Math.floor(diffDays / 365)
+      });
+
+      if (diffDays < 0) return 'Today'; // Handle future dates
       if (diffDays < 1) return 'Today';
       if (diffDays < 7) return `${diffDays} days ago`;
       if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
@@ -132,34 +191,98 @@ export default function MyServices() {
 
   // Transform services data for UI display
   const transformServiceData = (service: any) => {
-    // Robust date handling for different timestamp formats
+    // Date handling: API converts from nanoseconds to milliseconds by dividing by 1000000
+    // So created_at should already be in milliseconds
     let createdDate: string;
+    let createdTimestamp: number;
 
     if (!service.created_at) {
       // Fallback to current date for missing timestamps
+      createdTimestamp = Date.now();
       createdDate = new Date().toISOString().split('T')[0];
-    } else if (typeof service.created_at === 'bigint') {
-      // Handle bigint timestamps (nanoseconds since epoch)
-      try {
-        createdDate = new Date(Number(service.created_at) / 1000000).toISOString().split('T')[0];
-      } catch (error) {
-        console.warn('Invalid bigint timestamp:', service.created_at, error);
-        createdDate = new Date().toISOString().split('T')[0];
-      }
-    } else if (typeof service.created_at === 'number') {
-      // Handle number timestamps (nanoseconds since epoch)
-      try {
-        createdDate = new Date(service.created_at / 1000000).toISOString().split('T')[0];
-      } catch (error) {
-        console.warn('Invalid number timestamp:', service.created_at, error);
-        createdDate = new Date().toISOString().split('T')[0];
-      }
     } else {
-      // Handle string timestamps or other formats
       try {
-        createdDate = new Date(service.created_at).toISOString().split('T')[0];
+        // Convert to number regardless of type
+        let rawTimestamp: number;
+        
+        if (typeof service.created_at === 'bigint') {
+          rawTimestamp = Number(service.created_at);
+        } else if (typeof service.created_at === 'number') {
+          rawTimestamp = service.created_at;
+        } else {
+          // String or other type
+          rawTimestamp = parseFloat(String(service.created_at));
+          if (isNaN(rawTimestamp)) {
+            throw new Error('Cannot parse timestamp');
+          }
+        }
+
+        // The API already converted from nanoseconds to milliseconds
+        // So rawTimestamp should be in milliseconds
+        // However, if it's still very large (> 1e15), it might still be in nanoseconds
+        // Normal millisecond timestamps are 13 digits (e.g., 1704067200000 for 2024)
+        
+        if (rawTimestamp > 1e15) {
+          // Still in nanoseconds (very large), convert to milliseconds
+          createdTimestamp = Math.round(rawTimestamp / 1000000);
+        } else {
+          // Already in milliseconds (API already converted)
+          createdTimestamp = Math.round(rawTimestamp);
+        }
+
+        // Create date object
+        const date = new Date(createdTimestamp);
+        
+        // Validate date
+        if (isNaN(date.getTime())) {
+          throw new Error('Invalid date from timestamp');
+        }
+
+        // Check if date is reasonable (not before 2000)
+        const year = date.getFullYear();
+        if (year < 2000) {
+          // Date seems too old, try alternative conversion
+          // Maybe the timestamp wasn't converted correctly
+          console.warn('⚠️ Date seems too old:', year, 'from timestamp:', service.created_at);
+          
+          // Try treating as microseconds (divide by 1000 instead of 1000000)
+          const microsecondTimestamp = Math.round(rawTimestamp / 1000);
+          const microsecondDate = new Date(microsecondTimestamp);
+          
+          if (!isNaN(microsecondDate.getTime())) {
+            const microsecondYear = microsecondDate.getFullYear();
+            if (microsecondYear >= 2000 && microsecondYear <= 2100) {
+              console.log('✅ Using microsecond conversion (divide by 1000)');
+              createdTimestamp = microsecondTimestamp;
+              createdDate = microsecondDate.toISOString().split('T')[0];
+            } else {
+              // Fallback to current date
+              console.warn('⚠️ Microsecond conversion also failed, using current date');
+              createdTimestamp = Date.now();
+              createdDate = new Date().toISOString().split('T')[0];
+            }
+          } else {
+            // Fallback to current date
+            createdTimestamp = Date.now();
+            createdDate = new Date().toISOString().split('T')[0];
+          }
+        } else {
+          // Date is valid
+          createdDate = date.toISOString().split('T')[0];
+        }
+
+        console.log('📅 Date conversion:', {
+          raw: service.created_at,
+          rawType: typeof service.created_at,
+          rawTimestamp: rawTimestamp,
+          converted: createdTimestamp,
+          date: new Date(createdTimestamp).toISOString(),
+          year: new Date(createdTimestamp).getFullYear(),
+          formatted: createdDate
+        });
       } catch (error) {
         console.warn('Invalid timestamp format:', service.created_at, error);
+        createdTimestamp = Date.now();
         createdDate = new Date().toISOString().split('T')[0];
       }
     }
@@ -228,11 +351,22 @@ export default function MyServices() {
       price: minPrice,
       coverImage: getCoverImage(service),
       coverImages: Array.isArray(service.portfolio_images) ? service.portfolio_images : [],
-      status: service.status?.toLowerCase() || 'active',
+      // Status comes as 'Active' or 'Paused' from API, normalize to lowercase for comparison
+      status: (() => {
+        const rawStatus = service.status;
+        const normalizedStatus = rawStatus ? (typeof rawStatus === 'string' ? rawStatus.toLowerCase() : 'active') : 'active';
+        console.log(`📊 Service ${service.service_id} status:`, {
+          raw: rawStatus,
+          normalized: normalizedStatus,
+          type: typeof rawStatus
+        });
+        return normalizedStatus;
+      })(),
       views: 0, // Mock data doesn't include view count
       orders: service.total_orders || 0,
       rating: service.rating_avg || 0,
-      createdAt: createdDate,
+      createdAt: createdTimestamp, // Store timestamp for proper date calculations
+      createdAtDisplay: createdDate, // Store formatted date for display
       description: service.description,
 
       // NEW FIELDS FOR DISPLAY
@@ -356,13 +490,34 @@ export default function MyServices() {
   }
 
   const handleToggleStatus = async (serviceId: string, currentStatus: string) => {
-    if (!userId || !userEmail) return
+    // Check if user email is available
+    if (!userEmail) {
+      console.error('❌ Cannot toggle status: userEmail is not available');
+      alert('Failed to update service status: User email not found. Please log in again.');
+      return;
+    }
 
-    const newStatus = currentStatus === 'active' ? 'Paused' : 'Active'
+    // Normalize status for comparison (handle both 'active' and 'Active', 'paused' and 'Paused')
+    const normalizedStatus = currentStatus?.toLowerCase() || 'active';
+    const newStatus = normalizedStatus === 'active' ? 'Paused' : 'Active';
+
+    console.log('🔄 Toggling service status:', {
+      serviceId,
+      currentStatus,
+      normalizedStatus,
+      newStatus,
+      userEmail,
+      userId
+    });
 
     try {
-      const result = await updateService(userEmail, serviceId, { status: newStatus })
+      // Pass userId if available, otherwise it will be fetched in the hook
+      const result = await updateService(userEmail, serviceId, { status: newStatus }, userId || undefined);
+      
+      console.log('📡 Update Service Status - API Response:', result);
+      
       if (result.success) {
+        // Update local state with new status
         setServices(
           services.map((service) =>
             service.id === serviceId
@@ -372,13 +527,19 @@ export default function MyServices() {
                 }
               : service,
           ),
-        )
+        );
+        
+        // Refresh data from server to ensure consistency
+        refetch();
+        
+        alert(`Service status updated to ${newStatus} successfully!`);
       } else {
-        alert('Failed to update service status: ' + (result.error || 'Unknown error'))
+        console.error('❌ Update Service Status - API Error:', result.error);
+        alert('Failed to update service status: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      console.error('Error updating service status:', error)
-      alert('Failed to update service status. Please try again.')
+      console.error('❌ Error updating service status:', error);
+      alert('Failed to update service status. Please try again.');
     }
   }
   return (
@@ -598,7 +759,7 @@ export default function MyServices() {
                       <div className="flex justify-between items-center mt-2">
                         <div className="text-xs text-gray-500">
                           <div className="flex flex-col gap-1">
-                            <span>Created {formatDate(service.createdAt)}</span>
+                            <span>Created {formatDate(service.createdAt || service.createdAtDisplay)}</span>
                             <span className="text-gray-400">({getRelativeTime(service.createdAt)})</span>
                           </div>
                         </div>

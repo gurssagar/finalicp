@@ -74,7 +74,8 @@ export default function BrowseServices() {
                   reviews: `${service.total_orders}+`,
                   deliveryTimeline: service.delivery_timeline,
                   minDeliveryDays: service.min_delivery_days,
-                  maxDeliveryDays: service.max_delivery_days
+                  maxDeliveryDays: service.max_delivery_days,
+                  startingFromE8s: service.starting_from_e8s
                 }}
                 onClick={() => handleServiceClick(service.service_id)}
               />

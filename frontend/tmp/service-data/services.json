@@ -252,6 +252,32 @@
       ],
       "created_at": 1761392407057000000,
       "updated_at": 1761392407057000000
+    },
+    {
+      "service_id": "SVC_1762360483963_ND2MY8IWB",
+      "freelancer_email": "dev792258@gmail.com",
+      "cover_image_url": "",
+      "portfolio_images": [],
+      "description_format": "markdown",
+      "tier_mode": "1tier",
+      "packages": [
+        {
+          "package_id": "package-1762360483483-single",
+          "tier": "Basic",
+          "title": "service website",
+          "description": "frontendwqdwqdwqdwqdwqdwqdwqdqwdqwdqwdqwdqwdwqdqdqwd",
+          "price_e8s": 1200000000,
+          "delivery_days": 1,
+          "delivery_timeline": "Same day (24 hours)",
+          "features": [],
+          "revisions_included": 1,
+          "status": "Available"
+        }
+      ],
+      "client_questions": [],
+      "faqs": [],
+      "created_at": 1762360490573000000,
+      "updated_at": 1762360490573000000
     }
   ]
 }

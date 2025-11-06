@@ -25,19 +25,31 @@ export async function POST(request: NextRequest) {
 
     // Get user actor and update profile submission status
     const userActor = await getUserActor();
-    const result = await userActor.updateProfileSubmissionStatus(session.userId, isSubmitted);
+    
+    try {
+      const result = await userActor.updateProfileSubmissionStatus(session.userId, isSubmitted);
 
-    if ('err' in result) {
+      if ('err' in result) {
+        return NextResponse.json({
+          success: false,
+          error: result.err,
+        }, { status: 400 });
+      }
+
       return NextResponse.json({
-        success: false,
-        error: result.err,
-      }, { status: 400 });
+        success: true,
+        message: isSubmitted ? 'Profile marked as submitted' : 'Profile submission status updated',
+      });
+    } catch (error: any) {
+      // Method doesn't exist on deployed canister
+      if (error?.message?.includes('no update method') || error?.message?.includes('method not found')) {
+        return NextResponse.json({
+          success: false,
+          error: 'Profile submission feature is not available on the current canister version. Please update the canister.',
+        }, { status: 501 }); // 501 Not Implemented
+      }
+      throw error; // Re-throw other errors
     }
-
-    return NextResponse.json({
-      success: true,
-      message: isSubmitted ? 'Profile marked as submitted' : 'Profile submission status updated',
-    });
 
   } catch (error) {
     console.error('Profile submission update error:', error);
@@ -61,7 +73,19 @@ export async function GET(request: NextRequest) {
 
     // Get user actor and check profile submission status
     const userActor = await getUserActor();
-    const isSubmitted = await userActor.isProfileSubmitted(session.userId);
+    
+    let isSubmitted = false;
+    try {
+      isSubmitted = await userActor.isProfileSubmitted(session.userId);
+    } catch (error: any) {
+      // Method doesn't exist on deployed canister - default to false
+      if (error?.message?.includes('no update method') || error?.message?.includes('method not found')) {
+        console.warn('⚠️ isProfileSubmitted method not available on canister - defaulting to false');
+        isSubmitted = false;
+      } else {
+        throw error; // Re-throw other errors
+      }
+    }
 
     return NextResponse.json({
       success: true,

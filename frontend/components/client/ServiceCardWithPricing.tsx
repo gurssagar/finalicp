@@ -1,5 +1,5 @@
 'use client'
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -17,6 +17,7 @@ interface ServiceCardWithPricingProps {
     deliveryTimeline?: string;
     minDeliveryDays?: number;
     maxDeliveryDays?: number;
+    startingFromE8s?: number;
   };
   onClick: () => void;
 }
@@ -26,7 +27,7 @@ export function ServiceCardWithPricing({
   onClick
 }: ServiceCardWithPricingProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const { packages, getMinPrice } = useServicePackages(service.id);
+  const { packages, loading, getMinPrice } = useServicePackages(service.id, service.startingFromE8s);
 
   // For demo purposes, let's create a few dummy images for each service
   const serviceImages = [service.image, "/Organaise_Home_Page-2.png", "/Organaise_Home_Page-3.png"];
@@ -42,6 +43,17 @@ export function ServiceCardWithPricing({
   };
 
   const minPrice = getMinPrice();
+
+  // Debug logging
+  useEffect(() => {
+    console.log('ServiceCardWithPricing - Service:', service.id, {
+      startingFromE8s: service.startingFromE8s,
+      packagesCount: packages.length,
+      packages: packages,
+      minPrice: minPrice,
+      loading: loading
+    });
+  }, [service.id, service.startingFromE8s, packages, minPrice, loading]);
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={onClick}>

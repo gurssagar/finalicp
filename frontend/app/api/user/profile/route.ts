@@ -104,7 +104,18 @@ export async function GET(request: NextRequest) {
         github: profileData && profileData.github && profileData.github.length > 0 ? profileData.github[0] || '' : '',
         isOnline: false, // TODO: Implement online status tracking
         lastSeen: null, // TODO: Implement last seen tracking
-        profileSubmitted: await actor.isProfileSubmitted(userProfile.id)
+        profileSubmitted: await (async () => {
+          try {
+            return await actor.isProfileSubmitted(userProfile.id);
+          } catch (error: any) {
+            // Method doesn't exist on deployed canister - default to false
+            if (error?.message?.includes('no update method') || error?.message?.includes('method not found')) {
+              console.warn('⚠️ isProfileSubmitted method not available on canister - defaulting to false');
+              return false;
+            }
+            throw error; // Re-throw other errors
+          }
+        })()
       };
 
       console.log('✅ Retrieved user profile for:', email);
