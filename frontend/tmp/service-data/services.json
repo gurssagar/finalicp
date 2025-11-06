@@ -278,6 +278,56 @@
       "faqs": [],
       "created_at": 1762360490573000000,
       "updated_at": 1762360490573000000
+    },
+    {
+      "service_id": "SVC_1762403159219_MGBH6QE7N",
+      "freelancer_email": "rishu270722@gmail.com",
+      "cover_image_url": "",
+      "portfolio_images": [],
+      "description_format": "markdown",
+      "tier_mode": "3tier",
+      "packages": [
+        {
+          "package_id": "package-1762403158835-basic",
+          "tier": "Basic",
+          "title": "first",
+          "description": "snjkdnjkndjkndjknjdjdnjkqdnjkdnjkqwdnjkqdnjkqdnjqdnjkq",
+          "price_e8s": 1200000000,
+          "delivery_days": 1,
+          "delivery_timeline": "Same day (24 hours)",
+          "features": [],
+          "revisions_included": 1,
+          "status": "Available"
+        },
+        {
+          "package_id": "package-1762403158836-advanced",
+          "tier": "Advanced",
+          "title": "Second",
+          "description": "snjkdnjkndjkndjknjdjdnjkqdnjkdnjkqwdnjkqdnjkqdnjqdnjkq",
+          "price_e8s": 2000000000,
+          "delivery_days": 7,
+          "delivery_timeline": "1 week",
+          "features": [],
+          "revisions_included": 2,
+          "status": "Available"
+        },
+        {
+          "package_id": "package-1762403158836-premium",
+          "tier": "Premium",
+          "title": "Third",
+          "description": "snjkdnjkndjkndjknjdjdnjkqdnjkdnjkqwdnjkqdnjkqdnjqdnjkq",
+          "price_e8s": 2500000000,
+          "delivery_days": 14,
+          "delivery_timeline": "2 weeks",
+          "features": [],
+          "revisions_included": 3,
+          "status": "Available"
+        }
+      ],
+      "client_questions": [],
+      "faqs": [],
+      "created_at": 1762403172784000000,
+      "updated_at": 1762403172784000000
     }
   ]
 }

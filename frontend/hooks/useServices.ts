@@ -101,31 +101,57 @@ export function useServices(freelancerId?: string, filters?: ServiceFilters) {
   ]);
 
   const fetchServices = useCallback(async () => {
+    // If we're trying to filter by freelancer_email but don't have one, skip fetching
+    // This prevents showing all services when the user email isn't loaded yet
+    if (memoizedFilters?.freelancer_email === undefined && freelancerId === undefined) {
+      // If freelancer_email is explicitly set to undefined in filters, don't fetch
+      // This is a signal that we're waiting for the email
+      if (memoizedFilters && 'freelancer_email' in memoizedFilters && memoizedFilters.freelancer_email === undefined) {
+        console.log('⏸️ Skipping service fetch - waiting for freelancer_email');
+        setServices([]);
+        setLoading(false);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
 
     try {
       const queryParams = new URLSearchParams();
       if (memoizedFilters?.category) queryParams.append('category', memoizedFilters.category);
-      if (memoizedFilters?.freelancer_email) queryParams.append('freelancer_email', memoizedFilters.freelancer_email);
+      // Use freelancer_email from filters, or fallback to first parameter (freelancerId)
+      const freelancerEmail = memoizedFilters?.freelancer_email || freelancerId;
+      if (freelancerEmail) {
+        queryParams.append('freelancer_email', freelancerEmail);
+        console.log('🔍 useServices: Filtering by freelancer_email:', freelancerEmail);
+      } else {
+        console.log('⚠️ useServices: No freelancer_email filter - will fetch all services');
+      }
       if (memoizedFilters?.search_term) queryParams.append('search_term', memoizedFilters.search_term);
       if (memoizedFilters?.limit) queryParams.append('limit', memoizedFilters.limit.toString());
       if (memoizedFilters?.offset) queryParams.append('offset', memoizedFilters.offset.toString());
 
-      const response = await fetch(`/api/marketplace/services?${queryParams.toString()}`);
+      const url = `/api/marketplace/services?${queryParams.toString()}`;
+      console.log('📡 useServices: Fetching services from:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
 
       if (data.success) {
+        console.log(`✅ useServices: Received ${data.data.length} services`);
         setServices(data.data);
       } else {
+        console.error('❌ useServices: Failed to fetch services:', data.error);
         setError(data.error || 'Failed to fetch services');
       }
     } catch (err) {
+      console.error('❌ useServices: Network error:', err);
       setError('Network error occurred');
     } finally {
       setLoading(false);
     }
-  }, [memoizedFilters]);
+  }, [memoizedFilters, freelancerId]);
 
   useEffect(() => {
     fetchServices();

@@ -10,7 +10,6 @@ const LoginForm = () => {
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,8 +84,6 @@ const LoginForm = () => {
               className="w-full px-12 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400 pr-12"
               value={formData.password}
               onChange={handleChange}
-              onFocus={() => setShowPasswordTooltip(true)}
-              onBlur={() => setShowPasswordTooltip(false)}
               required
             />
             <button
@@ -96,29 +93,6 @@ const LoginForm = () => {
             >
               {showPassword ? <EyeOff className="text-gray-400 w-5 h-5" /> : <Eye className="text-gray-400 w-5 h-5" />}
             </button>
-            {showPasswordTooltip && <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10">
-                <h4 className="font-medium mb-2">Password must:</h4>
-                <ul className="space-y-1 text-sm">
-                  <li className="flex items-center gap-1">
-                    <span className="text-xs">•</span> Have minimum 8 characters
-                  </li>
-                  <li className="flex items-center gap-1">
-                    <span className="text-xs">•</span> Have minimum 1 uppercase
-                    letter
-                  </li>
-                  <li className="flex items-center gap-1">
-                    <span className="text-xs">•</span> Have minimum 1 lowercase
-                    letter
-                  </li>
-                  <li className="flex items-center gap-1">
-                    <span className="text-xs">•</span> Have minimum 1 special
-                    character
-                  </li>
-                  <li className="flex items-center gap-1">
-                    <span className="text-xs">•</span> Have minimum 1 digit
-                  </li>
-                </ul>
-              </div>}
           </div>
           <div className="flex justify-between items-center mt-2">
             <Link href="/forgot-password" className="text-red-500 text-sm">

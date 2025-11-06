@@ -12,6 +12,7 @@ const SignUpForm = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const [errors, setErrors] = useState<{
     email?: string;
     password?: string;
@@ -192,10 +193,12 @@ const SignUpForm = () => {
             <input
               type={showPassword ? 'text' : 'password'}
               name="password"
-              placeholder="Enter your password here (8+ chars, uppercase, lowercase, number, special)"
-              className="w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400"
+              placeholder="Enter your password here"
+              className="w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-1 focus:ring-gray-400 pr-12"
               value={formData.password}
               onChange={handleChange}
+              onFocus={() => setShowPasswordTooltip(true)}
+              onBlur={() => setShowPasswordTooltip(false)}
             />
             <button
               type="button"
@@ -204,6 +207,28 @@ const SignUpForm = () => {
             >
               {showPassword ? <EyeOff className="text-gray-400 w-5 h-5" /> : <Eye className="text-gray-400 w-5 h-5" />}
             </button>
+            {showPasswordTooltip && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10">
+                <h4 className="font-medium mb-2">Password must:</h4>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 8 characters
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 uppercase letter
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 lowercase letter
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 special character
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 digit
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
           {errors.password && <p className="text-red-500 text-sm mt-1 ml-4">{errors.password}</p>}
         </div>
