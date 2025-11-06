@@ -19,6 +19,7 @@ export default function SignupForm({ onSuccess }: SignupFormProps) {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -177,9 +178,11 @@ focus:ring-[#2ba24c] text-[#7d7d7d]"
              required
              value={formData.password}
              onChange={handleChange}
+             onFocus={() => setShowPasswordTooltip(true)}
+             onBlur={() => setShowPasswordTooltip(false)}
               className="w-full py-3 px-4 border border-[#cacaca] rounded-md shadow-sm focus:outline-none focus:ring-2
-focus:ring-[#2ba24c] text-[#7d7d7d]"
-             placeholder="Password (8+ chars, uppercase, lowercase, number, special)"
+focus:ring-[#2ba24c] text-[#7d7d7d] pr-12"
+             placeholder="Password"
 
             />
             <button
@@ -189,6 +192,28 @@ focus:ring-[#2ba24c] text-[#7d7d7d]"
             >
               {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
             </button>
+            {showPasswordTooltip && (
+              <div className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-10">
+                <h4 className="font-medium mb-2">Password must:</h4>
+                <ul className="space-y-1 text-sm">
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 8 characters
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 uppercase letter
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 lowercase letter
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 special character
+                  </li>
+                  <li className="flex items-center gap-1">
+                    <span className="text-xs">•</span> Have minimum 1 digit
+                  </li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
         <div className="mb-6">
