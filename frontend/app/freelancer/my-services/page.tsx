@@ -178,9 +178,22 @@ export default function MyServices() {
   }, [])
 
   // Fetch services using the hook with email filter only when userEmail is available
-  const { services: fetchedServices, loading, error, refetch } = useServices(userEmail || undefined, {
-    limit: 50
-  })
+  // IMPORTANT: Don't fetch if userEmail is not available yet - this prevents showing all services
+  const { services: fetchedServices, loading, error, refetch } = useServices(
+    userEmail || undefined, 
+    {
+      freelancer_email: userEmail || undefined, // Filter by user's email - MUST be set to filter
+      limit: 50
+    }
+  )
+  
+  // Log the filter being used
+  console.log('🔍 My Services - Filter Configuration:', {
+    userEmail,
+    userId,
+    isCheckingAuth,
+    willFilter: !!userEmail
+  });
 
   // Console log services data
   console.log('📋 Services Hook Data:', { fetchedServices, loading, error, userEmail });

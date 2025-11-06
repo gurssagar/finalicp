@@ -8,10 +8,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get('limit');
     const offset = searchParams.get('offset');
+    const freelancerEmail = searchParams.get('freelancer_email');
+    const category = searchParams.get('category');
+    const searchTerm = searchParams.get('search_term');
 
     console.log('Fetching services from canister with filters:', {
       limit,
-      offset
+      offset,
+      freelancerEmail,
+      category,
+      searchTerm
     });
 
     // Validate configuration
@@ -78,8 +84,77 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Apply basic filtering (simplified for now)
+    // Apply filtering
     let filteredServices = [...transformedServices];
+
+    // Filter by freelancer_email if provided
+    if (freelancerEmail) {
+      const freelancerEmailLower = freelancerEmail.toLowerCase().trim();
+      console.log(`🔍 Filtering services by freelancer_email: "${freelancerEmail}" (normalized: "${freelancerEmailLower}")`);
+      console.log(`📊 Total services before filtering: ${transformedServices.length}`);
+      
+      // Log all services before filtering for debugging
+      transformedServices.forEach((service: any, index: number) => {
+        console.log(`Service ${index + 1}:`, {
+          service_id: service.service_id,
+          title: service.title,
+          freelancer_id: service.freelancer_id,
+          freelancer_email: service.freelancer_email,
+          freelancer_id_normalized: service.freelancer_id?.toLowerCase().trim(),
+          freelancer_email_normalized: service.freelancer_email?.toLowerCase().trim(),
+          matches_id: service.freelancer_id?.toLowerCase().trim() === freelancerEmailLower,
+          matches_email: service.freelancer_email?.toLowerCase().trim() === freelancerEmailLower
+        });
+      });
+
+      filteredServices = transformedServices.filter((service: any) => {
+        // Match by freelancer_email (from additional data) or freelancer_id (from canister)
+        const serviceEmail = service.freelancer_email?.toLowerCase().trim() || '';
+        const serviceId = service.freelancer_id?.toLowerCase().trim() || '';
+        const matchesEmail = serviceEmail === freelancerEmailLower;
+        const matchesId = serviceId === freelancerEmailLower;
+        const matches = matchesEmail || matchesId;
+        
+        if (!matches) {
+          console.log(`❌ Service "${service.service_id}" (${service.title}) does NOT match - freelancer_id: "${service.freelancer_id}", freelancer_email: "${service.freelancer_email}"`);
+        }
+        
+        return matches;
+      });
+      
+      console.log(`✅ Filtered services by freelancer_email "${freelancerEmail}": ${filteredServices.length} services found out of ${transformedServices.length} total`);
+      filteredServices.forEach((service, index) => {
+        console.log(`✅ Matching service ${index + 1}:`, {
+          service_id: service.service_id,
+          title: service.title,
+          freelancer_id: service.freelancer_id,
+          freelancer_email: service.freelancer_email
+        });
+      });
+    } else {
+      console.log('⚠️ No freelancer_email filter provided - returning all services');
+    }
+
+    // Filter by category if provided
+    if (category) {
+      filteredServices = filteredServices.filter((service) => {
+        return service.main_category?.toLowerCase() === category.toLowerCase() ||
+               service.sub_category?.toLowerCase() === category.toLowerCase();
+      });
+      console.log(`Filtered services by category "${category}": ${filteredServices.length} services found`);
+    }
+
+    // Filter by search term if provided
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filteredServices = filteredServices.filter((service) => {
+        return service.title?.toLowerCase().includes(searchLower) ||
+               service.description?.toLowerCase().includes(searchLower) ||
+               service.main_category?.toLowerCase().includes(searchLower) ||
+               service.sub_category?.toLowerCase().includes(searchLower);
+      });
+      console.log(`Filtered services by search term "${searchTerm}": ${filteredServices.length} services found`);
+    }
 
     // Apply pagination
     const limitNum = limit ? parseInt(limit) : 10;
@@ -234,7 +309,7 @@ export async function POST(request: NextRequest) {
     // Store additional data in our storage system since canister doesn't support it
     const additionalServiceData = {
       service_id: serviceId,
-      freelancer_email: userEmail,
+      freelancer_email: effectiveUserEmail, // Use authenticated email
       cover_image_url: serviceData.cover_image_url || '',
       portfolio_images: serviceData.portfolio_images || [],
       description_format: serviceData.description_format || 'markdown',
