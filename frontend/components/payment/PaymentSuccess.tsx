@@ -1,21 +1,24 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { CheckCircle, MessageCircle, ExternalLink, Calendar, User, Shield } from 'lucide-react';
+import { CheckCircle, MessageCircle, ExternalLink, Calendar, User, Shield, Wallet, Coins, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { BookingTimeline } from './BookingTimeline';
 import { formatBookingDate, formatRelativeTime } from '@/lib/booking-transformer';
 
 interface PaymentSuccessProps {
-  serviceTitle: string;
-  freelancerEmail: string;
-  bookingId: string;
-  totalAmount: number;
+  serviceTitle?: string;
+  freelancerEmail?: string;
+  bookingId?: string;
+  totalAmount?: number;
   bookingData?: {
     createdAt: number;
     deliveryDeadline: number;
     deliveryDays: number;
     paymentCompletedAt: number;
     bookingConfirmedAt: number;
+    transactionId?: string;
+    tokenSymbol?: string;
+    tokenAmount?: string;
   };
 }
 
@@ -38,6 +41,15 @@ export function PaymentSuccess({
   const bookingInfo = bookingData || defaultBookingData;
   const [countdown, setCountdown] = useState(10);
   const [autoRedirect, setAutoRedirect] = useState(true);
+  const [copiedTxId, setCopiedTxId] = useState(false);
+
+  const copyTransactionId = () => {
+    if (bookingData?.transactionId) {
+      navigator.clipboard.writeText(bookingData.transactionId);
+      setCopiedTxId(true);
+      setTimeout(() => setCopiedTxId(false), 2000);
+    }
+  };
 
   useEffect(() => {
     if (!autoRedirect) return;
@@ -70,12 +82,15 @@ export function PaymentSuccess({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border border-green-100">
         {/* Success Icon */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle size={40} className="text-white" />
+          <div className="relative w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-green-500/30 animate-pulse">
+            <CheckCircle size={48} className="text-white" />
+            <div className="absolute -top-2 -right-2 w-8 h-8 bg-purple-600 rounded-full border-4 border-white flex items-center justify-center">
+              <Wallet size={16} className="text-white" />
+            </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
           <p className="text-gray-600">
@@ -100,8 +115,40 @@ export function PaymentSuccess({
 
             <div className="flex items-start justify-between">
               <span className="text-sm text-gray-600">Amount Paid</span>
-              <span className="text-sm font-medium text-gray-900">${totalAmount.toFixed(2)}</span>
+              <span className="text-sm font-medium text-gray-900">${(totalAmount || 0).toFixed(2)}</span>
             </div>
+
+            {bookingData?.tokenSymbol && bookingData?.tokenAmount && (
+              <div className="flex items-start justify-between">
+                <span className="text-sm text-gray-600">Token Payment</span>
+                <div className="text-right">
+                  <div className="flex items-center space-x-1">
+                    <Coins size={14} className="text-purple-600" />
+                    <span className="text-sm font-medium text-gray-900">
+                      {parseFloat(bookingData.tokenAmount).toFixed(4)} {bookingData.tokenSymbol}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {bookingData?.transactionId && (
+              <div className="flex items-start justify-between">
+                <span className="text-sm text-gray-600">Transaction ID</span>
+                <button
+                  onClick={copyTransactionId}
+                  className="text-sm font-mono text-purple-600 hover:text-purple-700 flex items-center space-x-1"
+                  title="Click to copy"
+                >
+                  <span>{bookingData.transactionId.substring(0, 12)}...</span>
+                  {copiedTxId ? (
+                    <CheckCircle size={14} className="text-green-600" />
+                  ) : (
+                    <Copy size={14} />
+                  )}
+                </button>
+              </div>
+            )}
 
             <div className="flex items-start justify-between">
               <span className="text-sm text-gray-600">Freelancer</span>
@@ -219,13 +266,37 @@ export function PaymentSuccess({
           </ul>
         </div>
 
+        {/* ICPay Transaction Info */}
+        <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <Wallet className="text-purple-600 mt-1" size={18} />
+            <div className="text-sm text-purple-900">
+              <div className="font-semibold mb-1">Powered by ICPay</div>
+              <p className="text-purple-700">
+                Transaction processed securely on the Internet Computer blockchain.
+                {bookingData?.transactionId && (
+                  <a
+                    href={`https://dashboard.internetcomputer.org/transaction/${bookingData.transactionId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block mt-1 text-purple-600 hover:text-purple-700 underline flex items-center space-x-1"
+                  >
+                    <span>View on ICP Dashboard</span>
+                    <ExternalLink size={12} />
+                  </a>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Protection Notice */}
         <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-start space-x-3">
             <Shield className="text-green-600 mt-1" size={18} />
             <div className="text-sm text-green-700">
-              <div className="font-medium mb-1">Purchase Protection</div>
-              <p>Your payment is protected until the service is delivered to your satisfaction.</p>
+              <div className="font-medium mb-1">Escrow Protection</div>
+              <p>Your payment is held securely in escrow until the service is delivered to your satisfaction.</p>
             </div>
           </div>
         </div>

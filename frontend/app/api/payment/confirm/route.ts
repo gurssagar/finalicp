@@ -47,12 +47,18 @@ function getUpsellCategory(upsellId: string): string {
 }
 
 interface PaymentConfirmationRequest {
-  paymentId: string;
-  paymentMethod: 'credit-card' | 'bitpay' | 'icp';
-  transactionId?: string;
+  paymentId?: string;
+  transactionId: string;
   paymentStatus: 'succeeded' | 'failed' | 'cancelled';
   amount: number;
   currency: string;
+  tokenSymbol?: string;
+  tokenAmount?: string;
+  serviceId?: string;
+  packageId?: string;
+  clientId?: string;
+  freelancerEmail?: string;
+  metadata?: Record<string, any>;
 }
 
 interface PaymentSession {
@@ -125,56 +131,35 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: PaymentConfirmationRequest = await request.json();
-    const { paymentId, paymentMethod, transactionId, paymentStatus, amount, currency } = body;
+    const { 
+      paymentId, 
+      transactionId, 
+      paymentStatus, 
+      amount, 
+      currency, 
+      tokenSymbol,
+      tokenAmount,
+      serviceId,
+      packageId,
+      clientId,
+      freelancerEmail,
+      metadata
+    } = body;
 
-    console.log('📝 Payment confirmation:', { paymentId, paymentMethod, paymentStatus, amount });
+    console.log('📝 ICPay payment confirmation:', { 
+      paymentId, 
+      transactionId, 
+      paymentStatus, 
+      amount, 
+      tokenSymbol,
+      tokenAmount 
+    });
 
     // Validate required fields
-    if (!paymentId || !paymentStatus) {
+    if (!transactionId || !paymentStatus) {
       return NextResponse.json({
         success: false,
-        error: 'Missing required payment confirmation data'
-      }, { status: 400 });
-    }
-
-    // Retrieve payment session from storage
-    const paymentSessions = getPaymentSessions();
-    const paymentSession = paymentSessions[paymentId];
-    if (!paymentSession) {
-      console.error('❌ Payment session not found:', paymentId);
-      console.log('Available sessions:', Object.keys(paymentSessions));
-      return NextResponse.json({
-        success: false,
-        error: 'Payment session not found or expired'
-      }, { status: 404 });
-    }
-
-    // Check if session has expired
-    const currentTime = new Date();
-    const expirationTime = new Date(paymentSession.expiresAt);
-    if (currentTime > expirationTime) {
-      console.error('❌ Payment session expired:', paymentId, 'expired at:', paymentSession.expiresAt);
-      // Clean up expired session
-      delete paymentSessions[paymentId];
-      savePaymentSession(paymentId, paymentSession); // This will update the file without the expired session
-      return NextResponse.json({
-        success: false,
-        error: 'Payment session expired'
-      }, { status: 410 });
-    }
-
-    // Verify payment details match
-    if (paymentSession.paymentMethod !== paymentMethod) {
-      return NextResponse.json({
-        success: false,
-        error: 'Payment method mismatch'
-      }, { status: 400 });
-    }
-
-    if (Math.abs(paymentSession.totalAmount - amount) > 0.01) {
-      return NextResponse.json({
-        success: false,
-        error: 'Payment amount mismatch'
+        error: 'Missing required payment confirmation data (transactionId and paymentStatus)'
       }, { status: 400 });
     }
 
@@ -186,8 +171,69 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Update payment session status
-    paymentSession.status = 'completed';
+    // For ICPay transactions, we may not have a payment session yet
+    // Create one if needed using the provided data
+    let paymentSession: PaymentSession | null = null;
+    
+    if (paymentId) {
+      const paymentSessions = getPaymentSessions();
+      paymentSession = paymentSessions[paymentId];
+      
+      if (paymentSession) {
+        // Check if session has expired
+        const currentTime = new Date();
+        const expirationTime = new Date(paymentSession.expiresAt);
+        if (currentTime > expirationTime) {
+          console.error('❌ Payment session expired:', paymentId, 'expired at:', paymentSession.expiresAt);
+          return NextResponse.json({
+            success: false,
+            error: 'Payment session expired'
+          }, { status: 410 });
+        }
+
+        // Verify payment details match
+        if (Math.abs(paymentSession.totalAmount - amount) > 0.01) {
+          console.warn('⚠️ Payment amount mismatch - Session:', paymentSession.totalAmount, 'Received:', amount);
+        }
+
+        // Update payment session status
+        paymentSession.status = 'completed';
+        paymentSession.transactionId = transactionId;
+      }
+    }
+    
+    // If no session found, create a minimal one from the provided data
+    if (!paymentSession) {
+      console.log('📝 No payment session found, creating from ICPay transaction data');
+      const timestamp = new Date().toISOString();
+      const platformFee = amount * 0.05;
+      const netAmount = amount - platformFee;
+      
+      paymentSession = {
+        paymentId: paymentId || `PAY_ICPAY_${Date.now()}_${transactionId.slice(0, 8)}`,
+        packageId: packageId || '',
+        serviceId: serviceId || '',
+        clientId: clientId || '',
+        paymentMethod: 'icpay',
+        totalAmount: amount,
+        platformFee,
+        netAmount,
+        tokenSymbol: tokenSymbol || 'ICP',
+        tokenAmount: tokenAmount || '',
+        transactionId,
+        upsells: metadata?.upsells || [],
+        promoCode: metadata?.promoCode || null,
+        specialInstructions: metadata?.specialInstructions || '',
+        status: 'completed',
+        createdAt: timestamp,
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        serviceData: {
+          freelancerEmail: freelancerEmail || '',
+          title: metadata?.serviceTitle || 'Service',
+        },
+        packageData: metadata?.packageData || {}
+      } as PaymentSession;
+    }
 
     // Create booking after successful payment
     console.log('💰 Payment successful, creating booking...');
@@ -369,10 +415,12 @@ export async function POST(request: NextRequest) {
         base_amount_e8s: Math.floor(paymentSession.netAmount * 100000000),
         platform_fee_e8s: Math.floor(paymentSession.platformFee * 100000000),
         status: 'active',
-        payment_id: paymentId,
-        payment_method: paymentMethod,
+        payment_id: paymentSession.paymentId,
+        payment_method: 'icpay',
         transaction_id: transactionId,
         payment_status: 'completed',
+        token_symbol: tokenSymbol || 'ICP',
+        token_amount: tokenAmount || '',
 
         // Upsells and enhancements
         upsells: paymentSession.upsells.map(upsell => ({
@@ -599,11 +647,13 @@ export async function POST(request: NextRequest) {
 
       const confirmationData = {
         paymentConfirmation: {
-          paymentId,
+          paymentId: paymentSession.paymentId,
           amount,
           currency,
-          paymentMethod,
+          paymentMethod: 'icpay',
           transactionId,
+          tokenSymbol: tokenSymbol || 'ICP',
+          tokenAmount: tokenAmount || '',
           confirmedAt: new Date().toISOString()
         },
         booking: bookingData,

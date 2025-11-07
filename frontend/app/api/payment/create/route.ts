@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createHash, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 
 // Shared payment session storage
@@ -30,9 +30,11 @@ function savePaymentSession(paymentId: string, session: any): void {
 interface PaymentRequest {
   packageId: string;
   clientId: string;
-  paymentMethod: 'credit-card' | 'bitpay' | 'icp';
   totalAmount: number;
-  upsells: Array<{
+  tokenSymbol: string;
+  tokenAmount?: string;
+  transactionId?: string;
+  upsells?: Array<{
     id: string;
     name: string;
     price: number;
@@ -58,22 +60,34 @@ interface PaymentRequest {
   };
 }
 
-// Mock payment processing for demonstration
+// Create payment session for ICPay transactions
 export async function POST(request: NextRequest) {
   try {
     const body: PaymentRequest = await request.json();
-    const { packageId, clientId, paymentMethod, totalAmount, upsells, promoCode, specialInstructions, serviceData, packageData } = body;
+    const { 
+      packageId, 
+      clientId, 
+      totalAmount, 
+      tokenSymbol,
+      tokenAmount,
+      transactionId,
+      upsells, 
+      promoCode, 
+      specialInstructions, 
+      serviceData, 
+      packageData 
+    } = body;
 
     // Validate required fields
-    if (!packageId || !clientId || !paymentMethod || totalAmount <= 0) {
+    if (!packageId || !clientId || totalAmount <= 0) {
       return NextResponse.json({
         success: false,
         error: 'Missing required payment information'
       }, { status: 400 });
     }
 
-    // Generate payment session
-    const paymentId = `PAY_${Date.now()}_${randomUUID().slice(0, 8)}`;
+    // Generate payment session ID
+    const paymentId = `PAY_ICPAY_${Date.now()}_${randomUUID().slice(0, 8)}`;
     const timestamp = new Date().toISOString();
 
     // Calculate platform fee (5%)
@@ -86,93 +100,51 @@ export async function POST(request: NextRequest) {
       packageId,
       serviceId: serviceData?.serviceId || `SVC_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       clientId,
-      paymentMethod,
+      paymentMethod: 'icpay',
       totalAmount,
       platformFee,
       netAmount,
+      tokenSymbol: tokenSymbol || 'ICP',
+      tokenAmount: tokenAmount || null,
+      transactionId: transactionId || null,
       upsells: upsells || [],
       promoCode: promoCode || null,
       specialInstructions: specialInstructions || '',
       status: 'pending',
       createdAt: timestamp,
       expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 minutes
-      // Store service and package data for use in confirmation
       serviceData: serviceData || {
         freelancerEmail: 'freelancer@example.com',
-        title: 'Web Development Service',
-        mainCategory: 'Web Development',
-        subCategory: 'Frontend Development',
-        description: 'Professional web development services with modern technologies and best practices.',
-        whatsIncluded: 'Complete web development solution including design, development, testing, and deployment.'
+        title: 'Service',
+        mainCategory: 'General',
+        subCategory: 'General',
+        description: 'Professional service',
+        whatsIncluded: 'Complete service solution'
       },
       packageData: packageData || {
         title: 'Standard Package',
-        description: 'Complete service package with professional delivery and quality assurance.',
+        description: 'Complete service package',
         deliveryDays: 7,
         deliveryTimeline: '7 days delivery',
         revisionsIncluded: 1,
-        features: ['Professional delivery', 'Quality assurance', 'Support included']
+        features: ['Professional delivery', 'Quality assurance']
       }
     };
 
-    // Generate payment method specific details
-    let paymentDetails = {};
-
-    switch (paymentMethod) {
-      case 'credit-card':
-        paymentDetails = {
-          type: 'credit_card',
-          processor: 'stripe',
-          intentId: `pi_${randomUUID().slice(0, 24)}`,
-          clientSecret: randomUUID().replace(/-/g, ''),
-          requiresAction: false
-        };
-        break;
-
-      case 'bitpay':
-        const bitpayAmount = (totalAmount * 4.5).toFixed(2); // Convert to crypto equivalent
-        paymentDetails = {
-          type: 'bitpay',
-          invoiceId: randomUUID().replace(/-/g, ''),
-          amount: bitpayAmount,
-          currency: 'BTC',
-          paymentUrl: `https://bitpay.com/invoice?id=${paymentId}`,
-          expirationTime: new Date(Date.now() + 15 * 60 * 1000).toISOString() // 15 minutes
-        };
-        break;
-
-      case 'icp':
-        paymentDetails = {
-          type: 'icp',
-          ledger: 'ic',
-          amount: (totalAmount * 4.5).toFixed(4), // Convert to ICP
-          canisterId: process.env.NEXT_PUBLIC_MARKETPLACE_CANISTER_ID,
-          account: randomUUID().replace(/-/g, ''),
-          transactionId: null
-        };
-        break;
-    }
-
-    // Store payment session in mock storage
-    const sessionData = {
-      ...paymentSession,
-      paymentDetails,
-      hash: createHash('sha256').update(JSON.stringify(paymentSession)).digest('hex')
-    };
-
-    savePaymentSession(paymentId, sessionData);
-    console.log('Payment session created and stored:', sessionData);
+    // Store payment session
+    savePaymentSession(paymentId, paymentSession);
+    console.log('ICPay payment session created:', paymentSession);
 
     // Return payment session details
     return NextResponse.json({
       success: true,
       data: {
-        paymentId: sessionData.paymentId,
-        paymentDetails: sessionData.paymentDetails,
-        amount: sessionData.totalAmount,
+        paymentId: paymentSession.paymentId,
+        amount: paymentSession.totalAmount,
         currency: 'USD',
+        tokenSymbol: paymentSession.tokenSymbol,
         status: 'pending',
-        expiresAt: sessionData.expiresAt
+        expiresAt: paymentSession.expiresAt
       }
     });
 
@@ -198,18 +170,27 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // In production, retrieve from database
-    // For now, return mock data
-    const mockPaymentData = {
-      paymentId,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
-    };
+    // Read payment session from storage
+    let sessions: Record<string, any> = {};
+    try {
+      const data = readFileSync(PAYMENT_SESSIONS_FILE, 'utf8');
+      sessions = JSON.parse(data);
+    } catch (error) {
+      console.error('Error reading payment sessions:', error);
+    }
+
+    const paymentData = sessions[paymentId];
+
+    if (!paymentData) {
+      return NextResponse.json({
+        success: false,
+        error: 'Payment session not found'
+      }, { status: 404 });
+    }
 
     return NextResponse.json({
       success: true,
-      data: mockPaymentData
+      data: paymentData
     });
 
   } catch (error) {
