@@ -277,9 +277,13 @@ export async function POST(request: NextRequest) {
             features: pkg.features
           });
 
+          // Include tier in package name so it can be retrieved later
+          // Format: "Tier: Title" (e.g., "Basic: Service Title")
+          const packageNameWithTier = pkg.tier ? `${pkg.tier}: ${pkg.title}` : pkg.title;
+
           const packageResult = await actor.createPackage(
             serviceId,
-            pkg.title,
+            packageNameWithTier,
             pkg.description,
             BigInt(pkg.price_e8s),
             BigInt(pkg.delivery_days),

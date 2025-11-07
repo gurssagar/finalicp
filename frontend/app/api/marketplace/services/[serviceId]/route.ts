@@ -55,8 +55,93 @@ export async function GET(
       console.warn('Failed to load additional service data:', error);
     }
 
-    // Load packages from additional data
-    let packages = (additionalData as any).packages || [];
+    // Fetch packages from canister (primary source)
+    let packages: any[] = [];
+    try {
+      console.log('📦 Fetching packages from canister for service:', serviceId);
+      const canisterPackages = await actor.getPackagesByServiceId(serviceId);
+      console.log('✅ Fetched packages from canister:', canisterPackages.length, 'packages');
+
+      // Get tier mapping from file storage if available (for backward compatibility)
+      const fileStoragePackages = (additionalData as any).packages || [];
+      const tierMap = new Map<string, string>();
+      fileStoragePackages.forEach((pkg: any) => {
+        if (pkg.package_id && pkg.tier) {
+          tierMap.set(pkg.package_id, pkg.tier);
+        }
+      });
+
+      // Sort packages by price (ascending) to determine tier order if needed
+      const sortedPackages = [...canisterPackages].sort((a: any, b: any) => {
+        const priceA = typeof a.price_e8s === 'bigint' ? Number(a.price_e8s) : Number(a.price_e8s || 0);
+        const priceB = typeof b.price_e8s === 'bigint' ? Number(b.price_e8s) : Number(b.price_e8s || 0);
+        return priceA - priceB;
+      });
+
+      // Transform canister packages to match frontend format
+      packages = sortedPackages.map((pkg: any, index: number) => {
+        // Try to get tier from file storage first
+        let tier = tierMap.get(pkg.package_id);
+        
+        if (!tier) {
+          // Try to extract tier from package name (format: "Tier: Title")
+          const packageName = pkg.name || '';
+          const tierMatch = packageName.match(/^(Basic|Standard|Advanced|Premium):\s*(.+)$/i);
+          
+          if (tierMatch) {
+            // Tier is in the name format "Tier: Title"
+            tier = tierMatch[1].charAt(0).toUpperCase() + tierMatch[1].slice(1).toLowerCase();
+            // Remove tier prefix from title
+            pkg.name = tierMatch[2];
+          } else {
+            // Try to infer tier from package name keywords
+            const nameLower = packageName.toLowerCase();
+            if (nameLower.includes('premium') || nameLower.includes('pro')) {
+              tier = 'Premium';
+            } else if (nameLower.includes('standard') || nameLower.includes('advanced')) {
+              tier = 'Standard';
+            } else if (nameLower.includes('basic') || nameLower.includes('starter')) {
+              tier = 'Basic';
+            } else {
+              // Infer tier from order and price (cheapest = Basic, most expensive = Premium)
+              if (sortedPackages.length === 1) {
+                tier = 'Basic';
+              } else if (sortedPackages.length === 2) {
+                tier = index === 0 ? 'Basic' : 'Premium';
+              } else {
+                // 3+ packages: Basic, Standard, Premium
+                if (index === 0) tier = 'Basic';
+                else if (index === sortedPackages.length - 1) tier = 'Premium';
+                else tier = 'Standard';
+              }
+            }
+          }
+        }
+
+        return {
+          package_id: pkg.package_id,
+          service_id: pkg.service_id,
+          tier: tier,
+          title: pkg.name || pkg.title || 'Package', // Use name from canister (with tier prefix removed if present)
+          description: pkg.description || '',
+          price_e8s: typeof pkg.price_e8s === 'bigint' ? Number(pkg.price_e8s) : Number(pkg.price_e8s || 0),
+          delivery_days: typeof pkg.delivery_time_days === 'bigint' ? Number(pkg.delivery_time_days) : Number(pkg.delivery_time_days || 1),
+          delivery_timeline: pkg.delivery_timeline || `${Number(pkg.delivery_time_days || 1)} days`,
+          features: pkg.features || [],
+          revisions_included: typeof pkg.revisions === 'bigint' ? Number(pkg.revisions) : Number(pkg.revisions || 1),
+          status: pkg.is_active ? 'Available' : 'Unavailable',
+          created_at: typeof pkg.created_at === 'bigint' ? Number(pkg.created_at) / 1000000 : Number(pkg.created_at || 0) / 1000000, // Convert from nanoseconds to milliseconds
+          updated_at: typeof pkg.created_at === 'bigint' ? Number(pkg.created_at) / 1000000 : Number(pkg.created_at || 0) / 1000000 // Use created_at as updated_at fallback
+        };
+      });
+
+      console.log('✅ Transformed packages:', packages.length, 'packages ready');
+    } catch (packageError) {
+      console.error('❌ Error fetching packages from canister:', packageError);
+      // Fallback to file storage packages if canister fetch fails
+      packages = (additionalData as any).packages || [];
+      console.warn('⚠️ Using file storage packages as fallback:', packages.length, 'packages');
+    }
 
     // Merge canister service data with additional data
     const mergedService = {
