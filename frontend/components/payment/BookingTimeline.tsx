@@ -10,7 +10,7 @@ import {
   Star,
   ChevronRight
 } from 'lucide-react';
-import { formatBookingDate, formatRelativeTime, getTimeRemaining, isOverdue } from '@/lib/booking-transformer';
+import { formatBookingDate, formatRelativeTime, getTimeRemaining, isOverdue } from '@/lib/booking-formatters';
 
 interface TimelineEvent {
   id: string;

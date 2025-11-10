@@ -6,24 +6,14 @@ import { useUserContext } from '@/contexts/UserContext';
 import {
   ChevronLeft,
   Shield,
-  Clock,
-  Star,
-  Check,
-  Plus,
-  Minus,
-  Info,
-  Truck,
-  RefreshCw,
-  Headphones
+  Info
 } from 'lucide-react';
-import { PaymentMethodSelector } from '@/components/payment/PaymentMethodSelector';
+import { ICPayWidget } from '@/components/payment/ICPayWidget';
 import { ServiceSummary } from '@/components/payment/ServiceSummary';
 import { UpsellSection } from '@/components/payment/UpsellSection';
 import { OrderSummary } from '@/components/payment/OrderSummary';
 import { PaymentProcessing } from '@/components/payment/PaymentProcessing';
 import { PaymentSuccess } from '@/components/payment/PaymentSuccess';
-import { createTokenPayment, createUSDPayment, createICPayClient, IcpayError, type SupportedToken, usdToTokenAmount } from '@/lib/icpay-client';
-import type { PaymentMode } from '@/components/payment/PaymentModeToggle';
 
 interface Service {
   service_id: string;
@@ -75,14 +65,10 @@ export default function PaymentPage() {
   const [selectedUpsells, setSelectedUpsells] = useState<UpsellItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'success'>('details');
-  const [selectedToken, setSelectedToken] = useState<SupportedToken>('ICP');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('usd');
   const [promoCode, setPromoCode] = useState('');
   const [promoApplied, setPromoApplied] = useState<{ discount: number; code: string } | null>(null);
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [bookingError, setBookingError] = useState<string | null>(null);
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [connectedWallet, setConnectedWallet] = useState<{ principal: string; accountId?: string } | null>(null);
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
 
   // Parse URL parameters
@@ -130,50 +116,6 @@ export default function PaymentPage() {
     fetchService();
   }, [id, packageId, packageTier]);
 
-  // Setup ICPay event listeners
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const icpay = createICPayClient();
-
-    const handleTransactionCompleted = (event: any) => {
-      console.log('Transaction completed:', event);
-    };
-
-    const handleTransactionFailed = (event: any) => {
-      console.error('Transaction failed:', event);
-      setBookingError('Payment transaction failed. Please try again.');
-      setPaymentStep('details');
-    };
-
-    const handleTransactionMismatched = (event: any) => {
-      console.error('Transaction amount mismatch:', event);
-      setBookingError(`Payment amount mismatch. Requested: ${event.requestedAmount}, Paid: ${event.paidAmount}`);
-      setPaymentStep('details');
-    };
-
-    const handleError = (event: any) => {
-      console.error('ICPay error:', event);
-      if (event.userAction) {
-        setBookingError(`${event.message}. ${event.userAction}`);
-      } else {
-        setBookingError(event.message || 'An error occurred during payment');
-      }
-    };
-
-    icpay.on('icpay-sdk-transaction-completed', handleTransactionCompleted);
-    icpay.on('icpay-sdk-transaction-failed', handleTransactionFailed);
-    icpay.on('icpay-sdk-transaction-mismatched', handleTransactionMismatched);
-    icpay.on('icpay-sdk-error', handleError);
-
-    return () => {
-      // Cleanup event listeners
-      icpay.removeEventListener?.('icpay-sdk-transaction-completed', handleTransactionCompleted);
-      icpay.removeEventListener?.('icpay-sdk-transaction-failed', handleTransactionFailed);
-      icpay.removeEventListener?.('icpay-sdk-transaction-mismatched', handleTransactionMismatched);
-      icpay.removeEventListener?.('icpay-sdk-error', handleError);
-    };
-  }, []);
 
   const calculateTotal = (): number => {
     if (!selectedPackage) return 0;
@@ -184,77 +126,26 @@ export default function PaymentPage() {
     return subtotal - discount;
   };
 
-  const handleWalletConnect = (wallet: { principal: string; accountId?: string }) => {
-    setConnectedWallet(wallet);
-    setWalletConnected(true);
-    setBookingError(null);
-  };
-
-  const handleWalletDisconnect = () => {
-    setConnectedWallet(null);
-    setWalletConnected(false);
-  };
-
-  const handlePayment = async () => {
-    if (!selectedPackage || !service) {
-      setBookingError('Please select a package');
-      return;
-    }
-
-    if (!walletConnected || !connectedWallet) {
-      setBookingError('Please connect your wallet to continue');
-      return;
-    }
+  const handlePaymentSuccess = async (paymentData: any) => {
+    if (!selectedPackage || !service) return;
 
     setPaymentStep('processing');
     setBookingError(null);
 
     try {
       const totalUSD = calculateTotal();
-      const metadata = {
-        serviceId: service.service_id,
-        packageId: selectedPackage.package_id,
-        clientId: profile.email,
-        freelancerEmail: service.freelancer_email,
-        specialInstructions,
-        upsells: selectedUpsells.map(u => ({
-          id: u.id,
-          name: u.name,
-          price: u.price
-        })),
-        promoCode: promoApplied?.code,
-      };
-
-      let transaction: any;
-
-      // Create payment based on selected mode
-      if (paymentMode === 'usd') {
-        transaction = await createUSDPayment({
-          symbol: selectedToken,
-          usdAmount: totalUSD,
-          metadata,
-          connectedWallet: { owner: connectedWallet.principal },
-        });
-      } else {
-        // For token mode, calculate the amount based on current price
-        const tokenDecimals = selectedToken === 'ICP' ? 8 : selectedToken === 'ckUSDC' ? 6 : selectedToken === 'ckBTC' ? 8 : 18;
-        // This would need the current token price - for now using a placeholder
-        const tokenAmount = usdToTokenAmount(totalUSD, 10, tokenDecimals); // Replace 10 with actual price
-        
-        transaction = await createTokenPayment({
-          symbol: selectedToken,
-          amount: tokenAmount,
-          metadata,
-          connectedWallet: { owner: connectedWallet.principal },
-        });
-      }
+      
+      // Extract payment info from ICPay widget
+      const transactionId = paymentData.transactionId || paymentData.id;
+      const tokenSymbol = paymentData.symbol || paymentData.ledger || 'ICP';
+      const tokenAmount = paymentData.amount || paymentData.tokenAmount;
 
       // Store payment result
       const result: PaymentResult = {
-        transactionId: transaction.transactionId || transaction.id,
-        amount: transaction.amount || '',
-        symbol: selectedToken,
-        status: transaction.status || 'completed',
+        transactionId,
+        amount: tokenAmount.toString(),
+        symbol: tokenSymbol,
+        status: 'completed',
       };
       setPaymentResult(result);
 
@@ -263,17 +154,29 @@ export default function PaymentPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          transactionId: result.transactionId,
+          transactionId,
           amount: totalUSD,
           currency: 'USD',
-          tokenSymbol: selectedToken,
-          tokenAmount: result.amount,
+          tokenSymbol,
+          tokenAmount,
           paymentStatus: 'succeeded',
           serviceId: service.service_id,
           packageId: selectedPackage.package_id,
           clientId: profile.email,
           freelancerEmail: service.freelancer_email,
-          metadata,
+          metadata: {
+            serviceId: service.service_id,
+            packageId: selectedPackage.package_id,
+            clientId: profile.email,
+            freelancerEmail: service.freelancer_email,
+            specialInstructions,
+            upsells: selectedUpsells.map(u => ({
+              id: u.id,
+              name: u.name,
+              price: u.price
+            })),
+            promoCode: promoApplied?.code,
+          },
         })
       });
 
@@ -290,18 +193,14 @@ export default function PaymentPage() {
 
     } catch (error) {
       console.error('Payment error:', error);
-      
-      if (error instanceof IcpayError) {
-        const errorMessage = error.userAction 
-          ? `${error.message}. ${error.userAction}`
-          : error.message;
-        setBookingError(errorMessage);
-      } else {
-        setBookingError(error instanceof Error ? error.message : 'Payment failed');
-      }
-      
+      setBookingError(error instanceof Error ? error.message : 'Payment failed');
       setPaymentStep('details');
     }
+  };
+
+  const handlePaymentError = (error: any) => {
+    console.error('ICPay payment error:', error);
+    setBookingError(error.message || 'Payment failed. Please try again.');
   };
 
   const applyPromoCode = () => {
@@ -414,16 +313,23 @@ export default function PaymentPage() {
               />
             </div>
 
-            {/* Payment Method */}
-            <PaymentMethodSelector
-              selectedToken={selectedToken}
-              onTokenChange={setSelectedToken}
-              paymentMode={paymentMode}
-              onPaymentModeChange={setPaymentMode}
-              usdAmount={calculateTotal()}
-              onWalletConnect={handleWalletConnect}
-              onWalletDisconnect={handleWalletDisconnect}
-            />
+            {/* Payment Widget */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="font-medium text-lg mb-4">Payment Method</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Pay securely with ICP tokens using the ICPay payment widget
+              </p>
+              <ICPayWidget
+                amountUsd={calculateTotal()}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+                metadata={{
+                  serviceId: service?.service_id,
+                  packageId: selectedPackage?.package_id,
+                  clientEmail: profile?.email,
+                }}
+              />
+            </div>
           </div>
 
           {/* Right Column - Order Summary */}
@@ -457,15 +363,6 @@ export default function PaymentPage() {
                   </button>
                 </div>
               </div>
-
-              {/* Pay Button */}
-              <button
-                onClick={handlePayment}
-                disabled={!walletConnected}
-                className="w-full mt-6 px-6 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-500/30"
-              >
-                {walletConnected ? `Pay $${calculateTotal().toFixed(2)}` : 'Connect Wallet to Pay'}
-              </button>
 
               {/* Trust Badges */}
               <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">

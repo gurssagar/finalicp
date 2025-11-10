@@ -13,12 +13,82 @@ interface UpsellItem {
 }
 
 interface UpsellSectionProps {
-  upsells: UpsellItem[];
+  upsells?: UpsellItem[];
   selectedUpsells: UpsellItem[];
-  onToggle: (upsell: UpsellItem) => void;
+  onUpsellsChange: (upsells: UpsellItem[]) => void;
+  onToggle?: (upsell: UpsellItem) => void;
 }
 
-export function UpsellSection({ upsells, selectedUpsells, onToggle }: UpsellSectionProps) {
+// Default upsells if none provided
+const DEFAULT_UPSELLS: UpsellItem[] = [
+  {
+    id: 'express-delivery',
+    name: 'Express Delivery',
+    description: 'Get your project delivered 2x faster',
+    price: 25,
+    duration: '2-3 days faster',
+    popular: true,
+    category: 'delivery'
+  },
+  {
+    id: 'extra-revisions',
+    name: 'Extra Revisions',
+    description: 'Add 2 more revision rounds',
+    price: 15,
+    category: 'revisions'
+  },
+  {
+    id: 'priority-support',
+    name: 'Priority Support',
+    description: '24/7 priority support and faster response times',
+    price: 20,
+    duration: 'Throughout project',
+    category: 'support'
+  },
+  {
+    id: 'commercial-license',
+    name: 'Commercial License',
+    description: 'Full commercial rights to use deliverables',
+    price: 50,
+    popular: true,
+    category: 'features'
+  },
+  {
+    id: 'source-files',
+    name: 'Source Files',
+    description: 'Receive all editable source files',
+    price: 30,
+    category: 'features'
+  },
+  {
+    id: 'extended-support',
+    name: 'Extended Support',
+    description: '30 days of post-delivery support',
+    price: 40,
+    duration: '30 days',
+    category: 'support'
+  }
+];
+
+export function UpsellSection({ 
+  upsells = DEFAULT_UPSELLS, 
+  selectedUpsells, 
+  onUpsellsChange,
+  onToggle 
+}: UpsellSectionProps) {
+  const handleToggle = (upsell: UpsellItem) => {
+    if (onToggle) {
+      onToggle(upsell);
+    } else {
+      // Use onUpsellsChange
+      const isSelected = selectedUpsells.some(item => item.id === upsell.id);
+      if (isSelected) {
+        onUpsellsChange(selectedUpsells.filter(item => item.id !== upsell.id));
+      } else {
+        onUpsellsChange([...selectedUpsells, upsell]);
+      }
+    }
+  };
   const getCategoryIcon = (category: UpsellItem['category']) => {
     switch (category) {
       case 'delivery':
@@ -88,7 +158,7 @@ export function UpsellSection({ upsells, selectedUpsells, onToggle }: UpsellSect
                           ? 'border-purple-600 bg-purple-50'
                           : 'border-gray-200 hover:border-gray-300 bg-white'
                       }`}
-                      onClick={() => onToggle(upsell)}
+                      onClick={() => handleToggle(upsell)}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-3 flex-1">

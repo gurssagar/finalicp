@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle, MessageCircle, ExternalLink, Calendar, User, Shield, Wallet, Coins, Copy } from 'lucide-react';
 import Link from 'next/link';
 import { BookingTimeline } from './BookingTimeline';
-import { formatBookingDate, formatRelativeTime } from '@/lib/booking-transformer';
+import { formatBookingDate, formatRelativeTime } from '@/lib/booking-formatters';
 
 interface PaymentSuccessProps {
   serviceTitle?: string;
