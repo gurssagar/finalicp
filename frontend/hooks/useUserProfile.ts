@@ -8,6 +8,14 @@ interface UserProfile {
   email: string;
   designation?: string;
   profileImage?: string;
+  bio: string;
+  phone: string;
+  location: string;
+  github: string;
+  linkedin: string;
+  website: string;
+  twitter: string;
+  skills: string[];
   isLoaded: boolean;
 }
 
@@ -18,6 +26,14 @@ export function useUserProfile() {
     email: '',
     designation: 'Client', // Default designation
     profileImage: '',
+    bio: '',
+    phone: '',
+    location: '',
+    github: '',
+    linkedin: '',
+    website: '',
+    twitter: '',
+    skills: [],
     isLoaded: false,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -34,13 +50,22 @@ export function useUserProfile() {
           const profileResponse = await fetch('/api/profile/check-completeness');
           if (profileResponse.ok) {
             const profileData = await profileResponse.json();
+            const canisterProfile = profileData.profile || {};
 
             setProfile({
-              firstName: profileData.profile?.firstName || '',
-              lastName: profileData.profile?.lastName || '',
-              email: sessionData.email || '',
-              designation: getUserDesignation(profileData.profile) || 'Client',
-              profileImage: profileData.profile?.profileImage || '',
+              firstName: canisterProfile.firstName || '',
+              lastName: canisterProfile.lastName || '',
+              email: sessionData.email || canisterProfile.email || '',
+              designation: getUserDesignation(canisterProfile) || 'Client',
+              profileImage: canisterProfile.profileImage || '',
+              bio: canisterProfile.bio || '',
+              phone: canisterProfile.phone || '',
+              location: canisterProfile.location || '',
+              github: canisterProfile.github || '',
+              linkedin: canisterProfile.linkedin || '',
+              website: canisterProfile.website || '',
+              twitter: canisterProfile.twitter || '',
+              skills: Array.isArray(canisterProfile.skills) ? canisterProfile.skills : [],
               isLoaded: true,
             });
           } else {
@@ -51,6 +76,14 @@ export function useUserProfile() {
               email: sessionData.email || '',
               designation: 'Client',
               profileImage: '',
+              bio: '',
+              phone: '',
+              location: '',
+              github: '',
+              linkedin: '',
+              website: '',
+              twitter: '',
+              skills: [],
               isLoaded: true,
             });
           }
@@ -64,6 +97,14 @@ export function useUserProfile() {
           email: '',
           designation: 'Client',
           profileImage: '',
+          bio: '',
+          phone: '',
+          location: '',
+          github: '',
+          linkedin: '',
+          website: '',
+          twitter: '',
+          skills: [],
           isLoaded: true,
         });
       } finally {
