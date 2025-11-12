@@ -51,6 +51,12 @@ export async function GET(request: NextRequest) {
     // Transform canister service data to match frontend interface and merge with additional data
     const transformedServices = services.map((service: any, index: number) => {
       const additionalData = additionalServicesData[index] || {};
+      const statusVariant = service.status || {};
+      const statusKey = Object.keys(statusVariant)[0];
+      let status = 'Unknown';
+      if (statusKey === 'Active' || statusKey === 'Paused' || statusKey === 'Deleted') {
+        status = statusKey;
+      }
 
       return {
         service_id: service.service_id,
@@ -64,7 +70,7 @@ export async function GET(request: NextRequest) {
         whats_included: service.whats_included,
         cover_image_url: additionalData.cover_image_url || service.cover_image_url || '',
         portfolio_images: additionalData.portfolio_images || service.portfolio_images || [],
-        status: service.status.Active ? 'Active' : 'Paused',
+        status,
         rating_avg: Number(service.total_rating || 0),
         total_orders: Number(service.review_count || 0),
         created_at: Number(service.created_at) / 1000000, // Convert from nanoseconds to milliseconds
@@ -85,7 +91,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Apply filtering
-    let filteredServices = [...transformedServices];
+    let filteredServices = transformedServices.filter((service: any) => service.status !== 'Deleted');
 
     // Filter by freelancer_email if provided
     if (freelancerEmail) {
@@ -123,7 +129,7 @@ export async function GET(request: NextRequest) {
       });
       
       console.log(`✅ Filtered services by freelancer_email "${freelancerEmail}": ${filteredServices.length} services found out of ${transformedServices.length} total`);
-      filteredServices.forEach((service, index) => {
+      filteredServices.forEach((service: any, index: number) => {
         console.log(`✅ Matching service ${index + 1}:`, {
           service_id: service.service_id,
           title: service.title,
@@ -137,7 +143,7 @@ export async function GET(request: NextRequest) {
 
     // Filter by category if provided
     if (category) {
-      filteredServices = filteredServices.filter((service) => {
+      filteredServices = filteredServices.filter((service: any) => {
         return service.main_category?.toLowerCase() === category.toLowerCase() ||
                service.sub_category?.toLowerCase() === category.toLowerCase();
       });
@@ -147,7 +153,7 @@ export async function GET(request: NextRequest) {
     // Filter by search term if provided
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
-      filteredServices = filteredServices.filter((service) => {
+      filteredServices = filteredServices.filter((service: any) => {
         return service.title?.toLowerCase().includes(searchLower) ||
                service.description?.toLowerCase().includes(searchLower) ||
                service.main_category?.toLowerCase().includes(searchLower) ||
