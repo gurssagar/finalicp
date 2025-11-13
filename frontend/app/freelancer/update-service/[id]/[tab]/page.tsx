@@ -15,6 +15,7 @@ export default function UpdateService() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const { formData, updateFormData, setSaved } = useServiceForm()
   const [newQuestion, setNewQuestion] = useState('')
   const [imageUrl, setImageUrl] = useState('')
@@ -33,7 +34,8 @@ export default function UpdateService() {
     whats_included: formData.whatsIncluded,
     cover_image_url: formData.coverImage,
     portfolio_images: formData.portfolioImages,
-    status: 'Active'
+    delivery_time_days: Number(formData.basicDeliveryDays || 7),
+    starting_from_e8s: Number(formData.basicPrice || 0) * 100000000
   }), [
     formData.serviceTitle,
     formData.mainCategory,
@@ -41,7 +43,9 @@ export default function UpdateService() {
     formData.description,
     formData.whatsIncluded,
     formData.coverImage,
-    formData.portfolioImages
+    formData.portfolioImages,
+    formData.basicDeliveryDays,
+    formData.basicPrice
   ])
 
   // Memoize authentication check function
@@ -51,15 +55,18 @@ export default function UpdateService() {
       const data = await response.json()
 
       if (data.success && data.session) {
-        setUserId(data.session.userId)
+        setUserId(data.session.userId || null)
+        setUserEmail(data.session.email || null)
       } else {
         setUserId(null)
+        setUserEmail(null)
         setError('Please log in to update services')
         setIsLoading(false)
       }
     } catch (error) {
       console.error('Error checking authentication:', error)
       setUserId(null)
+      setUserEmail(null)
       setError('Failed to authenticate')
       setIsLoading(false)
     }
@@ -113,7 +120,7 @@ export default function UpdateService() {
 
   // Memoize service data fetching function
   const fetchServiceData = useCallback(async () => {
-    if (!userId || !id) return
+    if (!userId || !userEmail || !id) return
 
     try {
       const response = await fetch(serviceApiEndpoint)
@@ -123,6 +130,7 @@ export default function UpdateService() {
         const service = data.data
         const transformedData = transformServiceData(service)
         updateFormData(transformedData)
+        setUserEmail(prev => prev ?? service.freelancer_email ?? null)
       } else {
         setError(data.error || 'Failed to load service data')
       }
@@ -132,7 +140,7 @@ export default function UpdateService() {
     } finally {
       setIsLoading(false)
     }
-  }, [userId, id, serviceApiEndpoint, transformServiceData, updateFormData])
+  }, [userId, userEmail, id, serviceApiEndpoint, transformServiceData, updateFormData])
 
   // Fetch service data from API
   useEffect(() => {
@@ -159,7 +167,7 @@ export default function UpdateService() {
   }, [navigate, id])
   // Memoize save handler with optimized payload
   const handleSave = useCallback(async () => {
-    if (!userId || !id) {
+    if (!userId || !userEmail || !id) {
       setError('User authentication required')
       return
     }
@@ -171,6 +179,7 @@ export default function UpdateService() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          userEmail,
           userId: userId,
           updates: serviceUpdatePayload
         })
@@ -179,7 +188,10 @@ export default function UpdateService() {
       const result = await response.json()
 
       if (result.success) {
-        setSuccessMessage('Changes saved successfully!')
+        setSuccessMessage('Service updated successfully!')
+        if (typeof window !== 'undefined') {
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+        }
         setTimeout(() => setSuccessMessage(null), 3000)
       } else {
         setError(result.error || 'Failed to save changes')

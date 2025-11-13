@@ -227,26 +227,65 @@ export async function PUT(
 
     const actor = await getMarketplaceActor();
 
-    // Map updates to ICP expected format (only send allowed fields)
-    const icpUpdates = {
-      title: updates.title,
-      description: updates.description,
-      status: updates.status
-    };
-
-    const result = await actor.updateService(userId, serviceId, icpUpdates);
-
-    if ('ok' in result) {
-      return NextResponse.json({
-        success: true,
-        data: result.ok
-      });
-    } else {
+    if (typeof updates.status !== 'undefined') {
       return NextResponse.json({
         success: false,
-        error: handleApiError(result.err)
+        error: 'Service status updates are not supported yet.'
       }, { status: 400 });
     }
+
+    const currentService = await actor.getService(serviceId);
+    const serviceRecord = Array.isArray(currentService) ? currentService[0] : currentService?.ok;
+
+    if (!serviceRecord) {
+      return NextResponse.json({
+        success: false,
+        error: 'Service not found'
+      }, { status: 404 });
+    }
+
+    const title = updates.title ?? serviceRecord.title;
+    const description = updates.description ?? serviceRecord.description;
+    const whatsIncluded = updates.whats_included ?? serviceRecord.whats_included;
+
+    const deliveryTimeDaysRaw = updates.delivery_time_days ?? serviceRecord.delivery_time_days ?? 7;
+    const deliveryTimeDays =
+      typeof deliveryTimeDaysRaw === 'bigint'
+        ? Number(deliveryTimeDaysRaw)
+        : Number(deliveryTimeDaysRaw ?? 7);
+
+    const startingFromRaw = updates.starting_from_e8s ?? serviceRecord.starting_from_e8s ?? BigInt(0);
+    const startingFromE8s =
+      typeof startingFromRaw === 'bigint'
+        ? startingFromRaw
+        : BigInt(startingFromRaw);
+
+    const tagsValue = updates.tags ?? serviceRecord.tags ?? [];
+    const tags: string[] = Array.isArray(tagsValue)
+      ? tagsValue.map((tag) => String(tag))
+      : [];
+
+    const updateResult = await actor.updateService(
+      serviceId,
+      title,
+      description,
+      whatsIncluded,
+      BigInt(deliveryTimeDays),
+      startingFromE8s,
+      tags
+    );
+
+    if ('ok' in updateResult) {
+      return NextResponse.json({
+        success: true,
+        data: updateResult.ok
+      });
+    }
+
+    return NextResponse.json({
+      success: false,
+      error: handleApiError(updateResult.err)
+    }, { status: 400 });
   } catch (error) {
     console.error('Error updating service:', error);
     return NextResponse.json({

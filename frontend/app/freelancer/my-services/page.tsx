@@ -93,7 +93,7 @@ export default function MyServices() {
           date = new Date(processedTimestamp);
         } else {
           // It's a date string, parse directly
-          date = new Date(timestamp);
+        date = new Date(timestamp);
           processedTimestamp = date.getTime();
         }
       } else {
@@ -183,7 +183,7 @@ export default function MyServices() {
     userEmail || undefined, 
     {
       freelancer_email: userEmail || undefined, // Filter by user's email - MUST be set to filter
-      limit: 50
+    limit: 50
     }
   )
   
@@ -272,14 +272,14 @@ export default function MyServices() {
               // Fallback to current date
               console.warn('⚠️ Microsecond conversion also failed, using current date');
               createdTimestamp = Date.now();
-              createdDate = new Date().toISOString().split('T')[0];
-            }
+        createdDate = new Date().toISOString().split('T')[0];
+      }
           } else {
             // Fallback to current date
             createdTimestamp = Date.now();
-            createdDate = new Date().toISOString().split('T')[0];
-          }
-        } else {
+        createdDate = new Date().toISOString().split('T')[0];
+      }
+    } else {
           // Date is valid
           createdDate = date.toISOString().split('T')[0];
         }
@@ -398,7 +398,8 @@ export default function MyServices() {
   const processServicesWithEmbeddedData = (servicesData: any[]) => {
     console.log('💰 Processing services with embedded packages for', servicesData.length, 'services');
 
-    const processedServices = servicesData.map((service) => {
+    const processedServices = servicesData
+      .map((service) => {
       const transformedService = transformServiceData(service);
 
       // Log the complete service data including new fields
@@ -413,7 +414,8 @@ export default function MyServices() {
       });
 
       return transformedService;
-    });
+    })
+      .filter((service) => service.status !== 'deleted');
 
     console.log('✅ All services with embedded data processed:', processedServices);
     return processedServices

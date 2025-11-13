@@ -1,64 +1,290 @@
 'use client'
-import React, { useState } from 'react'
+
+import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  ChevronDown,
-  ChevronUp,
   Calendar,
   TrendingUp,
   BarChart2,
   PieChart,
   ChevronRight,
 } from 'lucide-react'
+
+const ICP_TO_USD = 10
+const E8S_PER_ICP = 100_000_000
+
+const convertE8sToUsd = (e8s: number) =>
+  (Number(e8s || 0) / E8S_PER_ICP) * ICP_TO_USD
+
+const PIE_COLORS = ['#8b5cf6', '#6366f1', '#ec4899', '#f97316', '#22c55e']
+
+type Booking = {
+  booking_id: string
+  status: string
+  total_amount_e8s: number
+  payment_status?: string
+  created_at: number
+  updated_at: number
+  freelancer_rating?: number
+}
+
+type Service = {
+  service_id: string
+  main_category: string
+}
+
 export default function AnalyticsDashboard() {
   const router = useRouter()
-  const [activeTimeframe, setActiveTimeframe] = useState<
-    '7days' | '30days' | '90days'
-  >('7days')
+
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [bookings, setBookings] = useState<Booking[]>([])
+  const [services, setServices] = useState<Service[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session')
+        const data = await response.json()
+        if (data?.success && data.session?.userId) {
+          setUserId(data.session.userId)
+          setUserEmail(data.session.email || null)
+          return
+        }
+
+        const meResponse = await fetch('/api/auth/me')
+        const meData = await meResponse.json()
+        if (meData?.success && meData.session?.userId) {
+          setUserId(meData.session.userId)
+          setUserEmail(meData.session.email || null)
+        } else {
+          setError('Unable to determine authenticated freelancer.')
+          setLoading(false)
+        }
+      } catch (sessionError) {
+        console.error('Failed to load session:', sessionError)
+        setError('Failed to load session information.')
+        setLoading(false)
+      }
+    }
+
+    loadSession()
+  }, [])
+
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      if (!userId) return
+      setLoading(true)
+      try {
+        const bookingsRes = await fetch(
+          `/api/marketplace/bookings?user_id=${encodeURIComponent(
+            userId,
+          )}&user_type=freelancer&limit=200`,
+        )
+        const bookingsJson = await bookingsRes.json()
+        if (bookingsJson.success) {
+          setBookings(bookingsJson.data || [])
+        } else {
+          setError(bookingsJson.error || 'Failed to load bookings.')
+        }
+
+        if (userEmail) {
+          const servicesRes = await fetch(
+            `/api/marketplace/services?freelancer_email=${encodeURIComponent(
+              userEmail,
+            )}&limit=200`,
+          )
+          const servicesJson = await servicesRes.json()
+          if (servicesJson.success) {
+            const visibleServices = (servicesJson.data || []).filter(
+              (service: any) => service?.status !== 'Deleted',
+            )
+            setServices(visibleServices)
+          } else {
+            console.warn('Failed to load services:', servicesJson.error)
+          }
+        }
+      } catch (analyticsError) {
+        console.error('Analytics fetch error:', analyticsError)
+        setError('Failed to load analytics data.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAnalyticsData()
+  }, [userId, userEmail])
+
+  const analytics = useMemo(() => {
+    const completedStatuses = new Set(['Completed'])
+    const activeStatuses = new Set(['InProgress', 'Pending'])
+    const earningsStatuses = new Set(['Completed', 'Released'])
+
+    let totalE8s = 0
+    let activeProjects = 0
+    let completedProjects = 0
+    const ratings: number[] = []
+    const earningsByMonth = new Map<string, number>()
+
+    bookings.forEach((booking) => {
+      if (completedStatuses.has(booking.status)) {
+        completedProjects += 1
+      }
+      if (activeStatuses.has(booking.status)) {
+        activeProjects += 1
+      }
+
+      const qualifiesForEarnings =
+        earningsStatuses.has(booking.status) ||
+        (booking.payment_status &&
+          earningsStatuses.has(booking.payment_status))
+
+      if (qualifiesForEarnings) {
+        totalE8s += Number(booking.total_amount_e8s || 0)
+        const date = new Date(
+          booking.updated_at || booking.created_at || Date.now(),
+        )
+        const monthKey = `${date.getUTCFullYear()}-${String(
+          date.getUTCMonth() + 1,
+        ).padStart(2, '0')}`
+        earningsByMonth.set(
+          monthKey,
+          (earningsByMonth.get(monthKey) || 0) +
+            Number(booking.total_amount_e8s || 0),
+        )
+      }
+
+      if (typeof booking.freelancer_rating === 'number') {
+        ratings.push(booking.freelancer_rating)
+      }
+    })
+
+    const totalEarningsUsd = convertE8sToUsd(totalE8s)
+    const totalBookings = bookings.length
+    const completionRate =
+      totalBookings > 0 ? (completedProjects / totalBookings) * 100 : 0
+    const averageRating =
+      ratings.length > 0
+        ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
+        : null
+    const satisfaction =
+      averageRating !== null ? (averageRating / 5) * 100 : null
+
+    const earningsTrend = Array.from(earningsByMonth.entries())
+      .sort(([a], [b]) => (a > b ? 1 : -1))
+      .slice(-6)
+      .map(([month, value]) => {
+        const date = new Date(`${month}-01T00:00:00Z`)
+        const monthLabel = date.toLocaleDateString('en-US', {
+          month: 'short',
+          year: '2-digit',
+        })
+        return {
+          month: monthLabel,
+          amount: convertE8sToUsd(value),
+        }
+      })
+
+    const categoryCounts = services.reduce<Record<string, number>>(
+      (acc, service) => {
+        if (service.main_category) {
+          acc[service.main_category] = (acc[service.main_category] || 0) + 1
+        }
+        return acc
+      },
+      {},
+    )
+
+    const categoryDistribution = Object.entries(categoryCounts)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count)
+
+    return {
+      totalEarningsUsd,
+      activeProjects,
+      completedProjects,
+      completionRate,
+      averageRating,
+      satisfaction,
+      earningsTrend,
+      categoryDistribution,
+      totalServices: services.length,
+    }
+  }, [bookings, services])
+
+  const pieSegments = useMemo(() => {
+    if (!analytics.categoryDistribution.length || analytics.totalServices === 0)
+      return null
+
+    let startDeg = 0
+
+    const segments = analytics.categoryDistribution.map(
+      ({ category, count }, idx) => {
+        const fraction = count / analytics.totalServices
+        const degrees = fraction * 360
+        const segment = `${PIE_COLORS[idx % PIE_COLORS.length]} ${startDeg}deg ${
+          startDeg + degrees
+        }deg`
+        startDeg += degrees
+        return {
+          category,
+          count,
+          percentage: (fraction * 100).toFixed(1),
+          color: PIE_COLORS[idx % PIE_COLORS.length],
+          segment,
+        }
+      },
+    )
+
+    return {
+      gradient: segments.map((item) => item.segment).join(', '),
+      legend: segments.map(({ category, count, percentage, color }) => ({
+        category,
+        count,
+        percentage,
+        color,
+      })),
+    }
+  }, [analytics.categoryDistribution, analytics.totalServices])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="text-gray-600">Loading analytics...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-6 py-4 text-red-700">
+          {error}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen bg-white">
-      
       <div className="flex-1 overflow-auto">
-        
         <main className="p-6">
           <div className="mb-6">
-            <h1 className="text-2xl font-bold mb-2">Analytics Dashboard</h1>
-            <p className="text-gray-600">Manage your projects and proposals</p>
+            <h1 className="mb-2 text-2xl font-bold">Analytics Dashboard</h1>
+            <p className="text-gray-600">
+              Real-time insights from your bookings and services
+            </p>
           </div>
-          <div className="flex justify-between items-center mb-6">
-            <div></div>
-            <div className="flex bg-gray-100 rounded-full p-1">
-              <button
-                onClick={() => setActiveTimeframe('7days')}
-                className={`px-4 py-2 text-sm rounded-full ${activeTimeframe === '7days' ? 'bg-orange-500 text-white' : 'text-gray-600'}`}
-              >
-                7 Days
-              </button>
-              <button
-                onClick={() => setActiveTimeframe('30days')}
-                className={`px-4 py-2 text-sm rounded-full ${activeTimeframe === '30days' ? 'bg-orange-500 text-white' : 'text-gray-600'}`}
-              >
-                30 Days
-              </button>
-              <button
-                onClick={() => setActiveTimeframe('90days')}
-                className={`px-4 py-2 text-sm rounded-full ${activeTimeframe === '90days' ? 'bg-orange-500 text-white' : 'text-gray-600'}`}
-              >
-                90 Days
-              </button>
-            </div>
-          </div>
-          {/* Metrics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <div className="flex justify-between mb-2">
+
+          <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex justify-between">
                 <div className="text-sm text-gray-500">Total Earnings</div>
-                <div className="text-xs text-green-500 flex items-center">
-                  <TrendingUp size={14} className="mr-1" />
-                  +12.5%
-                </div>
+                <TrendingUp size={14} className="text-green-500" />
               </div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="mb-1 flex items-center gap-2">
                 <svg
                   width="20"
                   height="20"
@@ -81,33 +307,37 @@ export default function AnalyticsDashboard() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                <h3 className="text-xl font-bold">$17,500.90</h3>
+                <h3 className="text-xl font-bold">
+                  ${analytics.totalEarningsUsd.toFixed(2)}
+                </h3>
               </div>
-              <div className="text-xs text-gray-500">USD EQUIVALENT</div>
+              <div className="text-xs text-gray-500">
+                Across {bookings.length} bookings
+              </div>
             </div>
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <div className="flex justify-between mb-2">
+
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex justify-between">
                 <div className="text-sm text-gray-500">Completed</div>
-                <div className="text-xs text-green-500 flex items-center">
-                  <TrendingUp size={14} className="mr-1" />
-                  +12.5%
-                </div>
+                <Calendar size={14} className="text-green-500" />
               </div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="mb-1 flex items-center gap-2">
                 <Calendar size={20} className="text-gray-700" />
-                <h3 className="text-xl font-bold">98.5%</h3>
+                <h3 className="text-xl font-bold">
+                  {analytics.completedProjects}
+                </h3>
               </div>
-              <div className="text-xs text-gray-500">PROJECTS FINISHED</div>
+              <div className="text-xs text-gray-500">
+                {analytics.completionRate.toFixed(1)}% completion rate
+              </div>
             </div>
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <div className="flex justify-between mb-2">
+
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex justify-between">
                 <div className="text-sm text-gray-500">Client Rating</div>
-                <div className="text-xs text-green-500 flex items-center">
-                  <TrendingUp size={14} className="mr-1" />
-                  +12.5%
-                </div>
+                <BarChart2 size={14} className="text-green-500" />
               </div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="mb-1 flex items-center gap-2">
                 <svg
                   width="20"
                   height="20"
@@ -123,19 +353,25 @@ export default function AnalyticsDashboard() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                <h3 className="text-xl font-bold">5</h3>
+                <h3 className="text-xl font-bold">
+                  {analytics.averageRating !== null
+                    ? analytics.averageRating.toFixed(1)
+                    : 'N/A'}
+                </h3>
               </div>
-              <div className="text-xs text-gray-500">IN PROGRESS</div>
+              <div className="text-xs text-gray-500">
+                {analytics.satisfaction !== null
+                  ? `${analytics.satisfaction.toFixed(1)}% satisfaction`
+                  : 'Awaiting reviews'}
+              </div>
             </div>
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <div className="flex justify-between mb-2">
-                <div className="text-sm text-gray-500">Profile Views</div>
-                <div className="text-xs text-green-500 flex items-center">
-                  <TrendingUp size={14} className="mr-1" />
-                  +12.5%
-                </div>
+
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex justify-between">
+                <div className="text-sm text-gray-500">Active Projects</div>
+                <TrendingUp size={14} className="text-green-500" />
               </div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="mb-1 flex items-center gap-2">
                 <svg
                   width="20"
                   height="20"
@@ -158,205 +394,179 @@ export default function AnalyticsDashboard() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                <h3 className="text-xl font-bold">100%</h3>
+                <h3 className="text-xl font-bold">
+                  {analytics.activeProjects}
+                </h3>
               </div>
-              <div className="text-xs text-gray-500">CLIENT SATISFACTION</div>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-            {/* Earnings Chart */}
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4">Earning Overview</h2>
-              <div className="h-64 relative">
-                {/* Simplified chart visualization */}
-                <div className="absolute inset-0 flex items-end">
-                  <div className="w-1/6 bg-pink-100 h-1/5 rounded-t-md relative">
-                    <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-pink-200 to-transparent rounded-t-md"></div>
-                  </div>
-                  <div className="w-1/6 bg-pink-100 h-1/3 rounded-t-md relative">
-                    <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-pink-200 to-transparent rounded-t-md"></div>
-                  </div>
-                  <div className="w-1/6 bg-pink-100 h-3/5 rounded-t-md relative">
-                    <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-pink-200 to-transparent rounded-t-md"></div>
-                  </div>
-                  <div className="w-1/6 bg-pink-100 h-2/5 rounded-t-md relative">
-                    <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-pink-200 to-transparent rounded-t-md"></div>
-                  </div>
-                  <div className="w-1/6 bg-pink-100 h-1/2 rounded-t-md relative">
-                    <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-pink-200 to-transparent rounded-t-md"></div>
-                  </div>
-                  <div className="w-1/6 bg-pink-100 h-4/5 rounded-t-md relative">
-                    <div className="absolute bottom-0 w-full h-full bg-gradient-to-t from-pink-200 to-transparent rounded-t-md"></div>
-                    <div className="absolute -top-2 left-1/2 w-3 h-3 bg-pink-500 rounded-full transform -translate-x-1/2"></div>
-                    <div className="absolute -top-2 left-1/2 w-6 h-6 bg-pink-500 rounded-full transform -translate-x-1/2 opacity-20 animate-ping"></div>
-                  </div>
-                </div>
-                {/* X-axis labels */}
-                <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-gray-500 pt-2">
-                  <div>Jan</div>
-                  <div>Feb</div>
-                  <div>Mar</div>
-                  <div>Apr</div>
-                  <div>May</div>
-                  <div>Jun</div>
-                </div>
-                {/* Y-axis labels */}
-                <div className="absolute top-0 right-0 h-full flex flex-col justify-between text-xs text-gray-500 pr-2">
-                  <div>5000</div>
-                  <div>4000</div>
-                  <div>3000</div>
-                  <div>2000</div>
-                  <div>1000</div>
-                  <div>0</div>
-                </div>
-              </div>
-            </div>
-            {/* Project Categories */}
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4">Project Categories</h2>
-              <div className="h-64 flex flex-col justify-between space-y-4 pt-4">
-                <div className="flex items-center">
-                  <div className="w-24 text-sm text-gray-500">S</div>
-                  <div
-                    className="flex-1 h-6 bg-blue-100 rounded-sm"
-                    style={{
-                      width: '60%',
-                    }}
-                  ></div>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-24 text-sm text-gray-500">M</div>
-                  <div
-                    className="flex-1 h-6 bg-blue-100 rounded-sm"
-                    style={{
-                      width: '40%',
-                    }}
-                  ></div>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-24 text-sm text-gray-500">T</div>
-                  <div
-                    className="flex-1 h-6 bg-blue-100 rounded-sm"
-                    style={{
-                      width: '80%',
-                    }}
-                  ></div>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-24 text-sm text-gray-500">W</div>
-                  <div
-                    className="flex-1 h-6 bg-blue-500 rounded-sm"
-                    style={{
-                      width: '95%',
-                    }}
-                  ></div>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-24 text-sm text-gray-500">T</div>
-                  <div
-                    className="flex-1 h-6 bg-blue-100 rounded-sm"
-                    style={{
-                      width: '75%',
-                    }}
-                  ></div>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-24 text-sm text-gray-500">F</div>
-                  <div
-                    className="flex-1 h-6 bg-blue-100 rounded-sm"
-                    style={{
-                      width: '25%',
-                    }}
-                  ></div>
-                </div>
-                <div className="flex justify-between text-xs text-gray-500 pt-2">
-                  <div>Jan</div>
-                  <div>Feb</div>
-                  <div>Mar</div>
-                  <div>Apr</div>
-                  <div>May</div>
-                  <div>Jun</div>
-                </div>
+              <div className="text-xs text-gray-500">
+                Currently in progress
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Skills Distribution */}
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4">
-                Skills Distribution
+
+          <div className="mb-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold">
+                Earning Overview
               </h2>
-              <div className="h-64 relative flex items-center justify-center">
-                {/* Simplified pie chart */}
-                <div className="w-48 h-48 rounded-full border-[16px] border-purple-500 relative">
-                  <div className="absolute top-0 right-0 bottom-0 left-0 border-[16px] border-transparent border-t-orange-400 border-r-orange-400 rounded-full transform -rotate-45"></div>
-                  <div className="absolute top-0 right-0 bottom-0 left-0 border-[16px] border-transparent border-b-blue-400 border-l-blue-400 rounded-full transform rotate-45"></div>
-                  <div className="absolute top-0 right-0 bottom-0 left-0 border-[16px] border-transparent border-b-red-400 rounded-full transform rotate-[200deg]"></div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-orange-400 mr-2"></div>
-                  <span className="text-sm">ICP Development</span>
-                  <span className="ml-auto font-medium">35%</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-purple-500 mr-2"></div>
-                  <span className="text-sm">React</span>
-                  <span className="ml-auto font-medium">25%</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-blue-400 mr-2"></div>
-                  <span className="text-sm">UI/UX Design</span>
-                  <span className="ml-auto font-medium">15%</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 bg-red-400 mr-2"></div>
-                  <span className="text-sm">Other</span>
-                  <span className="ml-auto font-medium">5%</span>
-                </div>
+              <div className="relative h-64">
+                {analytics.earningsTrend.length ? (
+                  <div className="absolute inset-0 flex items-end gap-3">
+                    {analytics.earningsTrend.map(({ month, amount }) => {
+                      const max = Math.max(
+                        ...analytics.earningsTrend.map((d) => d.amount),
+                        1,
+                      )
+                      const height = Math.max(
+                        6,
+                        (amount / max) * 100,
+                      )
+                      return (
+                        <div
+                          key={month}
+                          className="flex h-full w-full flex-col items-center justify-end text-xs text-gray-500"
+                        >
+                          <div
+                            className="w-full rounded-t-md bg-gradient-to-t from-pink-500 to-pink-300"
+                            style={{ height: `${height}%` }}
+                          ></div>
+                        <div className="mt-2">{month}</div>
+                          <div className="mt-1 text-[10px] text-gray-400">
+                            ${amount.toFixed(0)}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                    No completed bookings yet. Earnings will appear once jobs are
+                    finished.
+                  </div>
+                )}
               </div>
             </div>
-            {/* Performance Insights */}
-            <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
-              <h2 className="text-lg font-semibold mb-4">
-                Performance Insights
+
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold">
+                Project Categories
               </h2>
-              <div className="space-y-6">
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-                  <h3 className="text-blue-700 font-medium">
-                    Strong Performance
+              <div className="flex h-64 flex-col justify-between gap-4">
+                {analytics.categoryDistribution.length ? (
+                  analytics.categoryDistribution.map(({ category, count }) => {
+                    const percentage = analytics.totalServices
+                      ? (count / analytics.totalServices) * 100
+                      : 0
+                    return (
+                      <div
+                        key={category}
+                        className="flex items-center gap-4 text-sm text-gray-600"
+                      >
+                        <div className="w-32">{category}</div>
+                        <div className="flex-1 rounded bg-blue-100">
+                          <div
+                            className="h-5 rounded bg-blue-500"
+                            style={{ width: `${Math.max(6, percentage)}%` }}
+                          ></div>
+                        </div>
+                        <div className="w-10 text-right font-medium">
+                          {count}
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-gray-500">
+                    No services yet. Add services to see their distribution.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold">
+                Skills Snapshot (by Service Category)
+              </h2>
+              {pieSegments ? (
+                <>
+                  <div className="flex h-64 items-center justify-center">
+                    <div
+                      className="relative h-48 w-48 rounded-full border border-purple-200 shadow-inner"
+                      style={{ background: `conic-gradient(${pieSegments.gradient})` }}
+                    >
+                      <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 transform rounded-full bg-white shadow-inner"></div>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-600">
+                    {pieSegments.legend.map(({ category, count, percentage, color }) => (
+                      <div key={category} className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-block h-3 w-3 rounded-sm"
+                            style={{ backgroundColor: color }}
+                          ></span>
+                          <span>{category}</span>
+                        </div>
+                        <span className="font-medium">
+                          {count} ({percentage}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-48 flex-col items-center justify-center text-sm text-gray-500">
+                  <PieChart className="mb-3 h-10 w-10 text-purple-400" />
+                  No services to analyse yet.
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 text-lg font-semibold">
+                Performance Highlights
+              </h2>
+              <div className="space-y-6 text-sm text-gray-600">
+                <div className="rounded border-l-4 border-blue-500 bg-blue-50 p-4">
+                  <h3 className="font-semibold text-blue-700">
+                    Consistent Delivery
                   </h3>
-                  <p className="text-sm mt-1">
-                    Your earnings increased by 23% this month. You're in the top
-                    10% of freelancers on the platform!
+                  <p className="mt-1">
+                    {analytics.completionRate.toFixed(1)}% of bookings reached
+                    completion. Keep up the steady delivery pace.
                   </p>
                 </div>
-                <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded">
-                  <h3 className="text-orange-700 font-medium">
-                    Optimization Tip
+                <div className="rounded border-l-4 border-orange-500 bg-orange-50 p-4">
+                  <h3 className="font-semibold text-orange-700">
+                    Earnings Growth
                   </h3>
-                  <p className="text-sm mt-1">
-                    Consider increasing your rates for ICP development projects.
-                    Market data shows 15% higher rates for similar skills.
+                  <p className="mt-1">
+                    You&apos;ve earned ${analytics.totalEarningsUsd.toFixed(2)}{' '}
+                    so far. Completing and releasing bookings will continue to
+                    grow this number.
                   </p>
                 </div>
-                <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
-                  <h3 className="text-purple-700 font-medium">
-                    Client Feedback
+                <div className="rounded border-l-4 border-purple-500 bg-purple-50 p-4">
+                  <h3 className="font-semibold text-purple-700">
+                    Client Sentiment
                   </h3>
-                  <p className="text-sm mt-1">
-                    Your client satisfaction score is exceptional at 4.9/5. Keep
-                    up the excellent work!
+                  <p className="mt-1">
+                    {analytics.averageRating !== null
+                      ? `Average rating of ${analytics.averageRating.toFixed(
+                          1,
+                        )}/5 from clients.`
+                      : 'No client ratings yet. Collect feedback to showcase reliability.'}
                   </p>
                 </div>
               </div>
             </div>
           </div>
+
           <div className="mt-8 text-center">
             <button
-            onClick={() => router.push('/freelancer/dashboard')}
-              className="inline-flex items-center text-purple-600 font-medium"
+              onClick={() => router.push('/freelancer/dashboard')}
+              className="inline-flex items-center font-medium text-purple-600"
             >
               Back to Dashboard
               <ChevronRight size={16} className="ml-1" />

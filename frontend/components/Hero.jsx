@@ -215,6 +215,42 @@ function Hero() {
   const canvasRef = useRef(null);
   const [counters, setCounters] = useState([0, 0, 0]);
   const targetCounts = [5, 120, 500]; // Projects, Clients, Freelancers
+  const [hasSession, setHasSession] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Check for user session
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        const data = await response.json();
+        if (data?.success && data.session?.userId) {
+          setHasSession(true);
+        } else {
+          // Try alternative endpoint
+          const meResponse = await fetch('/api/auth/me');
+          const meData = await meResponse.json();
+          if (meData?.success && meData.session?.userId) {
+            setHasSession(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check session:', error);
+      } finally {
+        setCheckingSession(false);
+      }
+    };
+
+    checkSession();
+  }, []);
+
+  const handleJoinClick = () => {
+    if (hasSession) {
+      router.push('/freelancer/dashboard');
+    } else {
+      router.push('/signup');
+    }
+  };
 
   // Counter animation effect
   useEffect(() => {
@@ -429,7 +465,7 @@ function Hero() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
             {/* Join ICP Work Button */}
             <button
-              onClick={() => router.push("/signup")}
+              onClick={handleJoinClick}
               className="relative rounded-[20px] text-white font-semibold transition-all duration-500 transform hover:-translate-y-0.5 px-6 py-3 sm:px-8 sm:py-3 lg:px-10 lg:py-4 xl:px-12 xl:py-5 text-sm sm:text-base lg:text-lg xl:text-lg whitespace-nowrap"
               style={{
                 background: "transparent",

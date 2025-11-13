@@ -27,19 +27,19 @@ export async function POST(request: NextRequest) {
     const userActor = await getUserActor();
     
     try {
-      const result = await userActor.updateProfileSubmissionStatus(session.userId, isSubmitted);
+    const result = await userActor.updateProfileSubmissionStatus(session.userId, isSubmitted);
 
-      if ('err' in result) {
-        return NextResponse.json({
-          success: false,
-          error: result.err,
-        }, { status: 400 });
-      }
-
+    if ('err' in result) {
       return NextResponse.json({
-        success: true,
-        message: isSubmitted ? 'Profile marked as submitted' : 'Profile submission status updated',
-      });
+        success: false,
+        error: result.err,
+      }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: isSubmitted ? 'Profile marked as submitted' : 'Profile submission status updated',
+    });
     } catch (error: any) {
       // Method doesn't exist on deployed canister
       if (error?.message?.includes('no update method') || error?.message?.includes('method not found')) {

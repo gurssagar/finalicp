@@ -211,8 +211,8 @@ export default function DashboardHome() {
         change: '+0%', // TODO: Calculate from previous period
         subtitle: 'PROJECTS FINISHED',
         icon: '✓',
-      },
-      {
+    },
+    {
         title: 'Success Rate',
         value: `${successRate}%`,
         change: '+0%', // TODO: Calculate from previous period
@@ -440,39 +440,39 @@ export default function DashboardHome() {
               <div className="space-y-4">
                 {recentProjects.length > 0 ? (
                   recentProjects.map((project) => (
-                    <div
-                      key={project.id}
-                      className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm flex"
-                    >
+                  <div
+                    key={project.id}
+                    className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm flex"
+                  >
                       <div className={`mr-4 rounded-lg w-12 h-12 flex items-center justify-center text-white ${
                         project.status === 'Completed' ? 'bg-green-500' :
                         project.status === 'Active' || project.status === 'InProgress' ? 'bg-blue-500' :
                         'bg-gray-500'
                       }`}>
-                        <Check size={20} />
+                      <Check size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium">{project.title}</h3>
+                      <div className="text-xs text-gray-500">
+                        From: {project.from}
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium">{project.title}</h3>
-                        <div className="text-xs text-gray-500">
-                          From: {project.from}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <div className="flex items-center text-green-500">
-                          <span>{project.amount}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center text-green-500">
+                        <span>{project.amount}</span>
                           <div className={`ml-2 text-xs px-2 py-0.5 rounded ${
                             project.status === 'Completed' ? 'bg-green-100 text-green-700' :
                             project.status === 'Active' || project.status === 'InProgress' ? 'bg-blue-100 text-blue-700' :
                             'bg-gray-100 text-gray-700'
                           }`}>
-                            {project.status}
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {project.date}
+                          {project.status}
                         </div>
                       </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {project.date}
+                      </div>
                     </div>
+                  </div>
                   ))
                 ) : (
                   <div className="bg-white border border-gray-100 rounded-lg p-8 text-center">
@@ -550,7 +550,7 @@ export default function DashboardHome() {
                 </div>
               </div>
             </div>
-          </div>
+      </div>
     </div>
   )
 }

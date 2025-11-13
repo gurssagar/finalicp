@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
         if (submitError?.message?.includes('no update method') || submitError?.message?.includes('method not found')) {
           console.warn('⚠️ markProfileAsSubmitted method not available on canister - profile is still saved');
         } else {
-          console.error('Auto-submission failed (profile still saved):', submitError);
+        console.error('Auto-submission failed (profile still saved):', submitError);
         }
         // Continue anyway - the main profile data is saved
       }
