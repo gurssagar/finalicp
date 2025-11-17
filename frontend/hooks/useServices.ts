@@ -353,7 +353,7 @@ export function useServicePackages(serviceId?: string, startingFromE8s?: number)
       });
       const minPrice = Math.min(...prices);
       console.log('getMinPrice from packages:', { prices, minPrice, packages });
-      return minPrice;
+    return minPrice;
     }
     // If no packages but we have starting_from_e8s, use that
     if (startingFromE8s) {
