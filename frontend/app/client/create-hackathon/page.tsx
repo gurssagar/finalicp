@@ -1,299 +1,1032 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { CreateHackathonNav } from '@/components/hackathon/CreateHackathonNav';
-import { CreateHackathonOverview } from '@/components/hackathon/CreateHackathonOverview';
-import CreateHackathonPrizes from '@/components/hackathon/CreateHackathonPrizes';
-import CreateHackathonJudges from '@/components/hackathon/CreateHackathonJudges';
-import CreateHackathonSchedule from '@/components/hackathon/CreateHackathonSchedule';
-import { X, Save, Eye, AlertCircle, CheckCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useHackathonForm } from '@/context/HackathonFormContext';
-import { HackathonFormProvider } from '@/context/HackathonFormContext';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { HttpAgent, Actor } from '@dfinity/agent';
+import { Principal } from '@dfinity/principal';
+import { Loader2, Plus, Trash2, CheckCircle2, AlertTriangle } from 'lucide-react';
 
-function CreateHackathonContent() {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<string>('overview');
-  const [showPublishModal, setShowPublishModal] = useState(false);
-    const [activeToast, setActiveToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+const CANISTER_ID = process.env.NEXT_PUBLIC_HACKATHON_CANISTER_ID ?? '';
+const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST ?? '';
 
-  const {
-    formData,
-    isAutoSaving,
-    lastSavedAt,
-    saveDraft
-  } = useHackathonForm();
+const hackquestIdl = ({ IDL }: typeof import('@dfinity/candid')) => {
+  const HackathonStatus = IDL.Variant({
+    Draft: IDL.Null,
+    Upcoming: IDL.Null,
+    Ongoing: IDL.Null,
+    Judging: IDL.Null,
+    Completed: IDL.Null,
+    Cancelled: IDL.Null,
+  });
 
-  const handleSaveDraft = async () => {
+  const CategoryInput = IDL.Record({
+    name: IDL.Text,
+    description: IDL.Text,
+    rewardSlots: IDL.Nat,
+    judgingCriteria: IDL.Vec(IDL.Text),
+  });
+
+  const RewardInput = IDL.Record({
+    title: IDL.Text,
+    description: IDL.Text,
+    amount: IDL.Nat64,
+    rank: IDL.Nat,
+    categoryName: IDL.Opt(IDL.Text),
+    perks: IDL.Vec(IDL.Text),
+  });
+
+  const Hackathon = IDL.Record({
+    id: IDL.Text,
+    organizer: IDL.Principal,
+    title: IDL.Text,
+    tagline: IDL.Text,
+    summary: IDL.Text,
+    bannerUrl: IDL.Text,
+    heroVideoUrl: IDL.Text,
+    location: IDL.Text,
+    theme: IDL.Text,
+    prizePool: IDL.Nat64,
+    faq: IDL.Vec(IDL.Text),
+    resources: IDL.Vec(IDL.Text),
+    minTeamSize: IDL.Nat,
+    maxTeamSize: IDL.Nat,
+    maxTeamsPerCategory: IDL.Nat,
+    submissionsOpenAt: IDL.Int,
+    submissionsCloseAt: IDL.Int,
+    startAt: IDL.Int,
+    endAt: IDL.Int,
+    createdAt: IDL.Int,
+    status: HackathonStatus,
+    categories: IDL.Vec(IDL.Text),
+    rewards: IDL.Vec(IDL.Text),
+  });
+
+  const HackQuestError = IDL.Variant({
+    NotFound: IDL.Text,
+    ValidationError: IDL.Text,
+    InvalidState: IDL.Text,
+    NotAuthorized: IDL.Null,
+  });
+
+  const CreateHackathonRequest = IDL.Record({
+    title: IDL.Text,
+    tagline: IDL.Text,
+    summary: IDL.Text,
+    bannerUrl: IDL.Text,
+    heroVideoUrl: IDL.Text,
+    location: IDL.Text,
+    theme: IDL.Text,
+    prizePool: IDL.Nat64,
+    faq: IDL.Vec(IDL.Text),
+    resources: IDL.Vec(IDL.Text),
+    minTeamSize: IDL.Nat,
+    maxTeamSize: IDL.Nat,
+    maxTeamsPerCategory: IDL.Nat,
+    submissionsOpenAt: IDL.Int,
+    submissionsCloseAt: IDL.Int,
+    startAt: IDL.Int,
+    endAt: IDL.Int,
+    categories: IDL.Vec(CategoryInput),
+    rewards: IDL.Vec(RewardInput),
+  });
+
+  return IDL.Service({
+    createHackathon: IDL.Func(
+      [CreateHackathonRequest, IDL.Principal], // request, organizer principal
+      [IDL.Variant({ ok: Hackathon, err: HackQuestError })],
+      []
+    ),
+    listHackathons: IDL.Func(
+      [IDL.Nat, IDL.Nat, IDL.Opt(HackathonStatus)],
+      [IDL.Vec(Hackathon)],
+      ['query']
+    ),
+  });
+};
+
+const createHackquestActor = async () => {
+  if (!CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_HACKATHON_CANISTER_ID is not configured');
+  }
+  const agent = new HttpAgent({ host: IC_HOST });
+  if (IC_HOST.includes('127.0.0.1') || IC_HOST.includes('localhost')) {
+    await agent.fetchRootKey();
+  }
+  return Actor.createActor(hackquestIdl as any, { agent, canisterId: CANISTER_ID });
+};
+
+const emptyCategory = { name: '', description: '', rewardSlots: 1, judgingCriteria: [''] };
+const emptyReward = { title: '', description: '', amount: '', rank: 1, categoryName: '', perks: [''] };
+
+const buildTimestamp = (value: string) => {
+  if (!value) return BigInt(0);
+  const millis = Date.parse(value);
+  return BigInt(millis) * BigInt(1_000_000);
+};
+
+const sanitizeTextArray = (items: string[]) => items.map(item => item.trim()).filter(Boolean);
+
+const CreateHackathonPage = () => {
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userPrincipal, setUserPrincipal] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    title: '',
+    tagline: '',
+    summary: '',
+    bannerUrl: '',
+    heroVideoUrl: '',
+    location: '',
+    theme: '',
+    prizePool: '',
+    minTeamSize: 1,
+    maxTeamSize: 4,
+    maxTeamsPerCategory: 20,
+    submissionsOpenAt: '',
+    submissionsCloseAt: '',
+    startAt: '',
+    endAt: '',
+    faq: [''],
+    resources: [''],
+    categories: [emptyCategory],
+    rewards: [emptyReward],
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingList, setIsLoadingList] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [hackathonList, setHackathonList] = useState<any[]>([]);
+
+  const updateForm = (key: keyof typeof form, value: any) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleArrayChange = (
+    key: 'faq' | 'resources',
+    index: number,
+    value: string
+  ) => {
+    const next = [...form[key]];
+    next[index] = value;
+    updateForm(key, next);
+  };
+
+  const addSimpleRow = (key: 'faq' | 'resources') => {
+    updateForm(key, [...form[key], '']);
+  };
+
+  const removeSimpleRow = (key: 'faq' | 'resources', index: number) => {
+    const next = form[key].filter((_, i) => i !== index);
+    updateForm(key, next.length ? next : ['']);
+  };
+
+  const updateCategory = (index: number, field: keyof typeof emptyCategory, value: any) => {
+    const next = [...form.categories];
+    next[index] = { ...next[index], [field]: value };
+    updateForm('categories', next);
+  };
+
+  const updateCategoryCriteria = (catIndex: number, critIndex: number, value: string) => {
+    const next = [...form.categories];
+    const criteria = [...next[catIndex].judgingCriteria];
+    criteria[critIndex] = value;
+    next[catIndex].judgingCriteria = criteria;
+    updateForm('categories', next);
+  };
+
+  const addCategoryCriterion = (catIndex: number) => {
+    const next = [...form.categories];
+    next[catIndex].judgingCriteria = [...next[catIndex].judgingCriteria, ''];
+    updateForm('categories', next);
+  };
+
+  const removeCategoryCriterion = (catIndex: number, critIndex: number) => {
+    const next = [...form.categories];
+    const filtered = next[catIndex].judgingCriteria.filter((_, i) => i !== critIndex);
+    next[catIndex].judgingCriteria = filtered.length ? filtered : [''];
+    updateForm('categories', next);
+  };
+
+  const updateReward = (index: number, field: keyof typeof emptyReward, value: any) => {
+    const next = [...form.rewards];
+    next[index] = { ...next[index], [field]: value };
+    updateForm('rewards', next);
+  };
+
+  const updateRewardPerk = (rewardIndex: number, perkIndex: number, value: string) => {
+    const next = [...form.rewards];
+    const perks = [...next[rewardIndex].perks];
+    perks[perkIndex] = value;
+    next[rewardIndex].perks = perks;
+    updateForm('rewards', next);
+  };
+
+  const addRewardPerk = (rewardIndex: number) => {
+    const next = [...form.rewards];
+    next[rewardIndex].perks = [...next[rewardIndex].perks, ''];
+    updateForm('rewards', next);
+  };
+
+  const removeRewardPerk = (rewardIndex: number, perkIndex: number) => {
+    const next = [...form.rewards];
+    const filtered = next[rewardIndex].perks.filter((_, i) => i !== perkIndex);
+    next[rewardIndex].perks = filtered.length ? filtered : [''];
+    updateForm('rewards', next);
+  };
+
+  const addCategory = () => {
+    updateForm('categories', [...form.categories, { ...emptyCategory }]);
+  };
+
+  const removeCategory = (index: number) => {
+    const next = form.categories.filter((_, i) => i !== index);
+    updateForm('categories', next.length ? next : [{ ...emptyCategory }]);
+  };
+
+  const addReward = () => {
+    updateForm('rewards', [...form.rewards, { ...emptyReward }]);
+  };
+
+  const removeReward = (index: number) => {
+    const next = form.rewards.filter((_, i) => i !== index);
+    updateForm('rewards', next.length ? next : [{ ...emptyReward }]);
+  };
+
+  const resetForm = () => {
+    setForm({
+      title: '',
+      tagline: '',
+      summary: '',
+      bannerUrl: '',
+      heroVideoUrl: '',
+      location: '',
+      theme: '',
+      prizePool: '',
+      minTeamSize: 1,
+      maxTeamSize: 4,
+      maxTeamsPerCategory: 20,
+      submissionsOpenAt: '',
+      submissionsCloseAt: '',
+      startAt: '',
+      endAt: '',
+      faq: [''],
+      resources: [''],
+      categories: [{ ...emptyCategory }],
+      rewards: [{ ...emptyReward }],
+    });
+  };
+
+  const fetchHackathons = useCallback(async () => {
     try {
-      const success = await saveDraft();
-      if (success) {
-        showToast('Draft saved successfully!', 'success');
+      setIsLoadingList(true);
+      const actor: any = await createHackquestActor();
+      const data = await actor.listHackathons(BigInt(20), BigInt(0), []);
+      setHackathonList(data);
+    } catch (error) {
+      console.error('Failed to load hackathons', error);
+      setStatusMessage({ type: 'error', text: 'Unable to load hackathons from canister.' });
+    } finally {
+      setIsLoadingList(false);
+    }
+  }, []);
+
+  // Get user email and principal from session
+  useEffect(() => {
+    const getUserInfo = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.session?.email) {
+            setUserEmail(data.session.email);
+            
+            // Get principal from email via API
+            try {
+              const principalResponse = await fetch(`/api/hackquest/participants/email-to-principal?email=${encodeURIComponent(data.session.email)}`);
+              if (principalResponse.ok) {
+                const principalData = await principalResponse.json();
+                if (principalData.success && principalData.principal) {
+                  setUserPrincipal(principalData.principal);
+                }
+              }
+            } catch (error) {
+              console.error('Error getting principal:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user email:', error);
+      }
+    };
+    getUserInfo();
+  }, []);
+
+  useEffect(() => {
+    fetchHackathons();
+  }, [fetchHackathons]);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    setStatusMessage(null);
+
+    try {
+      if (!form.title.trim() || !form.summary.trim()) {
+        throw new Error('Title and summary are required.');
+      }
+
+      const payload = {
+        title: form.title.trim(),
+        tagline: form.tagline.trim(),
+        summary: form.summary.trim(),
+        bannerUrl: form.bannerUrl.trim(),
+        heroVideoUrl: form.heroVideoUrl.trim(),
+        location: form.location.trim(),
+        theme: form.theme.trim(),
+        prizePool: BigInt(Math.max(Number(form.prizePool) || 0, 0)),
+        faq: sanitizeTextArray(form.faq),
+        resources: sanitizeTextArray(form.resources),
+        minTeamSize: BigInt(Math.max(form.minTeamSize, 1)),
+        maxTeamSize: BigInt(Math.max(form.maxTeamSize, form.minTeamSize)),
+        maxTeamsPerCategory: BigInt(Math.max(form.maxTeamsPerCategory, 1)),
+        submissionsOpenAt: buildTimestamp(form.submissionsOpenAt),
+        submissionsCloseAt: buildTimestamp(form.submissionsCloseAt),
+        startAt: buildTimestamp(form.startAt),
+        endAt: buildTimestamp(form.endAt),
+        categories: form.categories.map(category => ({
+          name: category.name.trim(),
+          description: category.description.trim(),
+          rewardSlots: BigInt(Math.max(category.rewardSlots, 1)),
+          judgingCriteria: sanitizeTextArray(category.judgingCriteria),
+        })),
+        rewards: form.rewards.map(reward => ({
+          title: reward.title.trim(),
+          description: reward.description.trim(),
+          amount: BigInt(Math.max(Number(reward.amount) || 0, 0)),
+          rank: BigInt(Math.max(reward.rank, 1)),
+          categoryName: reward.categoryName.trim() ? [reward.categoryName.trim()] : [],
+          perks: sanitizeTextArray(reward.perks),
+        })),
+      };
+
+      if (!userEmail) {
+        throw new Error('Please login to create a hackathon.');
+      }
+
+      // Ensure we have the principal
+      let principalToUse = userPrincipal;
+      if (!principalToUse) {
+        try {
+          const principalResponse = await fetch(`/api/hackquest/participants/email-to-principal?email=${encodeURIComponent(userEmail)}`);
+          if (principalResponse.ok) {
+            const principalData = await principalResponse.json();
+            if (principalData.success && principalData.principal) {
+              principalToUse = principalData.principal;
+              setUserPrincipal(principalData.principal);
+            } else {
+              throw new Error('Could not determine your identity. Please try refreshing the page.');
+            }
+          } else {
+            throw new Error('Could not determine your identity. Please try refreshing the page.');
+          }
+        } catch (error) {
+          throw new Error('Could not determine your identity. Please try refreshing the page.');
+        }
+      }
+
+      const actor: any = await createHackquestActor();
+      const organizerPrincipal = Principal.fromText(principalToUse!);
+      const result = await actor.createHackathon(payload, organizerPrincipal);
+
+      if ('ok' in result) {
+        setStatusMessage({ type: 'success', text: 'Hackathon saved to the canister!' });
+        resetForm();
+        fetchHackathons();
       } else {
-        showToast('Failed to save draft', 'error');
+        const errorVariant = result.err;
+        const key = Object.keys(errorVariant)[0] as keyof typeof errorVariant;
+        const details =
+          typeof errorVariant[key] === 'string'
+            ? errorVariant[key]
+            : 'Unknown error from canister';
+        throw new Error(details);
       }
     } catch (error) {
-      console.error('Error saving draft:', error);
-      showToast('Error saving draft', 'error');
+      console.error('Failed to save hackathon', error);
+      const message =
+        error instanceof Error ? error.message : 'Failed to save hackathon details.';
+      setStatusMessage({ type: 'error', text: message });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handlePreviewPublication = () => {
-    // Navigate to preview page with form data
-    const encodedData = encodeURIComponent(JSON.stringify(formData));
-    router.push(`/client/create-hackathon/preview?data=${encodedData}`);
+  const formatStatus = (status: any) => {
+    if (!status) return 'Unknown';
+    return Object.keys(status)[0];
   };
 
-  const handlePublishHackathon = () => {
-    // Redirect to preview page instead of publishing directly
-    setShowPublishModal(false);
-    handlePreviewPublication();
+  const formatDate = (timestamp: bigint) => {
+    if (!timestamp || timestamp === BigInt(0)) return 'TBD';
+    const millis = Number(timestamp / BigInt(1_000_000));
+    return new Date(millis).toLocaleString();
   };
 
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setActiveToast({ message, type });
-    setTimeout(() => setActiveToast(null), 3000);
-  };
+  const totalCategories = form.categories.length;
+  const totalRewards = form.rewards.length;
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'overview':
-        return <CreateHackathonOverview />;
-      case 'prizes':
-        return <CreateHackathonPrizes />;
-      case 'judges':
-        return <CreateHackathonJudges />;
-      case 'schedule':
-        return <CreateHackathonSchedule />;
-      default:
-        return <CreateHackathonOverview />;
-    }
-  };
-
-  const getCompletionPercentage = () => {
-    let completed = 0;
-    let total = 100;
-
-    // Basic Info (30%)
-    if (formData.title.trim()) completed += 10;
-    if (formData.description.trim()) completed += 10;
-    if (formData.startDate && formData.endDate) completed += 10;
-
-    // Event Details (30%)
-    if (formData.mode && formData.location) completed += 10;
-    if (formData.registrationStart && formData.registrationEnd) completed += 10;
-    if (formData.maxParticipants > 0) completed += 10;
-
-    // Content (40%)
-    if (formData.prizes.length > 0) completed += 15;
-    if (formData.judges.length > 0) completed += 15;
-    if (formData.schedule.length > 0) completed += 10;
-
-    return Math.round((completed / total) * 100);
-  };
-
-  const completionPercentage = getCompletionPercentage();
-
-  
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Toast Notification */}
-      {activeToast && (
-        <div className={cn(
-          'fixed top-4 right-4 z-50 flex items-center space-x-2 px-4 py-3 rounded-lg shadow-lg transition-all',
-          activeToast.type === 'success'
-            ? 'bg-green-500 text-white'
-            : 'bg-red-500 text-white'
-        )}>
-          {activeToast.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
-          <span>{activeToast.message}</span>
-        </div>
-      )}
+    <div className="min-h-screen bg-gray-50 pb-16">
+      <div className="max-w-6xl mx-auto py-10 px-4 md:px-8 space-y-8">
+        <header className="space-y-2">
+          <h1 className="text-3xl font-bold text-gray-900">Create a Hackathon</h1>
+          <p className="text-gray-600">
+            Fill out the required details and publish directly to the ICP testnet canister.
+          </p>
+        </header>
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            {/* Left: Save & Quit */}
-            <button
-              onClick={handleSaveDraft}
-              disabled={isAutoSaving}
-              className={cn(
-                "flex items-center text-gray-600 hover:text-gray-800 transition-colors",
-                "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 rounded-md px-3 py-2",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
-              aria-label="Save hackathon draft and quit"
-            >
-              <X size={18} className="mr-2" />
-              <span>{isAutoSaving ? 'Saving...' : 'Save & Quit'}</span>
-            </button>
-
-            {/* Center: Title & Progress */}
-            <div className="flex items-center space-x-4">
-              <h1 className="text-lg font-semibold text-gray-900">Create Hackathon</h1>
-              <div className="flex items-center space-x-2">
-                <div className="w-32 bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${completionPercentage}%` }}
-                  />
-                </div>
-                <span className="text-sm text-gray-600">{completionPercentage}%</span>
-              </div>
-            </div>
-
-            {/* Right: Actions */}
-            <div className="flex items-center space-x-3">
-              {/* Auto-save indicator */}
-              {lastSavedAt && (
-                <div className="flex items-center space-x-1 text-sm text-gray-500">
-                  <Save size={14} className={isAutoSaving ? 'animate-pulse' : ''} />
-                  <span>{isAutoSaving ? 'Saving...' : 'Saved'}</span>
-                </div>
-              )}
-
-              <button
-                onClick={handlePreviewPublication}
-                className="flex items-center px-3 py-2 text-blue-600 hover:text-blue-700 border border-blue-600 rounded-md hover:bg-blue-50 transition-colors"
-                aria-label="Preview hackathon publication"
-              >
-                <Eye size={16} className="mr-2" />
-                Preview
-              </button>
-
-              <button
-                onClick={() => setShowPublishModal(true)}
-                disabled={completionPercentage < 70}
-                className={cn(
-                  "px-4 py-2 rounded-md text-white transition-colors flex items-center",
-                  completionPercentage >= 70
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-gray-400 cursor-not-allowed"
-                )}
-                aria-label="Review & Publish hackathon"
-              >
-                <Eye size={16} className="mr-2" />
-                Review & Publish
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <CreateHackathonNav
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-        />
-
-        {/* Main content */}
-        <main
-          className="flex-1 overflow-y-auto"
-          role="main"
-          aria-label="Hackathon creation form"
-        >
-          <div className="p-6">
-            {renderTabContent()}
-
-            
-            {/* Completion Tips */}
-            {completionPercentage < 70 && (
-              <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-800 mb-2">Almost there!</h4>
-                <p className="text-blue-700">
-                  Complete more sections to enable publishing. Add basic information, dates, prizes, judges, and schedule to reach 70% completion.
-                </p>
-              </div>
+        {statusMessage && (
+          <div
+            className={`flex items-center gap-3 rounded-md p-4 text-sm font-medium ${
+              statusMessage.type === 'success'
+                ? 'bg-green-50 text-green-800 border border-green-200'
+                : 'bg-red-50 text-red-800 border border-red-200'
+            }`}
+          >
+            {statusMessage.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <AlertTriangle className="w-5 h-5" />
             )}
+            {statusMessage.text}
           </div>
-        </main>
-      </div>
+        )}
 
-  
-      {/* Publish Confirmation Modal */}
-      {showPublishModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Review & Publish</h3>
-
-              <div className="space-y-4">
-                {/* Summary */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold mb-2">{formData.title || 'Untitled Hackathon'}</h4>
-                  <div className="text-sm text-gray-600 space-y-1">
-                    <p>📅 {formData.startDate} - {formData.endDate}</p>
-                    <p>📍 {formData.mode} • {formData.location}</p>
-                    <p>👥 Max {formData.maxParticipants} participants</p>
-                    <p>🏆 {formData.prizes.length} prize{formData.prizes.length !== 1 ? 's' : ''}</p>
-                    <p>⚖️ {formData.judges.length} judge{formData.judges.length !== 1 ? 's' : ''}</p>
-                    <p>📅 {formData.schedule.length} scheduled event{formData.schedule.length !== 1 ? 's' : ''}</p>
-                  </div>
-                </div>
-
-                {/* Completion Status */}
-                <div className="flex items-center space-x-2">
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${completionPercentage}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium">{completionPercentage}%</span>
-                </div>
-
-                {/* Warning if not complete */}
-                {completionPercentage < 70 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="w-5 h-5 text-yellow-600" />
-                      <span className="text-yellow-800 text-sm">
-                        Your hackathon is {100 - completionPercentage}% incomplete. Consider adding more details before publishing.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Terms */}
-                <div className="text-xs text-gray-500">
-                  By publishing, you confirm that all information is accurate and you have the rights to organize this hackathon.
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowPublishModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handlePublishHackathon}
-                  disabled={completionPercentage < 70}
-                  className={cn(
-                    "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center",
-                    completionPercentage < 70 && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <Eye size={16} className="mr-2" />
-                  Review & Publish
-                </button>
-              </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Basic Information</h2>
+              <p className="text-sm text-gray-500">
+                These fields map directly to the HackQuest canister.
+              </p>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Title *</span>
+                <input
+                  type="text"
+                  value={form.title}
+                  onChange={e => updateForm('title', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="HackQuest Global Build"
+                  required
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Tagline</span>
+                <input
+                  type="text"
+                  value={form.tagline}
+                  onChange={e => updateForm('tagline', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Build the future on ICP"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Banner URL</span>
+                <input
+                  type="url"
+                  value={form.bannerUrl}
+                  onChange={e => updateForm('bannerUrl', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="https://..."
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Hero Video URL</span>
+                <input
+                  type="url"
+                  value={form.heroVideoUrl}
+                  onChange={e => updateForm('heroVideoUrl', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="https://..."
+                />
+              </label>
+            </div>
+
+            <label className="space-y-1 block">
+              <span className="text-sm font-medium text-gray-700">Summary *</span>
+              <textarea
+                value={form.summary}
+                onChange={e => updateForm('summary', e.target.value)}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+                rows={4}
+                placeholder="Describe the hackathon..."
+                required
+              />
+            </label>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Location</span>
+                <input
+                  type="text"
+                  value={form.location}
+                  onChange={e => updateForm('location', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Global / Remote"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Theme</span>
+                <input
+                  type="text"
+                  value={form.theme}
+                  onChange={e => updateForm('theme', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="DeFi, AI, Social..."
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Prize Pool (ICP)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={form.prizePool}
+                  onChange={e => updateForm('prizePool', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="1000"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Timeline</h2>
+              <p className="text-sm text-gray-500">Stored as nanosecond timestamps in the canister.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Submissions Open At</span>
+                <input
+                  type="datetime-local"
+                  value={form.submissionsOpenAt}
+                  onChange={e => updateForm('submissionsOpenAt', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Submissions Close At</span>
+                <input
+                  type="datetime-local"
+                  value={form.submissionsCloseAt}
+                  onChange={e => updateForm('submissionsCloseAt', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Hackathon Starts</span>
+                <input
+                  type="datetime-local"
+                  value={form.startAt}
+                  onChange={e => updateForm('startAt', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Hackathon Ends</span>
+                <input
+                  type="datetime-local"
+                  value={form.endAt}
+                  onChange={e => updateForm('endAt', e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Team Settings</h2>
+              <p className="text-sm text-gray-500">Validations run before sending data to the canister.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Min Team Size</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.minTeamSize}
+                  onChange={e => updateForm('minTeamSize', Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Max Team Size</span>
+                <input
+                  type="number"
+                  min={form.minTeamSize}
+                  value={form.maxTeamSize}
+                  onChange={e => updateForm('maxTeamSize', Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+              <label className="space-y-1">
+                <span className="text-sm font-medium text-gray-700">Max Teams / Category</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={form.maxTeamsPerCategory}
+                  onChange={e => updateForm('maxTeamsPerCategory', Number(e.target.value))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">FAQs</h2>
+                <p className="text-sm text-gray-500">Stored as an array of Text values.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => addSimpleRow('faq')}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add FAQ
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {form.faq.map((value, index) => (
+                <div key={`faq-${index}`} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={e => handleArrayChange('faq', index, e.target.value)}
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="What is the project submission deadline?"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSimpleRow('faq', index)}
+                    className="p-2 rounded-md border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Resources</h2>
+                <p className="text-sm text-gray-500">Share documentation or helpful links.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => addSimpleRow('resources')}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Resource
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {form.resources.map((value, index) => (
+                <div key={`resource-${index}`} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={e => handleArrayChange('resources', index, e.target.value)}
+                    className="flex-1 rounded-md border border-gray-300 px-3 py-2"
+                    placeholder="https://guide.icp.xyz"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSimpleRow('resources', index)}
+                    className="p-2 rounded-md border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Categories ({totalCategories})</h2>
+                <p className="text-sm text-gray-500">Each entry becomes a category record in the canister.</p>
+              </div>
+              <button
+                type="button"
+                onClick={addCategory}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Category
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {form.categories.map((category, catIndex) => (
+                <div key={`category-${catIndex}`} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-gray-800">Category #{catIndex + 1}</h3>
+                    <button
+                      type="button"
+                      onClick={() => removeCategory(catIndex)}
+                      className="p-2 rounded-md border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-gray-700">Name</span>
+                      <input
+                        type="text"
+                        value={category.name}
+                        onChange={e => updateCategory(catIndex, 'name', e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        placeholder="AI Track"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-gray-700">Reward Slots</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={category.rewardSlots}
+                        onChange={e => updateCategory(catIndex, 'rewardSlots', Number(e.target.value))}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="space-y-1 block">
+                    <span className="text-sm font-medium text-gray-700">Description</span>
+                    <textarea
+                      value={category.description}
+                      onChange={e => updateCategory(catIndex, 'description', e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      rows={3}
+                      placeholder="Focus on intelligent agents, automation..."
+                    />
+                  </label>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Judging Criteria</span>
+                      <button
+                        type="button"
+                        onClick={() => addCategoryCriterion(catIndex)}
+                        className="inline-flex items-center px-2 py-1 border border-gray-200 rounded-md text-xs text-gray-600 hover:bg-gray-50"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Criterion
+                      </button>
+                    </div>
+
+                    {category.judgingCriteria.map((criterion, critIndex) => (
+                      <div key={`criteria-${catIndex}-${critIndex}`} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={criterion}
+                          onChange={e => updateCategoryCriteria(catIndex, critIndex, e.target.value)}
+                          className="flex-1 rounded-md border border-gray-300 px-3 py-2"
+                          placeholder="Innovation, UI/UX..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeCategoryCriterion(catIndex, critIndex)}
+                          className="p-2 rounded-md border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Rewards ({totalRewards})</h2>
+                <p className="text-sm text-gray-500">Each reward can reference a category by name.</p>
+              </div>
+              <button
+                type="button"
+                onClick={addReward}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Reward
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {form.rewards.map((reward, rewardIndex) => (
+                <div key={`reward-${rewardIndex}`} className="border border-gray-200 rounded-lg p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-gray-800">Reward #{rewardIndex + 1}</h3>
+                    <button
+                      type="button"
+                      onClick={() => removeReward(rewardIndex)}
+                      className="p-2 rounded-md border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-gray-700">Title</span>
+                      <input
+                        type="text"
+                        value={reward.title}
+                        onChange={e => updateReward(rewardIndex, 'title', e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        placeholder="Grand Prize"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-gray-700">Amount (ICP)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={reward.amount}
+                        onChange={e => updateReward(rewardIndex, 'amount', e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-gray-700">Rank</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={reward.rank}
+                        onChange={e => updateReward(rewardIndex, 'rank', Number(e.target.value))}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      />
+                    </label>
+                    <label className="space-y-1">
+                      <span className="text-sm font-medium text-gray-700">Category Name (optional)</span>
+                      <input
+                        type="text"
+                        value={reward.categoryName}
+                        onChange={e => updateReward(rewardIndex, 'categoryName', e.target.value)}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2"
+                        placeholder="AI Track"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="space-y-1 block">
+                    <span className="text-sm font-medium text-gray-700">Description</span>
+                    <textarea
+                      value={reward.description}
+                      onChange={e => updateReward(rewardIndex, 'description', e.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2"
+                      rows={3}
+                      placeholder="Awarded to the best overall project..."
+                    />
+                  </label>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">Perks</span>
+                      <button
+                        type="button"
+                        onClick={() => addRewardPerk(rewardIndex)}
+                        className="inline-flex items-center px-2 py-1 border border-gray-200 rounded-md text-xs text-gray-600 hover:bg-gray-50"
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        Add Perk
+                      </button>
+                    </div>
+
+                    {reward.perks.map((perk, perkIndex) => (
+                      <div key={`perk-${rewardIndex}-${perkIndex}`} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={perk}
+                          onChange={e => updateRewardPerk(rewardIndex, perkIndex, e.target.value)}
+                          className="flex-1 rounded-md border border-gray-300 px-3 py-2"
+                          placeholder="Mentorship session"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeRewardPerk(rewardIndex, perkIndex)}
+                          className="p-2 rounded-md border border-gray-200 text-gray-500 hover:text-red-500 hover:border-red-200"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={resetForm}
+              className="px-4 py-2 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100"
+            >
+              Reset
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center px-5 py-2 rounded-md bg-blue-600 text-white font-semibold hover:bg-blue-700 disabled:opacity-60"
+            >
+              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save to Canister
+            </button>
           </div>
-        </div>
-      )}
+        </form>
+
+        <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Live Hackathons (Freelancer View)</h2>
+              <p className="text-sm text-gray-500">
+                Data is fetched directly from the ICP testnet canister.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchHackathons}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+            >
+              {isLoadingList ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Loader2 className="w-4 h-4 mr-2" />
+              )}
+              Refresh
+            </button>
+          </div>
+
+          {isLoadingList ? (
+            <div className="flex items-center justify-center py-10 text-gray-500">
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+              Loading hackathons...
+            </div>
+          ) : hackathonList.length === 0 ? (
+            <div className="text-sm text-gray-500">No hackathons available on the canister yet.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {hackathonList.map((hackathon: any) => (
+                <div key={hackathon.id} className="border border-gray-200 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-gray-900">{hackathon.title}</h3>
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-700">
+                      {formatStatus(hackathon.status)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">{hackathon.tagline}</p>
+                  <div className="text-sm text-gray-500 space-y-1">
+                    <p>
+                      <strong>Theme:</strong> {hackathon.theme || '—'}
+                    </p>
+                    <p>
+                      <strong>Location:</strong> {hackathon.location || '—'}
+                    </p>
+                    <p>
+                      <strong>Prize Pool:</strong> {hackathon.prizePool?.toString() ?? '0'} ICP
+                    </p>
+                    <p>
+                      <strong>Starts:</strong> {formatDate(hackathon.startAt)}
+                    </p>
+                    <p>
+                      <strong>Ends:</strong> {formatDate(hackathon.endAt)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
-}
+};
 
-export default function CreateHackathonPage() {
-  return (
-    <HackathonFormProvider>
-      <CreateHackathonContent />
-    </HackathonFormProvider>
-  );
-}
+export default CreateHackathonPage;
