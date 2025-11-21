@@ -1,8 +1,8 @@
 {
   "version": 1,
   "networks": {
-    "local": {
-      "bind": "127.0.0.1:4943",
+    "testnet": {
+      "providers": ["https://icp0.io"], 
       "type": "persistent"
     }
   },
@@ -34,6 +34,10 @@
     "escrow": {
       "type": "motoko",
       "main": "canisters/escrow.mo"
+    },
+    "hackquest": {
+      "type": "motoko",
+      "main": "canisters/hackquest.mo"
     }
   }
 }
