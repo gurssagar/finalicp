@@ -6,8 +6,8 @@ import { getCurrentSession } from '@/lib/actions/auth';
 import { clearProfileCache } from '../cache';
 
 // Environment validation
-const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST;
-const USER_CANISTER_ID = process.env.NEXT_PUBLIC_USER_CANISTER_ID;
+const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST ?? '';
+const USER_CANISTER_ID = process.env.NEXT_PUBLIC_USER_CANISTER_ID ?? '';
 
 function validateEnvironment() {
   const errors: string[] = [];
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
         if (submitError?.message?.includes('no update method') || submitError?.message?.includes('method not found')) {
           console.warn('⚠️ markProfileAsSubmitted method not available on canister - profile is still saved');
         } else {
-          console.error('Auto-submission failed (profile still saved):', submitError);
+        console.error('Auto-submission failed (profile still saved):', submitError);
         }
         // Continue anyway - the main profile data is saved
       }

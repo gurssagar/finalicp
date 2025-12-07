@@ -59,6 +59,25 @@ interface ExtendedHackathon extends Hackathon {
   max_participants?: number;
   tags?: string[];
   organizer_email?: string;
+  participantsCount?: number;
+  teamsCount?: number;
+  submissionsCount?: number;
+  categories?: Array<{
+    id: string;
+    name: string;
+    description: string;
+    rewardSlots: number;
+    judgingCriteria: string[];
+  }>;
+  rewards?: Array<{
+    id: string;
+    title: string;
+    description: string;
+    amount: string;
+    rank: number;
+    categoryId?: string | null;
+    perks?: string[];
+  }>;
 }
 
 interface HackathonViewPageProps {
@@ -76,8 +95,14 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [participants, setParticipants] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [submissions, setSubmissions] = useState<any[]>([]);
+  const [winners, setWinners] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
+  const [assigningWinner, setAssigningWinner] = useState(false);
 
-  // Get user email from session/localStorage
+  // Get user email from session
   const [userEmail, setUserEmail] = useState<string>('');
   const [isOwner, setIsOwner] = useState(false);
 
@@ -90,25 +115,25 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
     resolveParams();
   }, [params]);
 
+  // Get user email from session
   useEffect(() => {
-    const getUserEmail = () => {
-      if (typeof window !== 'undefined') {
-        const sessionEmail = sessionStorage.getItem('userEmail');
-        if (sessionEmail) return sessionEmail;
-
-        const localEmail = localStorage.getItem('userEmail');
-        if (localEmail) return localEmail;
-
-        return 'client@example.com';
+    const getUserEmail = async () => {
+      try {
+        const response = await fetch('/api/auth/session');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.session && data.session.email) {
+            setUserEmail(data.session.email);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting user email:', error);
       }
-      return 'client@example.com';
     };
-
-    const email = getUserEmail();
-    setUserEmail(email);
+    getUserEmail();
   }, []);
 
-  // Load hackathon data
+  // Load hackathon data from HackQuest canister
   const loadHackathon = useCallback(async () => {
     if (!hackathonId) return;
 
@@ -118,8 +143,8 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
 
       console.log('🔍 Loading hackathon details for ID:', hackathonId);
 
-      // Fetch hackathon data from API
-      const response = await fetch(`/api/hackathons/${hackathonId}`);
+      // Fetch hackathon data from HackQuest canister API
+      const response = await fetch(`/api/hackquest/hackathon/${hackathonId}`);
       const result = await response.json();
 
       if (!result.success) {
@@ -130,22 +155,60 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
       const hackathonData = result.data;
       console.log('✅ Hackathon data loaded:', hackathonData);
 
-      setHackathon(hackathonData);
+      // Transform to match ExtendedHackathon interface
+      const transformedData: ExtendedHackathon = {
+        hackathon_id: hackathonData.hackathon_id,
+        title: hackathonData.title,
+        tagline: hackathonData.tagline,
+        description: hackathonData.description,
+        theme: hackathonData.theme,
+        mode: hackathonData.mode,
+        location: hackathonData.location,
+        start_date: hackathonData.start_date,
+        end_date: hackathonData.end_date,
+        registration_start: hackathonData.registration_start,
+        registration_end: hackathonData.registration_end,
+        min_team_size: hackathonData.min_team_size,
+        max_team_size: hackathonData.max_team_size,
+        prize_pool: hackathonData.prize_pool,
+        status: hackathonData.status,
+        created_at: hackathonData.created_at,
+        updated_at: hackathonData.updated_at,
+        banner_image: hackathonData.bannerUrl || hackathonData.banner_image,
+        rules: '', // HackQuest doesn't have rules field
+        organizer_email: userEmail, // Will be checked separately
+        // Stats from canister
+        participantsCount: hackathonData.participantsCount || 0,
+        teamsCount: hackathonData.teamsCount || 0,
+        submissionsCount: hackathonData.submissionsCount || 0,
+        // Categories and rewards from canister
+        categories: hackathonData.categories || [],
+        rewards: hackathonData.rewards || [],
+      };
 
-      // Check if current user is the owner
-      if (userEmail && hackathonData.organizer_email) {
-        setIsOwner(userEmail === hackathonData.organizer_email);
-        console.log('👤 User ownership check:', { userEmail, organizerEmail: hackathonData.organizer_email, isOwner: userEmail === hackathonData.organizer_email });
+      setHackathon(transformedData);
+
+      // Check if current user is the owner by checking if they created this hackathon
+      // We'll check this by seeing if the hackathon is in their list
+      if (userEmail) {
+        const userHackathonsResponse = await fetch(`/api/hackquest/user-hackathons?email=${encodeURIComponent(userEmail)}`);
+        if (userHackathonsResponse.ok) {
+          const userHackathonsData = await userHackathonsResponse.json();
+          if (userHackathonsData.success) {
+            const isUserHackathon = userHackathonsData.hackathons.some((h: any) => h.id === hackathonId);
+            setIsOwner(isUserHackathon);
+            console.log('👤 User ownership check:', { userEmail, hackathonId, isOwner: isUserHackathon });
+          }
+        }
       }
 
-      // Load participants and teams (mock data for now)
-      setParticipants([
-        { participant_id: 'p1', full_name: 'John Doe', email: 'john@example.com', skills: ['JavaScript', 'React'] },
-        { participant_id: 'p2', full_name: 'Jane Smith', email: 'jane@example.com', skills: ['Python', 'Django'] }
-      ]);
-      setTeams([
-        { team_id: 't1', team_name: 'Code Warriors', member_ids: ['p1', 'p2'], project_title: 'AI Assistant' }
-      ]);
+      // Set participants and teams counts from canister data
+      setParticipants([]); // Participants list not available in current API
+      setTeams([]); // Teams list not available in current API
+
+      // Load submissions and winners
+      await loadSubmissions();
+      await loadWinners();
 
     } catch (err) {
       console.error('Error loading hackathon:', err);
@@ -155,10 +218,89 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
     }
   }, [hackathonId, userEmail]);
 
+  // Load submissions
+  const loadSubmissions = useCallback(async () => {
+    if (!hackathonId) return;
+
+    try {
+      const response = await fetch(`/api/hackquest/submissions?hackathonId=${encodeURIComponent(hackathonId)}${selectedCategory !== 'all' ? `&categoryId=${encodeURIComponent(selectedCategory)}` : ''}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setSubmissions(result.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading submissions:', error);
+    }
+  }, [hackathonId, selectedCategory]);
+
+  // Load winners
+  const loadWinners = useCallback(async () => {
+    if (!hackathonId) return;
+
+    try {
+      const response = await fetch(`/api/hackquest/winners/list?hackathonId=${encodeURIComponent(hackathonId)}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setWinners(result.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading winners:', error);
+    }
+  }, [hackathonId]);
+
   // Load hackathon on component mount
   useEffect(() => {
     loadHackathon();
   }, [loadHackathon]);
+
+  // Reload submissions when category changes
+  useEffect(() => {
+    if (hackathonId) {
+      loadSubmissions();
+    }
+  }, [loadSubmissions]);
+
+  // Handle assign winner
+  const handleAssignWinner = async (rewardId: string, note?: string) => {
+    if (!selectedSubmission || !hackathon) return;
+
+    try {
+      setAssigningWinner(true);
+
+      const response = await fetch('/api/hackquest/winners/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hackathonId,
+          rewardId,
+          submissionId: selectedSubmission.id,
+          note: note || '',
+          organizerEmail: userEmail,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('Winner assigned successfully!');
+        setShowWinnerModal(false);
+        setSelectedSubmission(null);
+        await loadWinners();
+        await loadSubmissions();
+      } else {
+        alert(result.error || 'Failed to assign winner');
+      }
+    } catch (error) {
+      console.error('Error assigning winner:', error);
+      alert('Failed to assign winner. Please try again.');
+    } finally {
+      setAssigningWinner(false);
+    }
+  };
 
   // Handle delete
   const handleDelete = async () => {
@@ -570,6 +712,180 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
                 </div>
               </div>
             )}
+
+            {/* Submitted Projects */}
+            {isOwner && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                    <Target className="w-6 h-6 mr-2 text-green-600" />
+                    Submitted Projects
+                  </h2>
+                  {hackathon.categories && hackathon.categories.length > 0 && (
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="all">All Categories</option>
+                      {hackathon.categories.map((cat: any) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {submissions.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No submissions yet.</p>
+                ) : (
+                  <div className="space-y-4">
+                    {submissions.map((submission: any) => {
+                      const isWinner = winners.some((w: any) => w.awardedSubmissionId === submission.id);
+                      return (
+                        <div
+                          key={submission.id}
+                          className={`border rounded-lg p-4 ${isWinner ? 'bg-yellow-50 border-yellow-300' : 'border-gray-200'}`}
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="text-lg font-semibold text-gray-900">{submission.title}</h3>
+                                {isWinner && (
+                                  <span className="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs rounded-full font-medium">
+                                    🏆 Winner
+                                  </span>
+                                )}
+                                <span className={`px-2 py-1 text-xs rounded-full ${
+                                  submission.status.Selected ? 'bg-green-100 text-green-800' :
+                                  submission.status.UnderReview ? 'bg-blue-100 text-blue-800' :
+                                  submission.status.Submitted ? 'bg-gray-100 text-gray-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {submission.status.Selected ? 'Selected' :
+                                   submission.status.UnderReview ? 'Under Review' :
+                                   submission.status.Submitted ? 'Submitted' : 'Draft'}
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">{submission.summary}</p>
+                              {submission.team && (
+                                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                  <p className="text-sm font-medium text-gray-700 mb-2">Team: {submission.team.name}</p>
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-gray-600">
+                                      <span className="font-medium">Leader:</span> {submission.team.leader.displayName} ({submission.team.leader.email})
+                                    </p>
+                                    {submission.team.members.length > 0 && (
+                                      <div>
+                                        <p className="text-xs font-medium text-gray-600 mb-1">Members:</p>
+                                        {submission.team.members.map((member: any, idx: number) => (
+                                          <p key={idx} className="text-xs text-gray-600 ml-2">
+                                            • {member.displayName} ({member.email})
+                                            {member.accepted ? ' ✓' : ' (Pending)'}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 mt-3">
+                            <Link
+                              href={`/freelancer/hackathons/${hackathonId}/view-project?submissionId=${submission.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-purple-600 hover:text-purple-700 flex items-center font-medium"
+                            >
+                              <Target className="w-4 h-4 mr-1" />
+                              View Project
+                            </Link>
+                            {submission.repoUrl && (
+                              <a
+                                href={submission.repoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
+                              >
+                                <Globe className="w-4 h-4 mr-1" />
+                                Repository
+                              </a>
+                            )}
+                            {submission.demoUrl && (
+                              <a
+                                href={submission.demoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-700 flex items-center"
+                              >
+                                <Globe className="w-4 h-4 mr-1" />
+                                Demo
+                              </a>
+                            )}
+                            {isOwner && !isWinner && hackathon.rewards && hackathon.rewards.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedSubmission(submission);
+                                  setShowWinnerModal(true);
+                                }}
+                                className="ml-auto px-3 py-1 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 transition-colors"
+                              >
+                                Select as Winner
+                              </button>
+                            )}
+                          </div>
+                          {submission.gallery && submission.gallery.length > 0 && (
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              {submission.gallery.slice(0, 3).map((img: string, idx: number) => (
+                                <img
+                                  key={idx}
+                                  src={img}
+                                  alt={`Gallery ${idx + 1}`}
+                                  className="w-full h-24 object-cover rounded"
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Winners Section */}
+            {isOwner && winners.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center">
+                  <Award className="w-6 h-6 mr-2 text-yellow-600" />
+                  Declared Winners
+                </h2>
+                <div className="space-y-3">
+                  {winners.map((winner: any) => (
+                    <div key={winner.id} className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">{winner.title}</h3>
+                          <p className="text-sm text-gray-600">{winner.description}</p>
+                          <p className="text-sm font-medium text-green-600 mt-1">
+                            Prize: {Number(winner.amount).toLocaleString()} ICP
+                          </p>
+                          {winner.note && (
+                            <p className="text-xs text-gray-500 mt-1">Note: {winner.note}</p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-gray-500">Rank #{winner.rank}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column - Sidebar */}
@@ -583,14 +899,21 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
                     <Users className="w-4 h-4 mr-2" />
                     Participants
                   </span>
-                  <span className="font-semibold">{participants.length}</span>
+                  <span className="font-semibold">{hackathon?.participantsCount || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center text-gray-600">
                     <Users2 className="w-4 h-4 mr-2" />
                     Teams
                   </span>
-                  <span className="font-semibold">{teams.length}</span>
+                  <span className="font-semibold">{hackathon?.teamsCount || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center text-gray-600">
+                    <Target className="w-4 h-4 mr-2" />
+                    Projects Submitted
+                  </span>
+                  <span className="font-semibold">{hackathon?.submissionsCount || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="flex items-center text-gray-600">
@@ -708,6 +1031,101 @@ export default function HackathonViewPage({ params }: HackathonViewPageProps) {
             )}
           </div>
         </div>
+
+        {/* Winner Selection Modal */}
+        {showWinnerModal && selectedSubmission && hackathon && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Select Winner</h2>
+                <button
+                  onClick={() => {
+                    setShowWinnerModal(false);
+                    setSelectedSubmission(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">Project:</p>
+                <p className="font-semibold text-gray-900">{selectedSubmission.title}</p>
+                <p className="text-sm text-gray-600 mt-1">{selectedSubmission.summary}</p>
+                {selectedSubmission.team && (
+                  <p className="text-sm text-gray-600 mt-2">Team: {selectedSubmission.team.name}</p>
+                )}
+              </div>
+
+              {hackathon.rewards && hackathon.rewards.length > 0 ? (
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Reward Tier:
+                  </label>
+                  {hackathon.rewards
+                    .filter((reward: any) => {
+                      // Filter rewards by category if submission has a category
+                      if (selectedSubmission.categoryId && reward.categoryId) {
+                        return reward.categoryId === selectedSubmission.categoryId;
+                      }
+                      // Show all rewards if no category match or no category
+                      return true;
+                    })
+                    .sort((a: any, b: any) => a.rank - b.rank)
+                    .map((reward: any) => {
+                      const isAlreadyWinner = winners.some((w: any) => w.id === reward.id);
+                      return (
+                        <div
+                          key={reward.id}
+                          className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                            isAlreadyWinner
+                              ? 'bg-gray-100 border-gray-300 cursor-not-allowed'
+                              : 'border-gray-200 hover:border-purple-500 hover:bg-purple-50'
+                          }`}
+                          onClick={() => {
+                            if (!isAlreadyWinner) {
+                              handleAssignWinner(reward.id);
+                            }
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{reward.title}</h3>
+                              <p className="text-sm text-gray-600">{reward.description}</p>
+                              <p className="text-sm font-medium text-green-600 mt-1">
+                                {Number(reward.amount).toLocaleString()} ICP
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs text-gray-500">Rank #{reward.rank}</span>
+                              {isAlreadyWinner && (
+                                <p className="text-xs text-red-600 mt-1">Already assigned</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center py-4">No rewards configured for this hackathon.</p>
+              )}
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowWinnerModal(false);
+                    setSelectedSubmission(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

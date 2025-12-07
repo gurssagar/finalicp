@@ -433,8 +433,8 @@ export default function AnalyticsDashboard() {
                         <div className="mt-2">{month}</div>
                           <div className="mt-1 text-[10px] text-gray-400">
                             ${amount.toFixed(0)}
-                          </div>
-                        </div>
+                  </div>
+                  </div>
                       )
                     })}
                   </div>
@@ -467,18 +467,18 @@ export default function AnalyticsDashboard() {
                           <div
                             className="h-5 rounded bg-blue-500"
                             style={{ width: `${Math.max(6, percentage)}%` }}
-                          ></div>
-                        </div>
+                  ></div>
+                </div>
                         <div className="w-10 text-right font-medium">
                           {count}
-                        </div>
-                      </div>
+                </div>
+                </div>
                     )
                   })
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm text-gray-500">
                     No services yet. Add services to see their distribution.
-                  </div>
+                </div>
                 )}
               </div>
             </div>
@@ -497,8 +497,8 @@ export default function AnalyticsDashboard() {
                       style={{ background: `conic-gradient(${pieSegments.gradient})` }}
                     >
                       <div className="absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 transform rounded-full bg-white shadow-inner"></div>
-                    </div>
-                  </div>
+                </div>
+              </div>
                   <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-gray-600">
                     {pieSegments.legend.map(({ category, count, percentage, color }) => (
                       <div key={category} className="flex items-center justify-between">
@@ -508,13 +508,13 @@ export default function AnalyticsDashboard() {
                             style={{ backgroundColor: color }}
                           ></span>
                           <span>{category}</span>
-                        </div>
+                </div>
                         <span className="font-medium">
                           {count} ({percentage}%)
                         </span>
-                      </div>
+                </div>
                     ))}
-                  </div>
+                </div>
                 </>
               ) : (
                 <div className="flex h-48 flex-col items-center justify-center text-sm text-gray-500">
@@ -565,7 +565,7 @@ export default function AnalyticsDashboard() {
 
           <div className="mt-8 text-center">
             <button
-              onClick={() => router.push('/freelancer/dashboard')}
+            onClick={() => router.push('/freelancer/dashboard')}
               className="inline-flex items-center font-medium text-purple-600"
             >
               Back to Dashboard
