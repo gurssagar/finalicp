@@ -60,6 +60,7 @@ export const profileBasicSchema = z.object({
   linkedin: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
   github: z.string().url('Invalid GitHub URL').optional().or(z.literal('')),
   twitter: z.string().url('Invalid Twitter URL').optional().or(z.literal('')),
+  profileImageUrl: z.string().url('Invalid profile image URL').optional().or(z.literal('')),
 });
 
 export const experienceSchema = z.object({
@@ -96,6 +97,7 @@ export const profileUpdateSchema = z.object({
   skills: z.array(z.string().max(50, 'Skill name is too long')).max(20, 'Maximum 20 skills allowed'),
   experience: z.array(experienceSchema).max(20, 'Maximum 20 experiences allowed'),
   education: z.array(educationSchema).max(20, 'Maximum 20 education entries allowed'),
+  profileImageUrl: z.string().url('Invalid profile image URL').optional().or(z.literal('')),
 });
 
 // File upload schemas

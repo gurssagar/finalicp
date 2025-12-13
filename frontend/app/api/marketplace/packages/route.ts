@@ -54,14 +54,14 @@ export async function GET(request: NextRequest) {
     
     try {
       // First verify service exists
-      const serviceResult = await actor.getService(serviceId);
-      
-      if ('err' in serviceResult) {
-        return NextResponse.json({
-          success: false,
-          error: handleApiError(serviceResult.err)
-        }, { status: 404 });
-      }
+    const serviceResult = await actor.getService(serviceId);
+
+    if ('err' in serviceResult) {
+      return NextResponse.json({
+        success: false,
+        error: handleApiError(serviceResult.err)
+      }, { status: 404 });
+    }
 
       // Get packages using the dedicated method
       const packages = await actor.getPackagesByServiceId(serviceId);
@@ -83,11 +83,11 @@ export async function GET(request: NextRequest) {
         updated_at: typeof pkg.updated_at === 'bigint' ? Number(pkg.updated_at) : Number(pkg.updated_at || 0)
       }));
 
-      return NextResponse.json({
-        success: true,
+    return NextResponse.json({
+      success: true,
         data: transformedPackages,
         count: transformedPackages.length
-      });
+    });
     } catch (error) {
       console.error('Error fetching packages:', error);
       return NextResponse.json({

@@ -1,37 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/actions/auth';
 import { getUserActor } from '@/lib/ic-agent';
-
-// Simple in-memory cache for profile data
-const profileCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-// Helper function to get cached data
-function getCachedData(email: string): any | null {
-  const cached = profileCache.get(email);
-  if (cached && Date.now() - cached.timestamp < cached.ttl) {
-    return cached.data;
-  }
-  return null;
-}
-
-// Helper function to set cached data
-function setCachedData(email: string, data: any): void {
-  profileCache.set(email, {
-    data,
-    timestamp: Date.now(),
-    ttl: CACHE_TTL
-  });
-}
-
-// Helper function to clear cache
-function clearCache(email?: string): void {
-  if (email) {
-    profileCache.delete(email);
-  } else {
-    profileCache.clear();
-  }
-}
+import {
+  getCachedProfile,
+  setCachedProfile,
+  clearProfileCache,
+  getProfileCacheTTL,
+} from '../cache';
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -80,7 +55,7 @@ export async function GET(request: NextRequest) {
 
     // Check cache first
     const cacheStart = Date.now();
-    const cachedData = getCachedData(session.email);
+    const cachedData = getCachedProfile(session.email);
     if (cachedData) {
       console.log('📋 Returning cached profile data for:', session.email);
       console.log('⏱️ Cache lookup took:', Date.now() - cacheStart, 'ms');
@@ -248,7 +223,7 @@ export async function GET(request: NextRequest) {
       console.log('⏱️ Profile processing took:', Date.now() - processingStart, 'ms');
 
       // Cache the response for future requests
-      setCachedData(session.email, responseData);
+      setCachedProfile(session.email, responseData, getProfileCacheTTL());
 
       const totalTime = Date.now() - startTime;
       console.log('⏱️ Total response time:', totalTime, 'ms');
@@ -262,6 +237,9 @@ export async function GET(request: NextRequest) {
         message: icpError instanceof Error ? icpError.message : 'Unknown error',
         stack: icpError instanceof Error ? icpError.stack : undefined
       });
+
+      // Clear any stale cached data
+      clearProfileCache(session.email);
 
       // Return a more user-friendly response instead of an error
       return NextResponse.json({

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Principal } from '@dfinity/principal';
 import { getCurrentSession } from '@/lib/actions/auth';
 import { getUserActor } from '@/lib/ic-agent';
 
@@ -22,11 +23,22 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Validate principal format (basic check)
-    if (!principal.startsWith('lxzze-')) {
+    // Validate principal format using DFINITY library
+    try {
+      Principal.fromText(principal);
+    } catch (err) {
+      console.warn('Invalid principal received for wallet update:', principal, err);
       return NextResponse.json({
         success: false,
         error: 'Invalid principal format',
+      }, { status: 400 });
+    }
+
+    // Basic sanity check for accountId (hex string length 64)
+    if (!/^[0-9a-fA-F]{64}$/.test(accountId)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid accountId format',
       }, { status: 400 });
     }
 

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { profileBasicSchema } from '@/lib/validations';
 import { getUserActor } from '@/lib/ic-agent';
 import { getCurrentSession } from '@/lib/actions/auth';
+import { clearProfileCache } from '../cache';
 
 // Environment validation
 const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST;
@@ -80,6 +81,28 @@ export async function POST(request: NextRequest) {
     // Validate input
     const validatedData = profileBasicSchema.parse(body);
 
+    const normalizeOptional = (value?: string | null) => {
+      if (!value) return [];
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? [trimmed] : [];
+    };
+
+    const normalizedSkills = Array.isArray(body.skills)
+      ? body.skills
+          .map((skill: unknown) => (typeof skill === 'string' ? skill.trim() : ''))
+          .filter((skill: string) => skill.length > 0)
+      : [];
+
+    const normalizedGithub = typeof body.github === 'string' ? body.github : validatedData.github;
+    const normalizedLinkedin = typeof body.linkedin === 'string' ? body.linkedin : validatedData.linkedin;
+    const normalizedWebsite = typeof body.website === 'string' ? body.website : validatedData.website;
+    const normalizedTwitter = typeof body.twitter === 'string' ? body.twitter : validatedData.twitter;
+    const normalizedPhone = typeof body.phone === 'string' ? body.phone : validatedData.phone;
+    const normalizedLocation = typeof body.location === 'string' ? body.location : validatedData.location;
+    const normalizedBio = typeof body.bio === 'string' ? body.bio : validatedData.bio;
+    const profileImageUrl = typeof body.profileImageUrl === 'string' ? body.profileImageUrl : undefined;
+    const resumeUrl = typeof body.resumeUrl === 'string' ? body.resumeUrl : undefined;
+
     // Update user profile in ICP backend with timeout
     try {
       const actor = await withTimeout(
@@ -90,16 +113,18 @@ export async function POST(request: NextRequest) {
 
       // Prepare profile data for ICP backend using the correct field names
       const profileData = {
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-        bio: validatedData.bio ? [validatedData.bio] : [],
-        phone: validatedData.phone ? [validatedData.phone] : [],
-        location: validatedData.location ? [validatedData.location] : [],
-        website: validatedData.website ? [validatedData.website] : [],
-        linkedin: validatedData.linkedin ? [validatedData.linkedin] : [],
-        github: validatedData.github ? [validatedData.github] : [],
-        twitter: validatedData.twitter ? [validatedData.twitter] : [],
-        skills: [],
+        firstName: validatedData.firstName.trim(),
+        lastName: validatedData.lastName.trim(),
+        bio: normalizeOptional(normalizedBio),
+        phone: normalizeOptional(normalizedPhone),
+        location: normalizeOptional(normalizedLocation),
+        website: normalizeOptional(normalizedWebsite),
+        linkedin: normalizeOptional(normalizedLinkedin),
+        github: normalizeOptional(normalizedGithub),
+        twitter: normalizeOptional(normalizedTwitter),
+        skills: normalizedSkills,
+        profileImageUrl: normalizeOptional(profileImageUrl),
+        resumeUrl: normalizeOptional(resumeUrl),
         experience: [],
         education: [],
       };
@@ -143,6 +168,9 @@ export async function POST(request: NextRequest) {
         }
         // Continue anyway - the main profile data is saved
       }
+
+      // Clear cached profile so subsequent reads fetch fresh data
+      clearProfileCache(session.email);
 
       return NextResponse.json({
         success: true,

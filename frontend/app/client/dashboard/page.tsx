@@ -251,6 +251,13 @@ export default function ClientDashboard() {
     )
   }
 
+  const lastMonthSpent = typeof (stats as any).lastMonthSpent === 'number'
+    ? (stats as any).lastMonthSpent
+    : 0
+  const spendDelta = stats.totalSpent - lastMonthSpent
+  const spendPercent = lastMonthSpent > 0 ? (spendDelta / lastMonthSpent) * 100 : 0
+  const hasTrend = lastMonthSpent > 0
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -289,8 +296,25 @@ export default function ClientDashboard() {
               </div>
             </div>
             <div className="mt-2 flex items-center text-sm">
-              <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-              <span className="text-green-600">+8.2% from last month</span>
+              {hasTrend ? (
+                <>
+                  <TrendingUp
+                    className={`w-4 h-4 mr-1 ${spendDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                  />
+                  <span className={spendDelta >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    {spendDelta >= 0 ? '+' : ''}
+                    {Math.abs(spendPercent).toFixed(1)}% from last month
+                  </span>
+                </>
+              ) : (
+                <span className="text-gray-500">
+                  {spendDelta > 0
+                    ? `+$${Math.abs(spendDelta).toLocaleString()} vs last month`
+                    : spendDelta < 0
+                      ? `-$${Math.abs(spendDelta).toLocaleString()} vs last month`
+                      : 'No change from last month'}
+                </span>
+              )}
             </div>
           </CardContent>
         </Card>

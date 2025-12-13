@@ -1,4 +1,4 @@
-import React, { useState, createContext, useContext, ReactNode, useEffect } from 'react';
+import React, { useState, createContext, useContext, ReactNode, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useCreateService } from '@/hooks/useServices';
 import { useCreatePackage } from '@/hooks/usePackages';
@@ -230,12 +230,12 @@ export const ServiceFormProvider: React.FC<{
     saveToStorage(formData);
   }, [formData]);
 
-  const updateFormData = (data: Partial<ServiceFormData>) => {
+  const updateFormData = useCallback((data: Partial<ServiceFormData>) => {
     setFormData(prev => ({
       ...prev,
       ...data
     }));
-  };
+  }, []);
 
   const clearFormData = () => {
     setFormData(defaultFormData);
