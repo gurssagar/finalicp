@@ -58,6 +58,7 @@ interface PaymentConfirmationRequest {
   packageId?: string;
   clientId?: string;
   freelancerEmail?: string;
+  escrowId?: string;
   metadata?: Record<string, any>;
 }
 
@@ -143,6 +144,7 @@ export async function POST(request: NextRequest) {
       packageId,
       clientId,
       freelancerEmail,
+      escrowId,
       metadata
     } = body;
 
@@ -421,6 +423,11 @@ export async function POST(request: NextRequest) {
         payment_status: 'completed',
         token_symbol: tokenSymbol || 'ICP',
         token_amount: tokenAmount || '',
+        
+        // Escrow details
+        escrow_id: escrowId || null,
+        escrow_status: escrowId ? 'created' : null,
+        escrow_created_at: escrowId ? currentTime : null,
 
         // Upsells and enhancements
         upsells: paymentSession.upsells.map(upsell => ({

@@ -34,6 +34,14 @@
     "escrow": {
       "type": "motoko",
       "main": "canisters/escrow.mo"
+    },
+    "user_wallet": {
+      "type": "motoko",
+      "main": "canisters/user_wallet.mo"
+    },
+    "wallet_factory": {
+      "type": "motoko",
+      "main": "canisters/wallet_factory.mo"
     }
   }
 }

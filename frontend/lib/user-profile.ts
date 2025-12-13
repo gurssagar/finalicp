@@ -18,6 +18,7 @@ export interface UserProfile {
   lastSeen?: string | null;
   profileSubmitted?: boolean;
   fallback?: boolean;
+  hotWalletCanisterId?: string | null;
 }
 
 // Simple in-memory cache for user profiles

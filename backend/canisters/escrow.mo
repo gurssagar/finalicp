@@ -33,6 +33,7 @@ persistent actor EscrowCanister {
     projectId: Text;
     client: Principal;
     freelancer: Principal;
+    freelancerHotWallet: ?Text;
     expectedE8s: Nat;
     status: EscrowStatus;
     subaccount: Blob;
@@ -175,7 +176,8 @@ persistent actor EscrowCanister {
     projectId: Text,
     client: Principal,
     freelancer: Principal,
-    amountE8s: Nat
+    amountE8s: Nat,
+    freelancerHotWallet: ?Text
   ): async (EscrowId, Account) {
 
     // Validate input
@@ -191,6 +193,7 @@ persistent actor EscrowCanister {
       projectId = projectId;
       client = client;
       freelancer = freelancer;
+      freelancerHotWallet = freelancerHotWallet;
       expectedE8s = amountE8s;
       status = #created;
       subaccount = subaccount;
@@ -247,6 +250,7 @@ persistent actor EscrowCanister {
             projectId = escrow.projectId;
             client = escrow.client;
             freelancer = escrow.freelancer;
+            freelancerHotWallet = escrow.freelancerHotWallet;
             expectedE8s = escrow.expectedE8s;
             status = #funded;
             subaccount = escrow.subaccount;
@@ -282,10 +286,19 @@ persistent actor EscrowCanister {
         let feeAmount = calculateFee(totalAmount);
         let freelancerAmount = totalAmount - feeAmount;
 
-        // Transfer to freelancer
+        // Determine recipient - hot wallet if available, otherwise freelancer principal
+        let recipientPrincipal = switch (escrow.freelancerHotWallet) {
+          case (?hotWalletId) {
+            // Use hot wallet canister as recipient
+            Principal.fromText(hotWalletId)
+          };
+          case null { escrow.freelancer };
+        };
+
+        // Transfer to freelancer or hot wallet
         let freelancerTransferArgs: ICRC1TransferArgs = {
           from_subaccount = ?escrow.subaccount;
-          to = { owner = escrow.freelancer; subaccount = null };
+          to = { owner = recipientPrincipal; subaccount = null };
           amount = freelancerAmount;
           fee = null; // Use default fee
           memo = ?Text.encodeUtf8("Escrow release: " # escrowId);
@@ -297,7 +310,22 @@ persistent actor EscrowCanister {
         var blockIndex: Nat = 0;
         switch (freelancerResult) {
           case (#Ok(idx)) { blockIndex := idx; };
-          case (#Err(err)) { return #err("Freelancer transfer failed: " # debug_show(err)); };
+          case (#Err(err)) { return #err("Transfer failed: " # debug_show(err)); };
+        };
+
+        // If hot wallet was used, notify it to record deposit
+        switch (escrow.freelancerHotWallet) {
+          case (?hotWalletId) {
+            try {
+              let hotWallet = actor(hotWalletId) : actor {
+                deposit: (tokenType: { #ICP; #ckBTC; #ckETH; #ckUSDC }, amount: Nat, memo: ?Text) -> async Result.Result<Text, Text>;
+              };
+              let _ = await hotWallet.deposit(#ICP, freelancerAmount, ?("Escrow release: " # escrowId));
+            } catch (err) {
+              Debug.print("Warning: Failed to notify hot wallet: " # debug_show(err));
+            };
+          };
+          case null { /* No hot wallet, direct transfer completed */ };
         };
 
         // Transfer fee to treasury
@@ -328,6 +356,7 @@ persistent actor EscrowCanister {
           projectId = escrow.projectId;
           client = escrow.client;
           freelancer = escrow.freelancer;
+          freelancerHotWallet = escrow.freelancerHotWallet;
           expectedE8s = escrow.expectedE8s;
           status = #released;
           subaccount = escrow.subaccount;
@@ -388,6 +417,7 @@ persistent actor EscrowCanister {
               projectId = escrow.projectId;
               client = escrow.client;
               freelancer = escrow.freelancer;
+              freelancerHotWallet = escrow.freelancerHotWallet;
               expectedE8s = escrow.expectedE8s;
               status = #refunded;
               subaccount = escrow.subaccount;
@@ -403,6 +433,50 @@ persistent actor EscrowCanister {
           case (#Err(err)) { #err("Refund transfer failed: " # debug_show(err)) };
         }
       };
+      case null { #err("Escrow not found") };
+    }
+  };
+
+  // ========================================
+  // HOT WALLET FUNCTIONS
+  // ========================================
+
+  public shared({ caller }) func setFreelancerHotWallet(
+    escrowId: EscrowId,
+    hotWalletCanisterId: Text
+  ): async Result.Result<(), Text> {
+    switch (escrows.get(escrowId)) {
+      case (?escrow) {
+        // Only freelancer can set their hot wallet
+        if (caller != escrow.freelancer) {
+          return #err("Unauthorized: Only freelancer can set hot wallet");
+        };
+
+        let updatedEscrow = {
+          escrowId = escrow.escrowId;
+          projectId = escrow.projectId;
+          client = escrow.client;
+          freelancer = escrow.freelancer;
+          freelancerHotWallet = ?hotWalletCanisterId;
+          expectedE8s = escrow.expectedE8s;
+          status = escrow.status;
+          subaccount = escrow.subaccount;
+          createdAtNs = escrow.createdAtNs;
+          fundedAtNs = escrow.fundedAtNs;
+          releaseAtNs = escrow.releaseAtNs;
+          ledgerBlockIndex = escrow.ledgerBlockIndex;
+        };
+
+        escrows.put(escrowId, updatedEscrow);
+        #ok(())
+      };
+      case null { #err("Escrow not found") };
+    }
+  };
+
+  public query func getEscrowWithWallet(escrowId: EscrowId): async Result.Result<Escrow, Text> {
+    switch (escrows.get(escrowId)) {
+      case (?escrow) { #ok(escrow) };
       case null { #err("Escrow not found") };
     }
   };

@@ -32,6 +32,7 @@ export interface ProfileData {
   skills: string[];
   experience: Experience[];
   education: Education[];
+  hotWalletCanisterId?: string | null;
 }
 
 export interface Experience {

@@ -134,6 +134,7 @@ export default function PaymentPage() {
 
     try {
       const totalUSD = calculateTotal();
+      const totalE8s = Math.floor(totalUSD * 100000000); // Convert USD to e8s
       
       // Extract payment info from ICPay widget
       const transactionId = paymentData.transactionId || paymentData.id;
@@ -148,6 +149,47 @@ export default function PaymentPage() {
         status: 'completed',
       };
       setPaymentResult(result);
+
+      // Get or create freelancer's hot wallet
+      let freelancerHotWalletId = null;
+      try {
+        const walletResponse = await fetch(`/api/wallet/create?userId=${service.freelancer_email}`);
+        const walletData = await walletResponse.json();
+        if (walletData.success) {
+          freelancerHotWalletId = walletData.wallet.walletCanisterId;
+        }
+      } catch (walletError) {
+        console.warn('Could not get freelancer hot wallet:', walletError);
+        // Continue without hot wallet - escrow will use direct payment
+      }
+
+      // Create escrow contract
+      let escrowId = null;
+      try {
+        const escrowResponse = await fetch('/api/escrow/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: service.service_id,
+            clientPrincipal: profile.principal || 'aaaaa-aa', // Fallback principal
+            freelancerPrincipal: service.freelancer_principal || 'aaaaa-aa',
+            amountE8s: totalE8s,
+            freelancerHotWalletId,
+          }),
+        });
+
+        const escrowData = await escrowResponse.json();
+        
+        if (escrowData.success) {
+          escrowId = escrowData.escrow.escrowId;
+          console.log('Escrow created:', escrowId);
+        } else {
+          console.warn('Escrow creation failed, continuing without escrow');
+        }
+      } catch (escrowError) {
+        console.warn('Could not create escrow:', escrowError);
+        // Continue without escrow
+      }
 
       // Confirm payment and create booking
       const confirmationResponse = await fetch('/api/payment/confirm', {
@@ -164,12 +206,15 @@ export default function PaymentPage() {
           packageId: selectedPackage.package_id,
           clientId: profile.email,
           freelancerEmail: service.freelancer_email,
+          escrowId, // Include escrow ID
           metadata: {
             serviceId: service.service_id,
             packageId: selectedPackage.package_id,
             clientId: profile.email,
             freelancerEmail: service.freelancer_email,
             specialInstructions,
+            escrowId,
+            freelancerHotWalletId,
             upsells: selectedUpsells.map(u => ({
               id: u.id,
               name: u.name,

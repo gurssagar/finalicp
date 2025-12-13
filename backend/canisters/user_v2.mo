@@ -30,6 +30,7 @@ persistent actor UserCanisterV2 {
         education: [Education];
         wallet_principal: ?Principal;
         wallet_account_id: ?Text;
+        hot_wallet_canister_id: ?Text;
     };
 
     public type Experience = {
@@ -358,6 +359,7 @@ persistent actor UserCanisterV2 {
                             education = [];
                             wallet_principal = walletPrincipal;
                             wallet_account_id = walletAccountId;
+                            hot_wallet_canister_id = null;
                         };
                         let updatedUser = {
                             user with profile = ?newProfile
@@ -390,6 +392,88 @@ persistent actor UserCanisterV2 {
                 }
             };
             case null { #err("User not found") }
+        }
+    };
+
+    // Hot Wallet Management Functions
+    public func updateHotWalletCanisterId(userId: UserId, canisterId: Text): async Result.Result<(), Text> {
+        switch (users.get(userId)) {
+            case (?user) {
+                switch (user.profile) {
+                    case (?profile) {
+                        let updatedProfile = {
+                            profile with
+                            hot_wallet_canister_id = ?canisterId;
+                        };
+                        let updatedUser = {
+                            user with profile = ?updatedProfile
+                        };
+                        users.put(userId, updatedUser);
+                        #ok(())
+                    };
+                    case null {
+                        // Create minimal profile with hot wallet info
+                        let newProfile: ProfileData = {
+                            firstName = "";
+                            lastName = "";
+                            bio = null;
+                            phone = null;
+                            location = null;
+                            website = null;
+                            linkedin = null;
+                            github = null;
+                            twitter = null;
+                            profileImageUrl = null;
+                            resumeUrl = null;
+                            skills = [];
+                            experience = [];
+                            education = [];
+                            wallet_principal = null;
+                            wallet_account_id = null;
+                            hot_wallet_canister_id = ?canisterId;
+                        };
+                        let updatedUser = {
+                            user with profile = ?newProfile
+                        };
+                        users.put(userId, updatedUser);
+                        #ok(())
+                    }
+                }
+            };
+            case null { #err("User not found") }
+        }
+    };
+
+    public func getHotWalletCanisterId(userId: UserId): async Result.Result<?Text, Text> {
+        switch (users.get(userId)) {
+            case (?user) {
+                switch (user.profile) {
+                    case (?profile) {
+                        #ok(profile.hot_wallet_canister_id)
+                    };
+                    case null {
+                        #ok(null)
+                    }
+                }
+            };
+            case null { #err("User not found") }
+        }
+    };
+
+    public func hasHotWallet(userId: UserId): async Bool {
+        switch (users.get(userId)) {
+            case (?user) {
+                switch (user.profile) {
+                    case (?profile) {
+                        switch (profile.hot_wallet_canister_id) {
+                            case (?_) { true };
+                            case null { false };
+                        }
+                    };
+                    case null { false }
+                }
+            };
+            case null { false }
         }
     };
 }

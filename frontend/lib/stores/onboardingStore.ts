@@ -12,6 +12,7 @@ interface ProfileData {
   github: string;
   twitter: string;
   profileImage?: string | null;
+  hotWalletCanisterId?: string | null;
 }
 
 interface AddressData {
