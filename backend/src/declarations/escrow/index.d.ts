@@ -48,4 +48,3 @@ export declare const createActor: (
  * @constructs {@link ActorSubClass}
  */
 export declare const escrow: ActorSubclass<_SERVICE>;
-

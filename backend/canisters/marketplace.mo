@@ -19,7 +19,7 @@ import Float "mo:base/Float";
 // Import UserCanister for authentication
 // import UserCanister "canister:user_v2"; // Commented out for now
 
-persistent actor MarketplaceCanister {
+actor MarketplaceCanister {
   // ========================================
   // TYPE DEFINITIONS
   // ========================================

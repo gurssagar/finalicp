@@ -113,7 +113,8 @@ const idlFactory = ({ IDL }: any) => {
     createPackageForBooking: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Nat64, IDL.Nat, IDL.Text, IDL.Nat, IDL.Vec(IDL.Text)], [IDL.Variant({ ok: IDL.Text, err: IDL.Text })]),
 
     // Booking methods
-    bookPackage: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Variant({
+    // Note: Canister expects 5 parameters: clientId, clientEmail, packageId, idempotencyKey, specialInstructions
+    bookPackage: IDL.Func([IDL.Text, IDL.Text, IDL.Text, IDL.Text, IDL.Text], [IDL.Variant({
       ok: IDL.Record({
         booking_id: IDL.Text,
         escrow_account: IDL.Text,
@@ -389,8 +390,33 @@ const idlFactory = ({ IDL }: any) => {
       err: IDL.Text
     })]),
 
+    // Booking status update methods
+    updateBookingStatusWithTimeline: IDL.Func([
+      IDL.Text, // bookingId
+      IDL.Text, // userId
+      IDL.Variant({ Pending: IDL.Null, Active: IDL.Null, InDispute: IDL.Null, Completed: IDL.Null, Cancelled: IDL.Null }), // status
+      IDL.Text // description
+    ], [IDL.Variant({ 
+      ok: IDL.Null, 
+      err: IDL.Variant({
+        NotFound: IDL.Text,
+        Unauthorized: IDL.Text,
+        InvalidInput: IDL.Text,
+        InvalidStatus: IDL.Text
+      })
+    })]),
+
     // Review methods
     submitReview: IDL.Func([IDL.Text, IDL.Float64, IDL.Text], [IDL.Variant({ ok: IDL.Null, err: IDL.Text })]),
+    addBookingReview: IDL.Func([IDL.Text, IDL.Text, IDL.Float64, IDL.Text, IDL.Bool], [IDL.Variant({ 
+      ok: IDL.Null, 
+      err: IDL.Variant({
+        NotFound: IDL.Text,
+        Unauthorized: IDL.Text,
+        InvalidInput: IDL.Text,
+        InvalidStatus: IDL.Text
+      })
+    })]),
 
     // Admin methods
     getMarketplaceStats: IDL.Func([], [IDL.Record({

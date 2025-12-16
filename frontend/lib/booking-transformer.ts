@@ -100,7 +100,10 @@ function transformCanisterStatus(canisterStatus: { [key: string]: null }): strin
   return statusMap[statusKey] || 'Pending';
 }
 
-function transformCanisterPaymentStatus(canisterPaymentStatus: { [key: string]: null }): string {
+function transformCanisterPaymentStatus(
+  canisterPaymentStatus: { [key: string]: null },
+  bookingStatus?: string
+): string {
   const paymentKey = Object.keys(canisterPaymentStatus)[0];
   const paymentMap: Record<string, string> = {
     'Pending': 'Pending',
@@ -110,7 +113,15 @@ function transformCanisterPaymentStatus(canisterPaymentStatus: { [key: string]: 
     'Disputed': 'Disputed'
   };
 
-  return paymentMap[paymentKey] || 'Pending';
+  let paymentStatus = paymentMap[paymentKey] || 'Pending';
+  
+  // If booking is Completed but payment_status is still HeldInEscrow,
+  // treat it as Released (funds were released when project was completed)
+  if (bookingStatus === 'Completed' && paymentStatus === 'Funded') {
+    paymentStatus = 'Released';
+  }
+
+  return paymentStatus;
 }
 
 function convertBigIntToNumber(value: bigint): number {
@@ -233,27 +244,48 @@ export async function transformCanisterBooking(canisterBooking: CanisterBooking)
       freelancerName = freelancerId.includes('@') ? freelancerId.split('@')[0] : freelancerId;
     }
     
+    const bookingStatus = transformCanisterStatus(canisterBooking.status);
+    
+    // Convert timestamps
+    const created_at = convertBigIntTimestamp(canisterBooking.created_at);
+    const deadlineTimestamp = convertBigIntTimestamp(canisterBooking.deadline);
+    
+    // If deadline is invalid (0 or too old), calculate from created_at + default delivery days
+    // Check if deadline is reasonable (not 1970 or before created_at)
+    const defaultDeliveryDays = 7; // Default 7 days
+    let delivery_deadline = deadlineTimestamp;
+    
+    if (!deadlineTimestamp || deadlineTimestamp <= created_at || deadlineTimestamp < 946684800000) { // Before 2000-01-01
+      // Calculate deadline from created_at + delivery days
+      delivery_deadline = created_at + (defaultDeliveryDays * 24 * 60 * 60 * 1000);
+      console.log('⚠️ Invalid deadline, calculating from created_at:', {
+        originalDeadline: deadlineTimestamp,
+        created_at,
+        calculatedDeadline: delivery_deadline
+      });
+    }
+    
     const transformedBooking: Booking = {
       booking_id: canisterBooking.booking_id,
       client_id: canisterBooking.client_id,
       freelancer_id: freelancerId,
       package_id: canisterBooking.package_id,
       service_id: canisterBooking.service_id,
-      status: transformCanisterStatus(canisterBooking.status),
+      status: bookingStatus,
       total_amount_e8s: totalAmountE8s,
       total_amount_dollars: totalAmountDollars,
       escrow_amount_e8s: Math.floor(totalAmountE8s * 0.95), // 95% escrow
       escrow_amount_dollars: convertE8sToDollars(Math.floor(totalAmountE8s * 0.95)),
-      payment_status: transformCanisterPaymentStatus(canisterBooking.payment_status),
+      payment_status: transformCanisterPaymentStatus(canisterBooking.payment_status, bookingStatus),
       client_notes: canisterBooking.description || canisterBooking.requirements.join(' '),
-      created_at: convertBigIntTimestamp(canisterBooking.created_at),
+      created_at: created_at,
       updated_at: convertBigIntTimestamp(canisterBooking.updated_at),
 
       // Enhanced fields from canister data
       service_title: canisterBooking.title,
       package_title: 'Standard Package',
       package_tier: 'basic',
-      delivery_deadline: convertBigIntTimestamp(canisterBooking.deadline),
+      delivery_deadline: delivery_deadline,
 
       // Additional fields with fetched data
       special_instructions: canisterBooking.requirements.join(' '),

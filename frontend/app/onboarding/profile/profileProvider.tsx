@@ -1,5 +1,5 @@
 "use client"
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 import { ProgressStepper } from '@/components/progress-stepper'
@@ -12,6 +12,8 @@ import ConnectWallet from '@/components/wallet/ConnectWallet'
 export function ProfileSetup() {
   const navigate = useRouter()
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [walletConnected, setWalletConnected] = useState(false)
+  const [walletInfo, setWalletInfo] = useState<{principal: string; accountId: string} | null>(null)
 
   const {
     profile,
@@ -104,6 +106,32 @@ export function ProfileSetup() {
   const handleBack = () => {
     goToPreviousStep(2);
   }
+
+  // Check if wallet is already connected on component mount
+  useEffect(() => {
+    const checkWallet = async () => {
+      try {
+        const response = await fetch('/api/user/wallet', {
+          method: 'GET',
+        });
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+          setWalletConnected(true);
+          setWalletInfo({
+            principal: result.data.principal,
+            accountId: result.data.accountId,
+          });
+        }
+      } catch (err) {
+        // Wallet not connected yet, ignore error
+        console.log('No wallet found or error checking wallet:', err);
+      }
+    };
+
+    checkWallet();
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen bg-[#fcfcfc]">
       
@@ -338,7 +366,23 @@ export function ProfileSetup() {
                       Connect your Plug wallet to enable secure escrow payments and receive funds from completed projects.
                     </p>
 
-                    <ConnectWallet />
+                    <ConnectWallet 
+                      onConnect={(data) => {
+                        setWalletConnected(true)
+                        setWalletInfo(data)
+                        console.log('✅ Wallet connected and saved:', data)
+                      }}
+                    />
+                    {walletConnected && walletInfo && (
+                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                        <div className="text-sm text-green-800">
+                          <div className="font-medium mb-1">✓ Wallet Connected & Saved</div>
+                          <div className="text-xs font-mono text-green-600">
+                            {walletInfo.principal.substring(0, 20)}...{walletInfo.principal.substring(walletInfo.principal.length - 10)}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 

@@ -54,6 +54,8 @@ export const idlFactory = ({ IDL }) => {
     'isVerified' : IDL.Bool,
     'profileSubmitted' : IDL.Bool,
     'passwordHash' : PasswordHash,
+    'walletPrincipal' : IDL.Opt(IDL.Principal),
+    'walletAccountId' : IDL.Opt(IDL.Text),
     'profile' : IDL.Opt(ProfileData),
   });
   const Result = IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text });
@@ -67,6 +69,11 @@ export const idlFactory = ({ IDL }) => {
     'getProfile' : IDL.Func([UserId], [IDL.Opt(ProfileData)], []),
     'getUserByEmail' : IDL.Func([Email], [IDL.Opt(User)], []),
     'getUserById' : IDL.Func([UserId], [IDL.Opt(User)], []),
+    'getWalletInfo' : IDL.Func(
+        [UserId],
+        [IDL.Opt(IDL.Tuple(IDL.Principal, IDL.Text))],
+        [],
+      ),
     'isProfileSubmitted' : IDL.Func([UserId], [IDL.Bool], []),
     'markProfileAsSubmitted' : IDL.Func([UserId], [Result_1], []),
     'updateLastLogin' : IDL.Func([UserId], [Result_1], []),
@@ -74,6 +81,11 @@ export const idlFactory = ({ IDL }) => {
     'updateProfile' : IDL.Func([UserId, ProfileData], [Result_1], []),
     'updateProfileSubmissionStatus' : IDL.Func(
         [UserId, IDL.Bool],
+        [Result_1],
+        [],
+      ),
+    'updateWalletInfo' : IDL.Func(
+        [UserId, IDL.Opt(IDL.Principal), IDL.Opt(IDL.Text)],
         [Result_1],
         [],
       ),

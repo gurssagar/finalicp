@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import ProfileStatus from '@/components/ProfileStatus'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Check, Clock, Plus } from 'lucide-react'
+import { Check, Clock, Plus, Star } from 'lucide-react'
 import { useBookings } from '@/hooks/useMarketplace'
 import { getCurrentSession } from '@/lib/actions/auth'
 
@@ -14,9 +14,9 @@ export default function DashboardHome() {
   const [metrics, setMetrics] = useState([
     {
       title: 'Total Earnings',
-      value: '$0.00',
+      value: '0.000000 ICP',
       change: '+0%',
-      subtitle: 'USD EQUIVALENT',
+      subtitle: 'ICP',
       icon: '$',
     },
     {
@@ -42,6 +42,7 @@ export default function DashboardHome() {
     },
   ])
   const [recentProjects, setRecentProjects] = useState<any[]>([])
+  const [recentReviews, setRecentReviews] = useState<any[]>([])
 
   // Get user session
   useEffect(() => {
@@ -62,10 +63,22 @@ export default function DashboardHome() {
   }, [router])
 
   // Fetch bookings for freelancer
-  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings(
+  const { bookings, loading: bookingsLoading, error: bookingsError, fetchBookings } = useBookings(
     userId,
     'freelancer'
   )
+  
+  // Auto-refresh bookings every 30 seconds to get updates
+  useEffect(() => {
+    if (!userId) return;
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing bookings for dashboard...');
+      fetchBookings();
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [userId, fetchBookings]);
 
   // Log bookings data when it changes
   useEffect(() => {
@@ -95,9 +108,9 @@ export default function DashboardHome() {
       setMetrics([
         {
           title: 'Total Earnings',
-          value: '$0.00',
+          value: '0.000000 ICP',
           change: '+0%',
-          subtitle: 'USD EQUIVALENT',
+          subtitle: 'ICP',
           icon: '$',
         },
         {
@@ -145,16 +158,23 @@ export default function DashboardHome() {
     let activeProjects = 0
     let completedProjects = 0
     let totalProjects = 0
+    let totalReviews = 0
+    let ratingsSum = 0
+    let ratingsCount = 0
 
     bookings.forEach(booking => {
-      // Convert e8s to ICP, then to USD (assuming $10 per ICP)
+      // Convert e8s to ICP
       const amountE8s = Number(booking.total_amount_e8s || booking.escrow_amount_e8s || 0)
       const amountICP = amountE8s / 100000000
-      const amountUSD = amountICP * 10 // Assuming $10 per ICP
 
-      // Total earnings (completed bookings only)
-      if (booking.status === 'Completed') {
-        totalEarnings += amountUSD
+      // Total earnings (completed bookings with released payment status)
+      // Only count earnings when funds have been released to freelancer
+      const isCompleted = booking.status === 'Completed'
+      const isReleased = booking.payment_status === 'Released' || 
+                        (isCompleted && (booking.payment_status === 'HeldInEscrow' || !booking.payment_status))
+      
+      if (isCompleted && isReleased) {
+        totalEarnings += amountICP
         completedProjects++
       }
 
@@ -167,6 +187,13 @@ export default function DashboardHome() {
       if (booking.status !== 'Cancelled') {
         totalProjects++
       }
+
+      // Count reviews and ratings (freelancer reviews from clients)
+      if ((booking as any).client_rating) {
+        totalReviews++
+        ratingsSum += (booking as any).client_rating
+        ratingsCount++
+      }
     })
 
     // Calculate completion rate
@@ -178,6 +205,9 @@ export default function DashboardHome() {
     const cancelledCount = bookings.filter(b => b.status === 'Cancelled').length
     const validProjects = totalProjects || 1 // Avoid division by zero
     const successRate = Math.round((completedProjects / validProjects) * 100)
+    
+    // Calculate average rating
+    const averageRating = ratingsCount > 0 ? ratingsSum / ratingsCount : 0
 
     console.log('📊 Dashboard - Calculated metrics:', {
       totalEarnings,
@@ -186,16 +216,18 @@ export default function DashboardHome() {
       totalProjects,
       cancelledCount,
       completionRate,
-      successRate
+      successRate,
+      totalReviews,
+      averageRating
     })
 
     // Update metrics
     setMetrics([
       {
         title: 'Total Earnings',
-        value: `$${totalEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        value: `${totalEarnings.toFixed(6)} ICP`,
         change: '+0%', // TODO: Calculate from previous period
-        subtitle: 'USD EQUIVALENT',
+        subtitle: 'ICP',
         icon: '$',
       },
       {
@@ -216,7 +248,7 @@ export default function DashboardHome() {
         title: 'Success Rate',
         value: `${successRate}%`,
         change: '+0%', // TODO: Calculate from previous period
-        subtitle: 'CLIENT SATISFACTION',
+        subtitle: totalReviews > 0 ? `${averageRating.toFixed(1)}⭐ (${totalReviews} reviews)` : 'CLIENT SATISFACTION',
         icon: '📈',
       },
     ])
@@ -229,12 +261,35 @@ export default function DashboardHome() {
       .map(booking => {
         const amountE8s = Number(booking.total_amount_e8s || booking.escrow_amount_e8s || 0)
         const amountICP = amountE8s / 100000000
-        const createdDate = new Date(Number(booking.created_at) / 1000000)
+        
+        // Handle timestamp conversion properly
+        let createdDate: Date;
+        try {
+          let timestamp = Number(booking.created_at);
+          let milliseconds: number;
+          
+          if (timestamp > 1000000000000) {
+            milliseconds = timestamp;
+          } else if (timestamp > 1000000000) {
+            milliseconds = timestamp * 1000;
+          } else {
+            milliseconds = timestamp / 1000000;
+          }
+          
+          // Validate timestamp
+          if (milliseconds < 946684800000) { // Before 2000-01-01
+            createdDate = new Date(); // Use current date as fallback
+          } else {
+            createdDate = new Date(milliseconds);
+          }
+        } catch (error) {
+          createdDate = new Date(); // Use current date as fallback
+        }
         
         return {
           id: booking.booking_id,
           title: (booking as any).service_title || (booking as any).package_title || 'Project',
-          amount: `+${amountICP.toFixed(2)} ICP`,
+          amount: `+${amountICP.toFixed(6)} ICP`,
           status: booking.status === 'Completed' ? 'Completed' : 
                   booking.status === 'Active' || booking.status === 'InProgress' ? 'Active' : 
                   booking.status,
@@ -248,11 +303,61 @@ export default function DashboardHome() {
           }),
         }
       })
+    
+    // Get recent reviews from clients
+    const recentReviews = bookings
+      .filter(booking => (booking as any).client_rating && (booking as any).client_review)
+      .sort((a, b) => {
+        // Sort by updated_at or created_at, most recent first
+        const aTime = Number((a as any).updated_at || a.created_at);
+        const bTime = Number((b as any).updated_at || b.created_at);
+        return bTime - aTime;
+      })
+      .slice(0, 3) // Get top 3 most recent reviews
+      .map(booking => {
+        // Handle timestamp conversion for review date
+        let reviewDate: Date;
+        try {
+          let timestamp = Number((booking as any).updated_at || booking.created_at);
+          let milliseconds: number;
+          
+          if (timestamp > 1000000000000) {
+            milliseconds = timestamp;
+          } else if (timestamp > 1000000000) {
+            milliseconds = timestamp * 1000;
+          } else {
+            milliseconds = timestamp / 1000000;
+          }
+          
+          if (milliseconds < 946684800000) {
+            reviewDate = new Date();
+          } else {
+            reviewDate = new Date(milliseconds);
+          }
+        } catch (error) {
+          reviewDate = new Date();
+        }
+        
+        return {
+          id: booking.booking_id,
+          projectTitle: (booking as any).service_title || (booking as any).package_title || 'Project',
+          clientName: (booking as any).client_name || booking.client_id || 'Client',
+          rating: (booking as any).client_rating,
+          review: (booking as any).client_review,
+          date: reviewDate.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          }),
+        }
+      })
 
     console.log('✅ Dashboard - Transformed projects:', transformedProjects)
+    console.log('✅ Dashboard - Recent reviews:', recentReviews)
     console.log('✅ Dashboard - Final metrics:', metrics)
     
     setRecentProjects(transformedProjects)
+    setRecentReviews(recentReviews)
     setLoading(false)
   }, [bookings])
 
@@ -488,6 +593,43 @@ export default function DashboardHome() {
               </div>
             </div>
             <div>
+              {/* Recent Reviews Section */}
+              {recentReviews.length > 0 && (
+                <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm mb-6">
+                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                    <Star size={20} className="text-yellow-500 fill-yellow-500" />
+                    Recent Reviews
+                  </h2>
+                  <div className="space-y-4">
+                    {recentReviews.map((review) => (
+                      <div key={review.id} className="border-b border-gray-100 pb-4 last:border-b-0 last:pb-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{review.projectTitle}</p>
+                            <p className="text-xs text-gray-500">From: {review.clientName}</p>
+                          </div>
+                          <div className="flex items-center gap-1 ml-2">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                size={14}
+                                className={
+                                  star <= review.rating
+                                    ? 'text-yellow-500 fill-yellow-500'
+                                    : 'text-gray-300'
+                                }
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-700 mt-2 line-clamp-2">{review.review}</p>
+                        <p className="text-xs text-gray-500 mt-2">{review.date}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <div className="bg-white border border-gray-100 rounded-lg p-6 shadow-sm mb-6">
                 <h2 className="text-xl font-bold mb-4">Performance</h2>
                 <div className="space-y-4">

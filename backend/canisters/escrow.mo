@@ -1,9 +1,9 @@
 import HashMap "mo:base/HashMap";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
-import Buffer "mo:base/Buffer";
 import Result "mo:base/Result";
 import Nat "mo:base/Nat";
+import Nat32 "mo:base/Nat32";
 import Nat64 "mo:base/Nat64";
 import Int "mo:base/Int";
 import Iter "mo:base/Iter";
@@ -13,7 +13,7 @@ import Array "mo:base/Array";
 import Option "mo:base/Option";
 import Blob "mo:base/Blob";
 
-persistent actor EscrowCanister {
+actor EscrowCanister {
 
   // ========================================
   // TYPE DEFINITIONS
@@ -64,19 +64,37 @@ persistent actor EscrowCanister {
     created_at_time: ?Nat64;
   };
 
-  public type ICRC1TransferResult = {
-    #Ok: Nat;
-    #Err: {
-      #InsufficientFunds;
-      #BadFee: { expected_fee: Nat };
-      #TemporarilyUnavailable;
-      #GenericError: { error_code: Nat; message: Text };
-      #BadBurn: { min_burn_amount: Nat };
-      #Duplicate: { duplicate_of: Nat };
-      #InvalidReceiver: { receiver: Principal };
-      #CreatedInFuture: { ledger_time: Nat64 };
-    };
+  // public type ICRC1TransferResult = {
+  //   #Ok: Nat;
+  //   #Err: {
+  //     #InsufficientFunds;
+  //     #BadFee: { expected_fee: Nat };
+  //     #TemporarilyUnavailable;
+  //     #GenericError: { error_code: Nat; message: Text };
+  //     #BadBurn: { min_burn_amount: Nat };
+  //     #Duplicate: { duplicate_of: Nat };
+  //     #InvalidReceiver: { receiver: Principal };
+  //     #CreatedInFuture: { ledger_time: Nat64 };
+  //   };
+  // };
+
+    // Errors returned by icrc1_transfer (must match ledger Candid exactly)
+  public type ICRC1TransferError = {
+    #GenericError : { message : Text; error_code : Nat };
+    #TemporarilyUnavailable;
+    #BadBurn : { min_burn_amount : Nat };
+    #Duplicate : { duplicate_of : Nat };
+    #BadFee : { expected_fee : Nat };
+    #CreatedInFuture : { ledger_time : Nat64 };
+    #TooOld;
+    #InsufficientFunds : { balance : Nat };
   };
+
+  public type ICRC1TransferResult = {
+    #Ok : Nat;
+    #Err : ICRC1TransferError;
+  };
+
 
   public type ICRC1BalanceArgs = {
     owner: Principal;
@@ -123,6 +141,54 @@ persistent actor EscrowCanister {
     icrc1_balance_of: (ICRC1BalanceArgs) -> async Nat;
   };
 
+
+  // Get the canister's own principal
+  private func getCanisterPrincipal(): Principal {
+    Principal.fromActor(EscrowCanister)
+  };
+
+  // Create a short memo (ICRC-1 memo field is limited to 32 bytes)
+  private func createShortMemo(prefix: Text, escrowId: EscrowId): ?Blob {
+    // Extract a short ID from escrowId (usually format is "PROJECT_ID:counter")
+    // Use only the counter part after ":"
+    let parts = Iter.toArray(Text.split(escrowId, #char ':'));
+    let shortId: Text = if (parts.size() > 1) {
+      parts[parts.size() - 1] // Last part (the counter)
+    } else {
+      // No ":" found, use hash as fallback
+      Nat.toText(Nat32.toNat(Text.hash(escrowId)))
+    };
+    
+    // Build memo text: "prefix:shortId"
+    let memoText = prefix # ":" # shortId;
+    let memoBytes = Text.encodeUtf8(memoText);
+    let memoBytesArray = Blob.toArray(memoBytes);
+    
+    // Truncate to 32 bytes if needed
+    if (Array.size(memoBytesArray) > 32) {
+      // Try with just the hash number
+      let hashId = Nat.toText(Nat32.toNat(Text.hash(escrowId)));
+      let hashMemo = prefix # ":" # hashId;
+      let hashBytes = Text.encodeUtf8(hashMemo);
+      let hashBytesArray = Blob.toArray(hashBytes);
+      
+      if (Array.size(hashBytesArray) <= 32) {
+        ?hashBytes
+      } else {
+        // Final fallback - just use prefix
+        let prefixBytes = Text.encodeUtf8(prefix);
+        let prefixBytesArray = Blob.toArray(prefixBytes);
+        if (Array.size(prefixBytesArray) <= 32) {
+          ?prefixBytes
+        } else {
+          null // Skip memo if can't fit
+        }
+      }
+    } else {
+      ?memoBytes
+    }
+  };
+
   // ========================================
   // HELPER FUNCTIONS
   // ========================================
@@ -135,25 +201,30 @@ persistent actor EscrowCanister {
 
   private func generateSubaccount(): Blob {
     // Generate a unique 32-byte subaccount using timestamp and counter
-    let timestamp = Nat64.toNat(Time.now());
+    let timestamp = Nat64.fromNat(Int.abs(Time.now()));
     let counter = nextEscrowId;
-    let data = Text.encodeUtf8(Nat.toText(timestamp) # ":" # Nat.toText(counter));
+    let data = Text.encodeUtf8(Nat64.toText(timestamp) # ":" # Nat.toText(counter));
 
     // Pad or truncate to exactly 32 bytes
     let bytes = Blob.toArray(data);
-    if (bytes.size() > 32) {
-      Array.subArray(bytes, 0, 32)
+    let finalBytes: [Nat8] = if (bytes.size() > 32) {
+      // Take first 32 bytes
+      Array.tabulate<Nat8>(32, func(i) { bytes[i] })
     } else {
+      // Pad to 32 bytes
       let padding = Array.tabulate<Nat8>(32 - bytes.size(), func(_) { 0 });
       Array.append(bytes, padding)
     };
-    Blob.fromArray(?bytes)
+    Blob.fromArray(finalBytes)
   };
 
   private func calculateFee(amountE8s: Nat): Nat {
     // 5% fee, rounded down
     amountE8s * 5 / 100
   };
+
+  // Network transfer fee: 0.0004 ICP = 40000 e8s
+  private let NETWORK_TRANSFER_FEE_E8S: Nat = 40_000;
 
   private func isAuthorizedForRelease(caller: Principal, escrow: Escrow): Bool {
     // Client can release, relayer can release
@@ -171,7 +242,7 @@ persistent actor EscrowCanister {
   // PUBLIC API FUNCTIONS
   // ========================================
 
-  public shared({ caller }) func create(
+  public shared({ caller = _ }) func create(
     projectId: Text,
     client: Principal,
     freelancer: Principal,
@@ -203,7 +274,7 @@ persistent actor EscrowCanister {
     escrows.put(escrowId, escrow);
 
     let depositAccount: Account = {
-      owner = Principal.fromActor(this);
+      owner = getCanisterPrincipal();
       subaccount = ?subaccount;
     };
 
@@ -221,7 +292,7 @@ persistent actor EscrowCanister {
     switch (escrows.get(escrowId)) {
       case (?escrow) {
         {
-          owner = Principal.fromActor(this);
+          owner = getCanisterPrincipal();
           subaccount = ?escrow.subaccount;
         }
       };
@@ -233,7 +304,7 @@ persistent actor EscrowCanister {
     switch (escrows.get(escrowId)) {
       case (?escrow) {
         let balanceArgs: ICRC1BalanceArgs = {
-          owner = Principal.fromActor(this);
+          owner = getCanisterPrincipal();
           subaccount = ?escrow.subaccount;
         };
 
@@ -280,7 +351,17 @@ persistent actor EscrowCanister {
         // Calculate amounts
         let totalAmount = escrow.expectedE8s;
         let feeAmount = calculateFee(totalAmount);
-        let freelancerAmount = totalAmount - feeAmount;
+        // Deduct network transfer fee (0.0004 ICP) from freelancer amount
+        // Network fee remains in escrow, not transferred
+        // Ensure freelancerAmount doesn't underflow
+        let freelancerAmount = if (totalAmount >= (feeAmount + NETWORK_TRANSFER_FEE_E8S)) {
+          totalAmount - feeAmount - NETWORK_TRANSFER_FEE_E8S
+        } else if (totalAmount >= feeAmount) {
+          // If we can't cover both fees, at least cover platform fee
+          totalAmount - feeAmount
+        } else {
+          0 : Nat
+        };
 
         // Transfer to freelancer
         let freelancerTransferArgs: ICRC1TransferArgs = {
@@ -288,7 +369,7 @@ persistent actor EscrowCanister {
           to = { owner = escrow.freelancer; subaccount = null };
           amount = freelancerAmount;
           fee = null; // Use default fee
-          memo = ?Text.encodeUtf8("Escrow release: " # escrowId);
+          memo = createShortMemo("REL", escrowId); // Short memo: "REL:escrowId"
           created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
         };
 
@@ -306,15 +387,17 @@ persistent actor EscrowCanister {
           to = { owner = treasuryPrincipal; subaccount = null };
           amount = feeAmount;
           fee = null; // Use default fee
-          memo = ?Text.encodeUtf8("Platform fee: " # escrowId);
+          memo = createShortMemo("FEE", escrowId); // Short memo: "FEE:escrowId"
           created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
         };
 
         let treasuryResult = await ledgerActor.icrc1_transfer(treasuryTransferArgs);
 
-        var treasuryBlockIndex: Nat = 0;
         switch (treasuryResult) {
-          case (#Ok(idx)) { treasuryBlockIndex := idx; };
+          case (#Ok(idx)) {
+            // Treasury transfer successful
+            Debug.print("Treasury fee transferred successfully: " # debug_show(idx));
+          };
           case (#Err(err)) {
             // If treasury transfer fails, this is critical - log and return error
             Debug.print("CRITICAL: Treasury transfer failed for escrow " # escrowId # ": " # debug_show(err));
@@ -359,7 +442,7 @@ persistent actor EscrowCanister {
 
         // Check current balance
         let balanceArgs: ICRC1BalanceArgs = {
-          owner = Principal.fromActor(this);
+          owner = getCanisterPrincipal();
           subaccount = ?escrow.subaccount;
         };
         let balance = await ledgerActor.icrc1_balance_of(balanceArgs);
@@ -374,7 +457,7 @@ persistent actor EscrowCanister {
           to = { owner = escrow.client; subaccount = null };
           amount = balance;
           fee = null; // Use default fee
-          memo = ?Text.encodeUtf8("Escrow refund: " # escrowId);
+          memo = createShortMemo("REF", escrowId); // Short memo: "REF:escrowId"
           created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
         };
 

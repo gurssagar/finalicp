@@ -45,16 +45,16 @@ export function ClientSidebar() {
       label: 'My Projects',
       path: '/client/projects',
     },
-    {
-      icon: <PlusCircle size={20} />,
-      label: 'Post a Job',
-      path: '/client/post-job',
-    },
-    {
-      icon: <Calendar size={20} />,
-      label: 'My Job Posts',
-      path: '/client/my-job-posts',
-    },
+    // {
+    //   icon: <PlusCircle size={20} />,
+    //   label: 'Post a Job',
+    //   path: '/client/post-job',
+    // },
+    // {
+    //   icon: <Calendar size={20} />,
+    //   label: 'My Job Posts',
+    //   path: '/client/my-job-posts',
+    // },
     {
       icon: <User size={20} />,
       label: 'Profile',

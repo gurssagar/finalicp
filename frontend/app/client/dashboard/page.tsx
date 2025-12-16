@@ -85,7 +85,19 @@ export default function ClientDashboard() {
   }, [router])
 
   // Fetch bookings
-  const { bookings, loading: bookingsLoading, error: bookingsError } = useBookings(userId, 'client')
+  const { bookings, loading: bookingsLoading, error: bookingsError, fetchBookings } = useBookings(userId, 'client')
+  
+  // Auto-refresh bookings every 30 seconds to get updates
+  useEffect(() => {
+    if (!userId) return;
+    
+    const interval = setInterval(() => {
+      console.log('🔄 Auto-refreshing bookings for dashboard...');
+      fetchBookings();
+    }, 30000); // Refresh every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, [userId, fetchBookings]);
   
   // Fetch marketplace stats
   const { stats: marketplaceStats, loading: statsLoading } = useMarketplaceStats()
@@ -130,17 +142,26 @@ export default function ClientDashboard() {
     let thisMonthSpent = 0
     let pendingPayments = 0
 
+    let totalReviews = 0
+    let ratingsSum = 0
+    let ratingsCount = 0
+
     bookings.forEach(booking => {
       const amount = Number(booking.total_amount_e8s) / 100000000 // Convert e8s to ICP
       const createdDate = new Date(Number(booking.created_at) / 1000000)
       
-      // Total spent (completed bookings only)
-      if (booking.status === 'Completed') {
+      // Total spent (completed bookings with released payment status)
+      // Only count spent when funds have been released to freelancer
+      const isCompleted = booking.status === 'Completed'
+      const isReleased = booking.payment_status === 'Released' || 
+                        (isCompleted && (booking.payment_status === 'HeldInEscrow' || !booking.payment_status))
+      
+      if (isCompleted && isReleased) {
         totalSpent += amount
       }
 
       // Active projects
-      if (booking.status === 'InProgress' || booking.status === 'Pending') {
+      if (booking.status === 'InProgress' || booking.status === 'Pending' || booking.status === 'Active') {
         activeProjects++
       }
 
@@ -149,14 +170,22 @@ export default function ClientDashboard() {
         completedProjects++
       }
 
-      // This month spent
-      if (createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear) {
+      // This month spent (only if completed and released)
+      if (isCompleted && isReleased && 
+          createdDate.getMonth() === thisMonth && createdDate.getFullYear() === thisYear) {
         thisMonthSpent += amount
       }
 
-      // Pending payments
-      if (booking.payment_status === 'Pending') {
+      // Pending payments (held in escrow, not yet released)
+      if (booking.payment_status === 'HeldInEscrow' || booking.payment_status === 'Pending') {
         pendingPayments += amount
+      }
+
+      // Count reviews and ratings
+      if ((booking as any).client_rating) {
+        totalReviews++
+        ratingsSum += (booking as any).client_rating
+        ratingsCount++
       }
     })
 
@@ -169,27 +198,98 @@ export default function ClientDashboard() {
       status: mapBookingStatus(booking.status),
       created_at: (() => {
         try {
-          const timestamp = Number(booking.created_at) / 1000000;
-          const date = new Date(timestamp);
+          let timestamp = Number(booking.created_at);
+          let milliseconds: number;
+          
+          // Handle different timestamp formats
+          if (timestamp > 1000000000000) {
+            milliseconds = timestamp;
+          } else if (timestamp > 1000000000) {
+            milliseconds = timestamp * 1000;
+          } else {
+            milliseconds = timestamp / 1000000;
+          }
+          
+          // Validate timestamp
+          if (milliseconds < 946684800000) { // Before 2000-01-01
+            console.warn('Invalid booking created_at timestamp:', booking.created_at, '->', milliseconds);
+            return new Date().toISOString();
+          }
+          
+          const date = new Date(milliseconds);
+          if (isNaN(date.getTime())) {
+            console.warn('Invalid date from created_at:', booking.created_at);
+            return new Date().toISOString();
+          }
           return date.toISOString();
         } catch (error) {
-          console.warn('Invalid booking created_at timestamp:', booking.created_at);
+          console.warn('Error processing booking created_at timestamp:', booking.created_at, error);
           return new Date().toISOString();
         }
       })(),
       deadline: (() => {
         try {
-          const timestamp = Number(booking.delivery_deadline) / 1000000;
-          const date = new Date(timestamp);
+          if (!booking.delivery_deadline || booking.delivery_deadline === 0) {
+            // Calculate from created_at + 7 days default
+            const created_at_ms = (() => {
+              let ts = Number(booking.created_at);
+              if (ts > 1000000000000) return ts;
+              if (ts > 1000000000) return ts * 1000;
+              return ts / 1000000;
+            })();
+            const futureDate = new Date(created_at_ms + (7 * 24 * 60 * 60 * 1000));
+            return futureDate.toISOString();
+          }
+          
+          let timestamp = Number(booking.delivery_deadline);
+          let milliseconds: number;
+          
+          // Handle different timestamp formats
+          if (timestamp > 1000000000000) {
+            milliseconds = timestamp;
+          } else if (timestamp > 1000000000) {
+            milliseconds = timestamp * 1000;
+          } else {
+            milliseconds = timestamp / 1000000;
+          }
+          
+          // Validate timestamp
+          if (milliseconds < 946684800000) { // Before 2000-01-01
+            console.warn('Invalid booking delivery_deadline timestamp:', booking.delivery_deadline, '->', milliseconds);
+            // Calculate from created_at + 7 days
+            const created_at_ms = (() => {
+              let ts = Number(booking.created_at);
+              if (ts > 1000000000000) return ts;
+              if (ts > 1000000000) return ts * 1000;
+              return ts / 1000000;
+            })();
+            const futureDate = new Date(created_at_ms + (7 * 24 * 60 * 60 * 1000));
+            return futureDate.toISOString();
+          }
+          
+          const date = new Date(milliseconds);
+          if (isNaN(date.getTime())) {
+            console.warn('Invalid date from delivery_deadline:', booking.delivery_deadline);
+            const created_at_ms = (() => {
+              let ts = Number(booking.created_at);
+              if (ts > 1000000000000) return ts;
+              if (ts > 1000000000) return ts * 1000;
+              return ts / 1000000;
+            })();
+            const futureDate = new Date(created_at_ms + (7 * 24 * 60 * 60 * 1000));
+            return futureDate.toISOString();
+          }
           return date.toISOString();
         } catch (error) {
-          console.warn('Invalid booking delivery_deadline timestamp:', booking.delivery_deadline);
+          console.warn('Error processing booking delivery_deadline timestamp:', booking.delivery_deadline, error);
           const futureDate = new Date();
           futureDate.setDate(futureDate.getDate() + 7);
           return futureDate.toISOString();
         }
       })()
     }))
+
+    const averageRating = ratingsCount > 0 ? ratingsSum / ratingsCount : 0
 
     setStats({
       totalSpent,
@@ -198,8 +298,8 @@ export default function ClientDashboard() {
       jobPostsCount: 0, // No job posts API yet
       thisMonthSpent,
       pendingPayments,
-      averageRating: 0, // No reviews API yet
-      totalReviews: 0 // No reviews API yet
+      averageRating: Math.round(averageRating * 10) / 10, // Round to 1 decimal
+      totalReviews: totalReviews
     })
 
     setRecentBookings(transformedBookings)
@@ -289,7 +389,7 @@ export default function ClientDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Spent</p>
-                <p className="text-2xl font-bold text-gray-900">${stats.totalSpent.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalSpent.toFixed(6)} ICP</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-green-600" />
@@ -309,9 +409,9 @@ export default function ClientDashboard() {
               ) : (
                 <span className="text-gray-500">
                   {spendDelta > 0
-                    ? `+$${Math.abs(spendDelta).toLocaleString()} vs last month`
+                    ? `+${Math.abs(spendDelta).toFixed(6)} ICP vs last month`
                     : spendDelta < 0
-                      ? `-$${Math.abs(spendDelta).toLocaleString()} vs last month`
+                      ? `-${Math.abs(spendDelta).toFixed(6)} ICP vs last month`
                       : 'No change from last month'}
                 </span>
               )}
@@ -332,7 +432,7 @@ export default function ClientDashboard() {
             </div>
             <div className="mt-2 flex items-center text-sm">
               <Clock className="w-4 h-4 text-blue-600 mr-1" />
-              <span className="text-blue-600">{stats.pendingPayments > 0 ? `$${stats.pendingPayments} pending` : 'All caught up'}</span>
+              <span className="text-blue-600">{stats.pendingPayments > 0 ? `${stats.pendingPayments.toFixed(6)} ICP pending` : 'All caught up'}</span>
             </div>
           </CardContent>
         </Card>
@@ -408,14 +508,34 @@ export default function ClientDashboard() {
                         {booking.status}
                       </Badge>
                       <span className="text-sm text-gray-500 ml-2">
-                        Due {new Date(booking.deadline).toLocaleDateString()}
+                        Due {(() => {
+                          try {
+                            const deadlineDate = new Date(booking.deadline);
+                            if (isNaN(deadlineDate.getTime())) {
+                              return 'Date not set';
+                            }
+                            return deadlineDate.toLocaleDateString();
+                          } catch (error) {
+                            return 'Date not set';
+                          }
+                        })()}
                       </span>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-900">${booking.amount.toLocaleString()}</p>
+                    <p className="font-semibold text-gray-900">{booking.amount.toFixed(6)} ICP</p>
                     <p className="text-sm text-gray-500">
-                      {new Date(booking.created_at).toLocaleDateString()}
+                      {(() => {
+                        try {
+                          const createdDate = new Date(booking.created_at);
+                          if (isNaN(createdDate.getTime())) {
+                            return 'Date not set';
+                          }
+                          return createdDate.toLocaleDateString();
+                        } catch (error) {
+                          return 'Date not set';
+                        }
+                      })()}
                     </p>
                   </div>
                 </div>

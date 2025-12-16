@@ -13,38 +13,63 @@ export type ApiError = { 'InvalidInput' : string } |
   { 'BookingNotFunded' : null } |
   { 'InsufficientFunds' : null };
 export interface Booking {
+  'transaction_id' : string,
+  'package_features' : Array<string>,
   'status' : BookingStatus,
+  'discount_amount_e8s' : bigint,
+  'package_title' : string,
   'title' : string,
   'updated_at' : bigint,
   'delivery_days' : bigint,
   'time_remaining_hours' : bigint,
+  'package_description' : string,
   'client_rating' : [] | [number],
   'payment_completed_at_readable' : string,
+  'upsells' : Array<
+    {
+      'id' : string,
+      'name' : string,
+      'category' : string,
+      'price_e8s' : bigint,
+    }
+  >,
+  'client_name' : string,
   'freelancer_id' : UserId,
   'dispute_id' : [] | [string],
   'description' : string,
   'deadline' : bigint,
+  'base_amount_e8s' : bigint,
   'freelancer_rating' : [] | [number],
   'created_at' : bigint,
   'payment_status' : PaymentStatus,
+  'payment_method' : string,
   'client_review' : [] | [string],
+  'platform_fee_e8s' : bigint,
+  'freelancer_name' : string,
   'delivery_deadline' : bigint,
   'service_id' : ServiceId,
   'total_amount_e8s' : bigint,
+  'escrow_amount_e8s' : bigint,
   'currency' : string,
   'work_completed_at' : [] | [bigint],
   'payment_completed_at' : [] | [bigint],
+  'special_instructions' : string,
   'freelancer_review' : [] | [string],
   'delivery_deadline_readable' : string,
   'client_id' : UserId,
   'requirements' : Array<string>,
+  'payment_id' : string,
   'client_reviewed_at' : [] | [bigint],
   'booking_id' : BookingId,
   'package_id' : PackageId,
+  'promo_code' : [] | [string],
+  'package_tier' : string,
   'freelancer_reviewed_at' : [] | [bigint],
+  'ledger_deposit_block' : [] | [bigint],
   'current_milestone' : [] | [StageId],
   'booking_confirmed_at' : [] | [bigint],
   'booking_confirmed_at_readable' : string,
+  'package_revisions' : bigint,
   'created_at_readable' : string,
   'work_started_at' : [] | [bigint],
   'milestones' : Array<StageId>,
@@ -61,6 +86,19 @@ export type BookingStatus = { 'InDispute' : null } |
   { 'Cancelled' : null } |
   { 'Completed' : null } |
   { 'Pending' : null };
+export interface Package {
+  'delivery_timeline' : string,
+  'features' : Array<string>,
+  'revisions' : bigint,
+  'name' : string,
+  'description' : string,
+  'created_at' : bigint,
+  'service_id' : ServiceId,
+  'is_active' : boolean,
+  'price_e8s' : bigint,
+  'delivery_time_days' : bigint,
+  'package_id' : PackageId,
+}
 export type PackageId = string;
 export interface PaginationParams { 'offset' : bigint, 'limit' : bigint }
 export type PaymentStatus = { 'Disputed' : null } |
@@ -153,16 +191,19 @@ export type TimelineEventType = { 'ClientReviewed' : null } |
 export type UserId = string;
 export interface _SERVICE {
   'addBookingReview' : ActorMethod<
-    [BookingId, number, string, boolean],
+    [BookingId, UserId, number, string, boolean],
     Result_1
   >,
-  'bookPackage' : ActorMethod<[UserId, PackageId, string, string], Result_9>,
+  'bookPackage' : ActorMethod<
+    [UserId, string, PackageId, string, string],
+    Result_9
+  >,
   'createBooking' : ActorMethod<
     [ServiceId, PackageId, string, string, Array<string>, bigint],
     Result_8
   >,
   'createChatRelationshipFromBooking' : ActorMethod<
-    [BookingId, [] | [string], [] | [string]],
+    [BookingId, UserId, [] | [string], [] | [string]],
     Result_7
   >,
   'createPackage' : ActorMethod<
@@ -184,7 +225,17 @@ export interface _SERVICE {
     Result_6
   >,
   'createService' : ActorMethod<
-    [string, string, string, string, string, bigint, bigint, Array<string>],
+    [
+      UserId,
+      string,
+      string,
+      string,
+      string,
+      string,
+      bigint,
+      bigint,
+      Array<string>,
+    ],
     Result_5
   >,
   'createServiceForBooking' : ActorMethod<
@@ -205,7 +256,7 @@ export interface _SERVICE {
   'deleteService' : ActorMethod<[ServiceId], Result>,
   'getActiveBookingChatsForUser' : ActorMethod<[string], Result_2>,
   'getAllServices' : ActorMethod<[], Array<Service>>,
-  'getBooking' : ActorMethod<[BookingId], [] | [Booking]>,
+  'getBooking' : ActorMethod<[BookingId, UserId], [] | [Booking]>,
   'getBookingById' : ActorMethod<[BookingId], Result_4>,
   'getBookingTimeline' : ActorMethod<[BookingId], Array<TimelineEvent>>,
   'getChatParticipantsForBooking' : ActorMethod<[BookingId], Result_3>,
@@ -219,6 +270,7 @@ export interface _SERVICE {
       'total_revenue_e8s' : bigint,
     }
   >,
+  'getPackagesByServiceId' : ActorMethod<[ServiceId], Array<Package>>,
   'getService' : ActorMethod<[ServiceId], [] | [Service]>,
   'getServicesByFreelancer' : ActorMethod<
     [UserId, PaginationParams],
@@ -240,10 +292,36 @@ export interface _SERVICE {
     [ServiceFilter, SortOption, PaginationParams],
     Array<Service>
   >,
-  'submitReview' : ActorMethod<[BookingId, number, string], Result>,
-  'updateBookingStatus' : ActorMethod<[BookingId, BookingStatus], Result>,
+  'submitReview' : ActorMethod<[BookingId, UserId, number, string], Result>,
+  'updateBookingEnrichedData' : ActorMethod<
+    [
+      BookingId,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      Array<
+        {
+          'id' : string,
+          'name' : string,
+          'category' : string,
+          'price_e8s' : bigint,
+        }
+      >,
+      [] | [string],
+      bigint,
+      [] | [bigint],
+    ],
+    Result_1
+  >,
+  'updateBookingStatus' : ActorMethod<
+    [BookingId, UserId, BookingStatus],
+    Result
+  >,
   'updateBookingStatusWithTimeline' : ActorMethod<
-    [BookingId, BookingStatus, string],
+    [BookingId, UserId, BookingStatus, string],
     Result_1
   >,
   'updateService' : ActorMethod<

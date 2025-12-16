@@ -12,10 +12,25 @@ export default function AddServicePricing() {
     tier: 'basic' | 'advanced' | 'premium',
     value: string,
   ) => {
-    const numericValue = value.replace(/[^0-9]/g, '')
-    updateFormData({
-      [`${tier}Price`]: numericValue,
-    })
+    // Allow digits, single decimal point, and empty string
+    // Match pattern: optional digits, optional decimal point, optional digits after decimal
+    const decimalRegex = /^\d*\.?\d*$/
+    
+    // If empty, allow it (for clearing the field)
+    if (value === '') {
+      updateFormData({
+        [`${tier}Price`]: '',
+      })
+      return
+    }
+    
+    // Check if the value matches the decimal pattern
+    if (decimalRegex.test(value)) {
+      updateFormData({
+        [`${tier}Price`]: value,
+      })
+    }
+    // If it doesn't match, keep the previous value (don't update)
   }
 
   const handleTierModeToggle = () => {

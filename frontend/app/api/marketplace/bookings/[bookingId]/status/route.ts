@@ -173,7 +173,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { bookingId } = await params;
     const body = await request.json();
-    const { action, metadata, notes } = body;
+    const { userId, status, description: desc, action, metadata, notes } = body;
 
     if (!bookingId) {
       return NextResponse.json({
@@ -182,10 +182,76 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }, { status: 400 });
     }
 
+    // If userId and status are provided, call marketplace canister directly
+    if (userId && status) {
+      console.log(`🔄 Updating booking ${bookingId} status to ${status} via marketplace canister`);
+      
+      try {
+        const { getMarketplaceActor } = await import('@/lib/ic-marketplace-agent');
+        const actor = await getMarketplaceActor();
+        
+        // Map frontend status to canister BookingStatus variant
+        let bookingStatus: any;
+        switch (status.toLowerCase()) {
+          case 'pending':
+            bookingStatus = { 'Pending': null };
+            break;
+          case 'active':
+            bookingStatus = { 'Active': null };
+            break;
+          case 'completed':
+            bookingStatus = { 'Completed': null };
+            break;
+          case 'cancelled':
+            bookingStatus = { 'Cancelled': null };
+            break;
+          case 'indispute':
+          case 'in_dispute':
+            bookingStatus = { 'InDispute': null };
+            break;
+          default:
+            return NextResponse.json({
+              success: false,
+              error: `Invalid status: ${status}`
+            }, { status: 400 });
+        }
+
+        const description = desc || `Booking status updated to ${status}`;
+        const result = await actor.updateBookingStatusWithTimeline(bookingId, userId, bookingStatus, description);
+
+        if ('ok' in result) {
+          console.log('✅ Booking status updated successfully');
+          return NextResponse.json({
+            success: true,
+            message: 'Status updated successfully',
+            data: {
+              bookingId,
+              status,
+              description,
+              timestamp: Date.now()
+            }
+          });
+        } else {
+          console.error('❌ Failed to update booking status:', result.err);
+          return NextResponse.json({
+            success: false,
+            error: `Failed to update booking status: ${JSON.stringify(result.err)}`
+          }, { status: 400 });
+        }
+      } catch (canisterError) {
+        console.error('❌ Error calling marketplace canister:', canisterError);
+        return NextResponse.json({
+          success: false,
+          error: `Canister error: ${canisterError}`
+        }, { status: 500 });
+      }
+    }
+
+    // Fallback to old action-based logic
     if (!action) {
       return NextResponse.json({
         success: false,
-        error: 'Action is required'
+        error: 'Action or status is required'
       }, { status: 400 });
     }
 

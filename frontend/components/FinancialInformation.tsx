@@ -3,11 +3,17 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, AlertCircle, ExternalLink, XCircle } from 'lucide-react';
 
 interface FinancialInformationProps {
   project: any;
   onViewTransaction?: () => void;
+  onReleaseFunds?: () => void;
+  onRefundFunds?: () => void;
+  onMarkComplete?: () => void;
+  releasing?: boolean;
+  refunding?: boolean;
+  completing?: boolean;
 }
 
 // Helper function to convert status object to string
@@ -33,13 +39,26 @@ const getPaymentStatusIcon = (status: string) => {
 
 export default function FinancialInformation({
   project,
-  onViewTransaction
+  onViewTransaction,
+  onReleaseFunds,
+  onRefundFunds,
+  onMarkComplete,
+  releasing = false,
+  refunding = false,
+  completing = false
 }: FinancialInformationProps) {
   const paymentStatus = getStatusString(project.payment_status);
   const projectStatus = getStatusString(project.status);
-  const totalAmount = BigInt(project.total_amount_e8s || 0);
-  const escrowAmount = BigInt(project.escrow_amount_e8s || 0);
-  const releasedAmount = totalAmount - escrowAmount;
+  
+  // Get amounts in e8s (ICP has 8 decimals)
+  const totalAmountE8s = Number(project.total_amount_e8s || 0);
+  const escrowAmountE8s = Number(project.escrow_amount_e8s || project.base_amount_e8s || Math.floor(totalAmountE8s * 0.95));
+  const releasedAmountE8s = totalAmountE8s - escrowAmountE8s;
+  
+  // Convert to ICP (divide by 100000000)
+  const totalAmountICP = totalAmountE8s / 100000000;
+  const escrowAmountICP = escrowAmountE8s / 100000000;
+  const releasedAmountICP = releasedAmountE8s / 100000000;
 
   return (
     <Card>
@@ -53,9 +72,12 @@ export default function FinancialInformation({
         {/* Main Amount Display */}
         <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
           <div className="text-sm text-blue-600 font-medium mb-1">Total Project Value</div>
-          {project.total_amount_usd && (
-            <div className="text-2xl font-bold text-blue-900">
-              ${project.total_amount_usd.toFixed(2)} USD
+          <div className="text-xl sm:text-2xl font-bold text-blue-900 break-words break-all">
+            {totalAmountICP.toFixed(8)} ICP
+          </div>
+          {project.total_amount_usd && project.total_amount_usd > 0 && (
+            <div className="text-sm text-blue-600 mt-1 break-words">
+              (${project.total_amount_usd.toFixed(2)} USD)
             </div>
           )}
           <div className="text-xs text-blue-600 mt-1">
@@ -66,11 +88,12 @@ export default function FinancialInformation({
         {/* Financial Breakdown */}
         <div className="space-y-4">
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Total Amount</span>
-              <div className="text-right">
-                {project.total_amount_usd && (
-                  <div className="text-sm font-medium">${project.total_amount_usd.toFixed(2)} USD</div>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <span className="text-sm text-gray-600 flex-shrink-0">Total Amount</span>
+              <div className="text-right min-w-0 flex-1">
+                <div className="text-sm font-medium break-words break-all">{totalAmountICP.toFixed(8)} ICP</div>
+                {project.total_amount_usd && project.total_amount_usd > 0 && (
+                  <div className="text-xs text-gray-500 break-words">${project.total_amount_usd.toFixed(2)} USD</div>
                 )}
               </div>
             </div>
@@ -83,11 +106,12 @@ export default function FinancialInformation({
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">In Escrow</span>
-              <div className="text-right">
-                {project.escrow_amount_usd && (
-                  <div className="text-sm font-medium">${project.escrow_amount_usd.toFixed(2)} USD</div>
+            <div className="flex items-center justify-between mb-2 gap-2">
+              <span className="text-sm text-gray-600 flex-shrink-0">In Escrow</span>
+              <div className="text-right min-w-0 flex-1">
+                <div className="text-sm font-medium break-words break-all">{escrowAmountICP.toFixed(8)} ICP</div>
+                {project.escrow_amount_usd && project.escrow_amount_usd > 0 && (
+                  <div className="text-xs text-gray-500 break-words">${project.escrow_amount_usd.toFixed(2)} USD</div>
                 )}
               </div>
             </div>
@@ -95,19 +119,22 @@ export default function FinancialInformation({
               <div
                 className="bg-yellow-500 h-2 rounded-full transition-all duration-300"
                 style={{
-                  width: totalAmount > 0 ? `${(Number(escrowAmount) / Number(totalAmount)) * 100}%` : '0%'
+                  width: totalAmountE8s > 0 ? `${(escrowAmountE8s / totalAmountE8s) * 100}%` : '0%'
                 }}
               ></div>
             </div>
           </div>
 
-          {releasedAmount > 0 && (
+          {releasedAmountICP > 0 && (
             <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Released to Freelancer</span>
-                <div className="text-right">
+              <div className="flex items-center justify-between mb-2 gap-2">
+                <span className="text-sm text-gray-600 flex-shrink-0">Released to Freelancer</span>
+                <div className="text-right min-w-0 flex-1">
+                  <div className="text-sm font-medium text-green-600 break-words break-all">
+                    {releasedAmountICP.toFixed(8)} ICP
+                  </div>
                   {project.total_amount_usd && project.escrow_amount_usd && (
-                    <div className="text-sm font-medium text-green-600">
+                    <div className="text-xs text-gray-500 break-words">
                       ${(project.total_amount_usd - project.escrow_amount_usd).toFixed(2)} USD
                     </div>
                   )}
@@ -117,7 +144,7 @@ export default function FinancialInformation({
                 <div
                   className="bg-green-500 h-2 rounded-full transition-all duration-300"
                   style={{
-                    width: totalAmount > 0 ? `${(Number(releasedAmount) / Number(totalAmount)) * 100}%` : '0%'
+                    width: totalAmountE8s > 0 ? `${(releasedAmountE8s / totalAmountE8s) * 100}%` : '0%'
                   }}
                 ></div>
               </div>
@@ -187,8 +214,73 @@ export default function FinancialInformation({
         </div>
 
         {/* Financial Actions */}
-        {projectStatus !== 'Completed' && paymentStatus !== 'Completed' && (
-          <div className="pt-4 border-t border-gray-200">
+        <div className="pt-4 border-t border-gray-200 space-y-3">
+          {projectStatus !== 'Completed' && onMarkComplete && (
+            <Button
+              onClick={onMarkComplete}
+              disabled={completing}
+              className="w-full bg-green-600 hover:bg-green-700 text-white"
+            >
+              {completing ? (
+                <>
+                  <AlertCircle className="w-4 h-4 mr-2 animate-spin" />
+                  Marking as Complete...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Mark as Complete
+                </>
+              )}
+            </Button>
+          )}
+
+          {paymentStatus === 'HeldInEscrow' && projectStatus !== 'Completed' && (
+            <>
+              {onReleaseFunds && (
+                <Button
+                  onClick={onReleaseFunds}
+                  disabled={releasing}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {releasing ? (
+                    <>
+                      <AlertCircle className="w-4 h-4 mr-2 animate-spin" />
+                      Releasing Funds...
+                    </>
+                  ) : (
+                    <>
+                      <DollarSign className="w-4 h-4 mr-2" />
+                      Release Funds to Freelancer
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {onRefundFunds && (
+                <Button
+                  onClick={onRefundFunds}
+                  disabled={refunding}
+                  variant="outline"
+                  className="w-full border-red-300 text-red-600 hover:bg-red-50"
+                >
+                  {refunding ? (
+                    <>
+                      <AlertCircle className="w-4 h-4 mr-2 animate-spin" />
+                      Refunding...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Refund Funds
+                    </>
+                  )}
+                </Button>
+              )}
+            </>
+          )}
+
+          {onViewTransaction && (
             <Button
               variant="outline"
               className="w-full"
@@ -197,8 +289,29 @@ export default function FinancialInformation({
               <TrendingUp className="w-4 h-4 mr-2" />
               View Transaction Details
             </Button>
-          </div>
-        )}
+          )}
+
+          {projectStatus === 'Completed' && (
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+              <CheckCircle className="w-6 h-6 text-green-600 mx-auto mb-1" />
+              <p className="text-xs text-green-800 font-medium">Project Completed</p>
+            </div>
+          )}
+
+          {paymentStatus === 'Released' && (
+            <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <DollarSign className="w-6 h-6 text-blue-600 mx-auto mb-1" />
+              <p className="text-xs text-blue-800 font-medium">Funds Released</p>
+            </div>
+          )}
+
+          {paymentStatus === 'Refunded' && (
+            <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <AlertCircle className="w-6 h-6 text-yellow-600 mx-auto mb-1" />
+              <p className="text-xs text-yellow-800 font-medium">Funds Refunded</p>
+            </div>
+          )}
+        </div>
 
         {/* Financial Summary */}
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">

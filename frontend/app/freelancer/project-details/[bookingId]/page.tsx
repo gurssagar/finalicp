@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   X, MessageSquare, MoreVertical, Download, ArrowLeft, Clock, CheckCircle,
-  AlertCircle, Calendar, User, DollarSign, FileText, Send, Phone, Video
+  AlertCircle, Calendar, User, DollarSign, FileText, Send, Phone, Video, Star
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,8 @@ interface BookingDetails {
   updated_at: number;
   delivery_deadline: number;
   payment_status: string;
+  client_review?: string;
+  client_rating?: number;
 }
 
 export default function ProjectDetailsPage() {
@@ -75,7 +77,15 @@ export default function ProjectDetailsPage() {
       }
       const data = await response.json();
       if (data.success) {
-        setBooking(data.data);
+        // Transform status if it's an object (from canister)
+        const bookingData = data.data;
+        if (bookingData.status && typeof bookingData.status === 'object') {
+          bookingData.status = Object.keys(bookingData.status)[0] || 'Pending';
+        }
+        if (bookingData.payment_status && typeof bookingData.payment_status === 'object') {
+          bookingData.payment_status = Object.keys(bookingData.payment_status)[0] || 'Pending';
+        }
+        setBooking(bookingData);
       } else {
         setError(data.error || 'Failed to load booking details');
       }
@@ -87,8 +97,19 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  // Helper to convert status object to string
+  const getStatusString = (status: any): string => {
+    if (typeof status === 'string') return status;
+    if (typeof status === 'object' && status !== null) {
+      const keys = Object.keys(status);
+      return keys.length > 0 ? keys[0] : 'Pending';
+    }
+    return 'Pending';
+  };
+
+  const getStatusIcon = (status: any) => {
+    const statusStr = getStatusString(status);
+    switch (statusStr) {
       case 'Pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'Active': return <Clock className="w-4 h-4 text-blue-500" />;
       case 'Completed': return <CheckCircle className="w-4 h-4 text-green-500" />;
@@ -98,8 +119,9 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (status: any) => {
+    const statusStr = getStatusString(status);
+    switch (statusStr) {
       case 'Pending': return 'bg-yellow-100 text-yellow-800';
       case 'Active': return 'bg-blue-100 text-blue-800';
       case 'Completed': return 'bg-green-100 text-green-800';
@@ -109,8 +131,9 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const getProjectStage = (status: string) => {
-    switch (status) {
+  const getProjectStage = (status: any) => {
+    const statusStr = getStatusString(status);
+    switch (statusStr) {
       case 'Pending': return { stage: 1, label: 'Order Placed', completed: true };
       case 'Active': return { stage: 2, label: 'Work in Progress', completed: true };
       case 'Completed': return { stage: 5, label: 'Project Completed', completed: true };
@@ -209,13 +232,15 @@ export default function ProjectDetailsPage() {
     );
   }
 
-  const projectStage = getProjectStage(booking.status);
+  const bookingStatus = getStatusString(booking.status);
+  const paymentStatus = getStatusString(booking.payment_status);
+  const projectStage = getProjectStage(bookingStatus);
   const stages = [
     { id: 1, label: 'Order Placed', completed: true },
-    { id: 2, label: 'Work in Progress', completed: booking.status === 'Active' || booking.status === 'Completed' },
-    { id: 3, label: 'Review & Revision', completed: booking.status === 'Completed' },
-    { id: 4, label: 'Final Approval', completed: booking.status === 'Completed' },
-    { id: 5, label: 'Project Completed', completed: booking.status === 'Completed' },
+    { id: 2, label: 'Work in Progress', completed: bookingStatus === 'Active' || bookingStatus === 'Completed' },
+    { id: 3, label: 'Review & Revision', completed: bookingStatus === 'Completed' },
+    { id: 4, label: 'Final Approval', completed: bookingStatus === 'Completed' },
+    { id: 5, label: 'Project Completed', completed: bookingStatus === 'Completed' },
   ];
 
   return (
@@ -247,7 +272,7 @@ export default function ProjectDetailsPage() {
                 <MessageSquare size={18} />
                 Chat with Client
               </Button>
-              {booking.status === 'Active' && (
+              {bookingStatus === 'Active' && (
                 <Button
                   onClick={handleCompleteProject}
                   className="bg-green-600 hover:bg-green-700"
@@ -265,9 +290,9 @@ export default function ProjectDetailsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Status</p>
-                    <Badge className={getStatusColor(booking.status)}>
-                      {getStatusIcon(booking.status)}
-                      <span className="ml-1">{booking.status}</span>
+                    <Badge className={getStatusColor(bookingStatus)}>
+                      {getStatusIcon(bookingStatus)}
+                      <span className="ml-1">{bookingStatus}</span>
                     </Badge>
                   </div>
                 </div>
@@ -280,7 +305,13 @@ export default function ProjectDetailsPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-600">Project Value</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {formatICP(BigInt(booking.total_amount_e8s))}
+                      {(() => {
+                        const amountE8s = typeof booking.total_amount_e8s === 'bigint' 
+                          ? Number(booking.total_amount_e8s) 
+                          : booking.total_amount_e8s || 0;
+                        const amountICP = amountE8s / 100000000;
+                        return `${amountICP.toFixed(6)} ICP`;
+                      })()}
                     </p>
                   </div>
                   <DollarSign className="w-8 h-8 text-green-600" />
@@ -362,12 +393,6 @@ export default function ProjectDetailsPage() {
                     <p className="text-sm text-gray-600">Project Started</p>
                     <p className="font-medium">{new Date(booking.created_at).toLocaleDateString()}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Payment Status</p>
-                    <Badge className={booking.payment_status === 'Completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
-                      {booking.payment_status}
-                    </Badge>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -401,6 +426,51 @@ export default function ProjectDetailsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Client Review Section */}
+          {booking.client_rating && booking.client_review && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Star size={20} className="text-yellow-500 fill-yellow-500" />
+                  Client Review
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Rating Display */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          size={24}
+                          className={
+                            star <= (booking.client_rating || 0)
+                              ? 'text-yellow-500 fill-yellow-500'
+                              : 'text-gray-300'
+                          }
+                        />
+                      ))}
+                    </div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {booking.client_rating} out of 5
+                    </div>
+                  </div>
+                  
+                  {/* Review Comment */}
+                  <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-2">Client's Feedback:</p>
+                    <p className="text-gray-900 whitespace-pre-wrap">{booking.client_review}</p>
+                  </div>
+                  
+                  <div className="text-xs text-gray-500">
+                    Review from: {booking.client_id}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Actions */}
           <Card className="mt-6">

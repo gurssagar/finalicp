@@ -199,7 +199,13 @@ export default function MyProjectsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">Total Earnings</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatICP(BigInt(totalEarnings))}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {(() => {
+                        // totalEarnings is already in e8s, convert to ICP
+                        const amountICP = totalEarnings / 100000000;
+                        return `${amountICP.toFixed(6)} ICP`;
+                      })()}
+                    </p>
                   </div>
                   <div className="p-3 bg-yellow-100 rounded-full">
                     <DollarSign className="w-6 h-6 text-yellow-600" />
@@ -272,7 +278,26 @@ export default function MyProjectsPage() {
                                 Client: {booking.client_id}
                               </p>
                               <p className="text-sm text-gray-500">
-                                Started {new Date(booking.created_at).toLocaleDateString()}
+                                Started {(() => {
+                                  try {
+                                    // Handle timestamp conversion
+                                    let timestamp = Number(booking.created_at);
+                                    if (timestamp > 1000000000000) {
+                                      // Already in milliseconds
+                                      return new Date(timestamp).toLocaleDateString();
+                                    } else if (timestamp > 1000000000) {
+                                      // In seconds
+                                      return new Date(timestamp * 1000).toLocaleDateString();
+                                    } else if (timestamp > 0) {
+                                      // In nanoseconds
+                                      return new Date(timestamp / 1000000).toLocaleDateString();
+                                    } else {
+                                      return 'Date not set';
+                                    }
+                                  } catch (error) {
+                                    return 'Invalid date';
+                                  }
+                                })()}
                               </p>
                             </div>
                           </div>
@@ -282,7 +307,13 @@ export default function MyProjectsPage() {
                               <span className="ml-1">{booking.status}</span>
                             </Badge>
                             <span className="text-lg font-semibold text-gray-900">
-                              {formatICP(BigInt(booking.total_amount_e8s))}
+                              {(() => {
+                                const amountE8s = typeof booking.total_amount_e8s === 'bigint' 
+                                  ? Number(booking.total_amount_e8s) 
+                                  : booking.total_amount_e8s || 0;
+                                const amountICP = amountE8s / 100000000;
+                                return `${amountICP.toFixed(6)} ICP`;
+                              })()}
                             </span>
                             <Button
                               onClick={() => router.push(`/freelancer/project-details/${booking.booking_id}`)}

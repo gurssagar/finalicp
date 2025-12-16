@@ -8,7 +8,7 @@ import Iter "mo:base/Iter";
 import Char "mo:base/Char";
 import Int "mo:base/Int";
 
-persistent actor UserCanister {
+actor UserCanister {
     // Types
     public type UserId = Text;
     public type Email = Text;
@@ -67,6 +67,8 @@ persistent actor UserCanister {
         profile: ?ProfileData;
         profileSubmitted: Bool;
         otpData: ?OTPData;
+        walletPrincipal: ?Principal;
+        walletAccountId: ?Text;
     };
     
     // Storage
@@ -98,6 +100,8 @@ persistent actor UserCanister {
             profile = user.profile;
             profileSubmitted = false; // Default to false for existing users
             otpData = user.otpData;
+            walletPrincipal = null; // Default to null for existing users
+            walletAccountId = null; // Default to null for existing users
         }
     };
 
@@ -160,6 +164,8 @@ persistent actor UserCanister {
                     profile = null;
                     profileSubmitted = false;
                     otpData = null;
+                    walletPrincipal = null;
+                    walletAccountId = null;
                 };
                 users.put(userId, user);
                 emailToUserId.put(email, userId);
@@ -337,6 +343,48 @@ persistent actor UserCanister {
                 #ok(())
             };
             case null { #err("User not found") }
+        }
+    };
+
+    // Wallet management functions
+    public func updateWalletInfo(userId: UserId, walletPrincipal: ?Principal, walletAccountId: ?Text): async Result.Result<(), Text> {
+        switch (users.get(userId)) {
+            case (?user) {
+                let updatedUser = {
+                    user with 
+                    walletPrincipal = walletPrincipal;
+                    walletAccountId = walletAccountId;
+                };
+                users.put(userId, updatedUser);
+                #ok(())
+            };
+            case null { #err("User not found") }
+        }
+    };
+
+    // Get wallet info - returns optional record (matches IDL declaration)
+    public func getWalletInfo(userId: UserId): async ?{principal: Principal; accountId: Text} {
+        switch (users.get(userId)) {
+            case (?user) {
+                switch (user.walletPrincipal, user.walletAccountId) {
+                    case (?principal, ?accountId) {
+                        ?{
+                            principal = principal;
+                            accountId = accountId;
+                        }
+                    };
+                    case (_, _) { null }
+                }
+            };
+            case null { null }
+        }
+    };
+
+    // Get wallet principal for logged-in user (helper function)
+    public func getLoggedInUserWallet(userId: UserId): async ?Principal {
+        switch (users.get(userId)) {
+            case (?user) { user.walletPrincipal };
+            case null { null }
         }
     };
 }

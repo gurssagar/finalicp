@@ -1,20 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentSession } from '@/lib/actions/auth';
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 import { idlFactory as escrowIdlFactory } from '@/lib/declarations/escrow/escrow.did.js';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getCurrentSession();
-
-    if (!session) {
-      return NextResponse.json({
-        success: false,
-        error: 'Not authenticated',
-      }, { status: 401 });
-    }
-
     const { id: escrowId } = await params;
 
     if (!escrowId) {
@@ -27,28 +17,36 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const escrowActor = await getMainnetEscrowActor();
 
     try {
-      const result: any = await escrowActor.refresh_funding(escrowId);
+      const escrow = await escrowActor.get(escrowId);
 
       return NextResponse.json({
         success: true,
         data: {
-          funded: result.funded,
-          balanceE8s: Number(result.balanceE8s),
+          escrowId: escrow.escrowId,
+          projectId: escrow.projectId,
+          client: escrow.client.toText(),
+          freelancer: escrow.freelancer.toText(),
+          expectedE8s: Number(escrow.expectedE8s),
+          status: escrow.status,
+          createdAtNs: Number(escrow.createdAtNs),
+          fundedAtNs: escrow.fundedAtNs ? Number(escrow.fundedAtNs) : null,
+          releaseAtNs: escrow.releaseAtNs ? Number(escrow.releaseAtNs) : null,
+          ledgerBlockIndex: escrow.ledgerBlockIndex ? Number(escrow.ledgerBlockIndex) : null,
         },
       });
     } catch (escrowError: any) {
-      console.error('Escrow refresh error:', escrowError);
+      console.error('Escrow get error:', escrowError);
       return NextResponse.json({
         success: false,
-        error: escrowError.message || 'Failed to refresh escrow funding status',
+        error: escrowError.message || 'Failed to get escrow',
       }, { status: 500 });
     }
 
   } catch (error) {
-    console.error('Escrow refresh API error:', error);
+    console.error('Escrow get API error:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to refresh escrow funding status',
+      error: 'Failed to get escrow',
     }, { status: 500 });
   }
 }
@@ -73,3 +71,4 @@ async function getMainnetEscrowActor() {
     canisterId,
   });
 }
+

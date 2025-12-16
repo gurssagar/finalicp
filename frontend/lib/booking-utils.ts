@@ -111,10 +111,16 @@ export async function createBookingInCanister(bookingData: any): Promise<{ succe
     
     // Create booking via canister using bookPackage method
     // Generate unique idempotency key to prevent duplicate booking errors
+    // Note: Canister expects 5 parameters: clientId, clientEmail, packageId, idempotencyKey, specialInstructions
     const idempotencyKey = `${bookingData.booking_id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const result = await actor.bookPackage(
+    // Get client email - use client_email if provided, otherwise use client_id if it looks like an email
+    const clientEmail = bookingData.client_email || 
+                       (bookingData.client_id?.includes('@') ? bookingData.client_id : `${bookingData.client_id}@example.com`);
+    
+    const result = await (actor as any).bookPackage(
       bookingData.client_id,
+      clientEmail,  // clientEmail: Text (required by canister)
       bookingData.package_id,
       idempotencyKey,
       bookingData.special_instructions || ''

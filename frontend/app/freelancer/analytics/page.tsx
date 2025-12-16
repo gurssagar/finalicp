@@ -136,10 +136,12 @@ export default function AnalyticsDashboard() {
         activeProjects += 1
       }
 
-      const qualifiesForEarnings =
-        earningsStatuses.has(booking.status) ||
-        (booking.payment_status &&
-          earningsStatuses.has(booking.payment_status))
+      // Only count earnings when payment is actually released
+      const isCompleted = completedStatuses.has(booking.status)
+      const isReleased = booking.payment_status === 'Released' || 
+                        (isCompleted && (booking.payment_status === 'HeldInEscrow' || !booking.payment_status))
+      
+      const qualifiesForEarnings = isCompleted && isReleased
 
       if (qualifiesForEarnings) {
         totalE8s += Number(booking.total_amount_e8s || 0)

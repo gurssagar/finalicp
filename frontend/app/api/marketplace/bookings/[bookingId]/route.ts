@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMarketplaceActor, handleApiError, validateMarketplaceConfig, serializeBigInts } from '@/lib/ic-marketplace-agent';
+import { Actor, HttpAgent } from '@dfinity/agent';
+import { Principal } from '@dfinity/principal';
+import { idlFactory as escrowIdlFactory } from '@/lib/declarations/escrow/escrow.did.js';
 
 // Enhanced booking data storage (mock implementation)
 const enhancedBookingStorage: Record<string, any> = {};
@@ -94,6 +97,83 @@ export async function GET(
       // Use the email from canister or the original freelancer_id
       const finalFreelancerEmail = freelancerEmail || bookingData.freelancer_id;
       
+      // Try to get actual escrow balance from escrow canister
+      let actualEscrowBalance = null;
+      let escrowId = null;
+      
+      try {
+        // Try to find escrow ID from booking data
+        escrowId = bookingData.payment_id || bookingData.transaction_id || 
+                   (bookingData.service_id ? `${bookingData.service_id}:0` : null);
+        
+        if (escrowId && escrowId.includes(':')) {
+          // Try to get escrow and refresh balance
+          const escrowActor = await getMainnetEscrowActor();
+          
+          // Try to find the escrow by trying different counter values
+          let foundEscrow = null;
+          let foundEscrowId = escrowId;
+          
+          if (escrowId.includes(':')) {
+            const parts = escrowId.split(':');
+            const projectId = parts.slice(0, -1).join(':');
+            
+            // Try counters 0-20 to find the actual escrow
+            for (let i = 0; i <= 20; i++) {
+              const tryEscrowId = `${projectId}:${i}`;
+              try {
+                foundEscrow = await escrowActor.get(tryEscrowId);
+                foundEscrowId = tryEscrowId;
+                escrowId = tryEscrowId;
+                break;
+              } catch (e) {
+                // Not found, continue
+              }
+            }
+          }
+          
+          if (foundEscrow) {
+            // Refresh funding to get actual balance
+            try {
+              const refreshResult = await escrowActor.refresh_funding(escrowId);
+              actualEscrowBalance = Number(refreshResult.balanceE8s);
+              console.log(`✅ Found actual escrow balance: ${actualEscrowBalance / 100000000} ICP (Escrow ID: ${escrowId})`);
+            } catch (refreshError) {
+              console.warn('⚠️ Could not refresh escrow balance:', refreshError);
+            }
+          }
+        }
+      } catch (escrowError) {
+        console.warn('⚠️ Could not fetch escrow balance:', escrowError);
+        // Continue with calculated values as fallback
+      }
+      
+      // Use actual escrow balance if available, otherwise calculate from booking data
+      const calculatedEscrowAmount = bookingData.total_amount_e8s ? 
+        Math.floor(Number(bookingData.total_amount_e8s) * 0.95) : 0;
+      const escrowAmountE8s = actualEscrowBalance !== null ? actualEscrowBalance : calculatedEscrowAmount;
+      
+      // Convert timestamps from nanoseconds to milliseconds
+      const created_at_ms = bookingData.created_at ? Number(bookingData.created_at) / 1000000 : Date.now();
+      const updated_at_ms = bookingData.updated_at ? Number(bookingData.updated_at) / 1000000 : Date.now();
+      const deadline_ms_raw = bookingData.deadline ? Number(bookingData.deadline) / 1000000 : null;
+      
+      // Get delivery time days from service or package
+      const delivery_time_days = serviceData?.delivery_time_days || 7;
+      
+      // Calculate deadline: use provided deadline if valid, otherwise calculate from created_at + delivery_days
+      let deadline_ms = deadline_ms_raw;
+      if (!deadline_ms || deadline_ms <= created_at_ms || deadline_ms < 946684800000) { // Before 2000-01-01
+        // Calculate deadline from created_at + delivery days
+        deadline_ms = created_at_ms + (delivery_time_days * 24 * 60 * 60 * 1000);
+        console.log('⚠️ Invalid deadline in booking detail, calculating from created_at:', {
+          originalDeadline: deadline_ms_raw,
+          created_at: created_at_ms,
+          delivery_time_days,
+          calculatedDeadline: deadline_ms
+        });
+      }
+      
       // Transform the booking data to include additional information
       const transformedData = {
         ...bookingData,
@@ -101,14 +181,12 @@ export async function GET(
         // Use freelancer email from canister or original freelancer_id
         freelancer_id: finalFreelancerEmail,
         
+        // Use actual escrow balance if fetched, otherwise calculated
+        escrow_amount_e8s: escrowAmountE8s,
+        
         // Add USD amounts
         total_amount_usd: bookingData.total_amount_e8s ? (Number(bookingData.total_amount_e8s) / 100000000) * 10 : 0, // Assuming $10 per ICP
-        escrow_amount_usd: bookingData.total_amount_e8s ? (Number(bookingData.total_amount_e8s) * 0.95 / 100000000) * 10 : 0,
-        
-        // Convert timestamps from nanoseconds to milliseconds
-        created_at: bookingData.created_at ? Number(bookingData.created_at) / 1000000 : Date.now(),
-        updated_at: bookingData.updated_at ? Number(bookingData.updated_at) / 1000000 : Date.now(),
-        deadline: bookingData.deadline ? Number(bookingData.deadline) / 1000000 : null,
+        escrow_amount_usd: (escrowAmountE8s / 100000000) * 10,
         
         // Add package details
         package_details: {
@@ -118,15 +196,21 @@ export async function GET(
           service_description: serviceData?.description || '',
           service_category: serviceData?.main_category || '',
           service_subcategory: serviceData?.sub_category || '',
-          delivery_time_days: serviceData?.delivery_time_days || 7,
+          delivery_time_days: delivery_time_days,
           starting_from_e8s: serviceData?.starting_from_e8s || 100000000,
           starting_from_usd: serviceData?.starting_from_e8s ? (Number(serviceData.starting_from_e8s) / 100000000) * 10 : 10,
         },
         
+        // Add timestamps (in milliseconds)
+        created_at: created_at_ms,
+        updated_at: updated_at_ms,
+        deadline: deadline_ms,
+        delivery_deadline: deadline_ms, // Alias for consistency
+        
         // Add human-readable dates
-        created_at_readable: bookingData.created_at ? new Date(Number(bookingData.created_at) / 1000000).toISOString() : new Date().toISOString(),
-        updated_at_readable: bookingData.updated_at ? new Date(Number(bookingData.updated_at) / 1000000).toISOString() : new Date().toISOString(),
-        deadline_readable: bookingData.deadline ? new Date(Number(bookingData.deadline) / 1000000).toISOString() : null,
+        created_at_readable: new Date(created_at_ms).toISOString(),
+        updated_at_readable: new Date(updated_at_ms).toISOString(),
+        deadline_readable: new Date(deadline_ms).toISOString(),
       };
       
       // Remove currency field as requested
@@ -271,5 +355,26 @@ export async function POST(
       error: 'Failed to complete project'
     }, { status: 500 });
   }
+}
+
+// Get escrow actor for ICP mainnet
+async function getMainnetEscrowActor() {
+  const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST || 'https://icp0.io';
+  const agent = new HttpAgent({ host: IC_HOST });
+
+  // Only fetch root key for localhost development
+  if (IC_HOST.includes('localhost') || IC_HOST.includes('127.0.0.1')) {
+    await agent.fetchRootKey();
+  }
+
+  if (!process.env.NEXT_PUBLIC_ESCROW_CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_ESCROW_CANISTER_ID is required');
+  }
+
+  const canisterId = Principal.fromText(process.env.NEXT_PUBLIC_ESCROW_CANISTER_ID);
+  return Actor.createActor(escrowIdlFactory, {
+    agent,
+    canisterId,
+  });
 }
 

@@ -6,9 +6,6 @@ import { idlFactory as escrowIdlFactory } from '@/lib/declarations/escrow/escrow
 import { getUserActor } from '@/lib/ic-agent';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  let originalEscrowId: string | null = null;
-  let actualEscrowId: string | null = null;
-  
   try {
     const session = await getCurrentSession();
 
@@ -20,7 +17,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const { id: escrowId } = await params;
-    originalEscrowId = escrowId;
 
     if (!escrowId) {
       return NextResponse.json({
@@ -32,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Get escrow actor for mainnet
     const escrowActor = await getMainnetEscrowActor();
 
-    console.log('🔍 Attempting to get escrow:', escrowId);
+    console.log('🔍 Attempting to get escrow for refund:', escrowId);
 
     // Try to find the escrow - if not found with given ID, try different counter values
     let escrow;
@@ -55,7 +51,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (escrowId.includes(':')) {
           const parts = escrowId.split(':');
           const projectId = parts.slice(0, -1).join(':'); // Handle projectIds that might contain colons
-          const providedCounter = parts[parts.length - 1];
           
           console.log(`🔍 Trying to find escrow with projectId: ${projectId}`);
           
@@ -95,9 +90,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Use the found escrow - update escrowId variable for subsequent calls
-      console.log('Escrow client principal:', escrow.client.toString());
-    actualEscrowId = foundEscrowId; // Store the actual escrow ID found
+    const actualEscrowId = foundEscrowId; // Use a new variable since escrowId is const
 
+    try {
       // Get current user's wallet principal
       const userActor = await getUserActor();
       const user = await userActor.getUserById(session.userId);
@@ -106,7 +101,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({
           success: false,
           error: 'User not found',
-        escrowId: actualEscrowId,
         }, { status: 404 });
       }
 
@@ -114,72 +108,80 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (!userData.walletPrincipal || userData.walletPrincipal.length === 0) {
         return NextResponse.json({
           success: false,
-          error: 'User wallet not connected. Please connect your Plug wallet in your profile settings.',
-        escrowId: actualEscrowId,
+          error: 'User wallet not connected',
         }, { status: 400 });
       }
 
       const userPrincipal = userData.walletPrincipal[0];
-      console.log('User wallet principal:', userPrincipal.toString());
 
       // Check if user is the client
-      const escrowClientStr = escrow.client.toString();
-      const userPrincipalStr = userPrincipal.toString();
-      
-      if (escrowClientStr !== userPrincipalStr) {
-        console.error('Principal mismatch:', {
-          escrowClient: escrowClientStr,
-          userPrincipal: userPrincipalStr,
-          match: escrowClientStr === userPrincipalStr
-        });
+      if (escrow.client.toString() !== userPrincipal.toString()) {
         return NextResponse.json({
           success: false,
-          error: `Unauthorized: only the client can release escrow. Escrow client: ${escrowClientStr.substring(0, 20)}..., Your wallet: ${userPrincipalStr.substring(0, 20)}...`,
-        escrowId: actualEscrowId,
+          error: 'Unauthorized: only the client can refund escrow',
         }, { status: 403 });
       }
 
-    // Get escrow details - we'll let the canister handle the release logic
-    // The escrow.mo will check balance and release whatever is available
-    console.log('📋 Preparing to release escrow:', actualEscrowId);
-    console.log('💼 Expected amount:', Number(escrow.expectedE8s) / 100000000, 'ICP');
-    
-    // Log escrow status for debugging
-    const currentStatus = 'funded' in escrow.status ? 'FUNDED' : 
-                         'created' in escrow.status ? 'CREATED' : 
-                         'released' in escrow.status ? 'RELEASED' : 
-                         'refunded' in escrow.status ? 'REFUNDED' : 'UNKNOWN';
-    console.log(`📊 Current escrow status: ${currentStatus}`);
-
-    // Release the escrow - the canister will check balance and release whatever is available
-    console.log('🚀 Releasing escrow:', actualEscrowId);
-    const releaseResult = await escrowActor.release(actualEscrowId);
-
-      if ('err' in releaseResult) {
+      // Check escrow status - cannot refund if already released
+      if ('released' in escrow.status) {
         return NextResponse.json({
           success: false,
-          error: releaseResult.err,
-        escrowId: actualEscrowId,
-        expectedE8s: Number(escrow.expectedE8s),
+          error: 'Cannot refund a released escrow',
+        }, { status: 400 });
+      }
+
+      // Refresh funding to get current balance (needed for refund to work correctly)
+      console.log('Refreshing escrow funding status before refund...');
+      try {
+        const refreshResult = await escrowActor.refresh_funding(actualEscrowId); // Use the found escrow ID
+        console.log('Refresh funding result:', {
+          funded: refreshResult.funded,
+          balanceE8s: Number(refreshResult.balanceE8s)
+        });
+        
+        if (Number(refreshResult.balanceE8s) === 0) {
+          return NextResponse.json({
+            success: false,
+            error: 'No funds available to refund',
+          }, { status: 400 });
+        }
+      } catch (refreshError: any) {
+        console.error('Error refreshing funding:', refreshError);
+        // Continue anyway - the refund call will check balance
+      }
+
+      // Refund the escrow (use the found escrow ID)
+      console.log('Refunding escrow:', actualEscrowId);
+      const refundResult = await escrowActor.refund(actualEscrowId);
+
+      if ('err' in refundResult) {
+        return NextResponse.json({
+          success: false,
+          error: refundResult.err,
         }, { status: 500 });
       }
 
       return NextResponse.json({
         success: true,
         data: {
-          blockIndex: Number(releaseResult.ok),
-          message: 'Escrow released successfully. Funds have been transferred to the freelancer.',
+          blockIndex: Number(refundResult.ok),
+          message: 'Escrow refunded successfully. Funds have been returned to your wallet.',
         },
       });
 
-  } catch (error: any) {
-    console.error('Escrow release API error:', error);
-    // Use the actual escrow ID found, or fallback to original
-    const errorEscrowId = actualEscrowId || originalEscrowId || 'unknown';
+    } catch (escrowError: any) {
+      console.error('Escrow refund error:', escrowError);
+      return NextResponse.json({
+        success: false,
+        error: escrowError.message || 'Failed to refund escrow',
+      }, { status: 500 });
+    }
+
+  } catch (error) {
+    console.error('Escrow refund API error:', error);
     return NextResponse.json({
       success: false,
-      error: error.message || 'Failed to release escrow',
-      escrowId: errorEscrowId,
+      error: 'Failed to refund escrow',
     }, { status: 500 });
   }
 }
@@ -204,3 +206,4 @@ async function getMainnetEscrowActor() {
     canisterId,
   });
 }
+

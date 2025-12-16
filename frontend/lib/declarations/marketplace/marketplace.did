@@ -149,6 +149,20 @@ type PaginationParams =
    offset: nat;
  };
 type PackageId = text;
+type Package = 
+ record {
+   created_at: int;
+   delivery_time_days: nat;
+   delivery_timeline: text;
+   description: text;
+   features: vec text;
+   is_active: bool;
+   name: text;
+   package_id: PackageId;
+   price_e8s: nat64;
+   revisions: nat;
+   service_id: ServiceId;
+ };
 type BookingStatus = 
  variant {
    Active;
@@ -167,10 +181,12 @@ type BookingResponse =
 type BookingId = text;
 type Booking = 
  record {
+   base_amount_e8s: nat64;
    booking_confirmed_at: opt int;
    booking_confirmed_at_readable: text;
    booking_id: BookingId;
    client_id: UserId;
+   client_name: text;
    client_rating: opt float64;
    client_review: opt text;
    client_reviewed_at: opt int;
@@ -183,23 +199,44 @@ type Booking =
    delivery_deadline: int;
    delivery_deadline_readable: text;
    description: text;
+   discount_amount_e8s: nat64;
    dispute_id: opt text;
+   escrow_amount_e8s: nat64;
    freelancer_id: UserId;
+   freelancer_name: text;
    freelancer_rating: opt float64;
    freelancer_review: opt text;
    freelancer_reviewed_at: opt int;
+   ledger_deposit_block: opt nat64;
    milestones: vec StageId;
+   package_description: text;
+   package_features: vec text;
    package_id: PackageId;
+   package_revisions: nat;
+   package_tier: text;
+   package_title: text;
    payment_completed_at: opt int;
    payment_completed_at_readable: text;
+   payment_id: text;
+   payment_method: text;
    payment_status: PaymentStatus;
+   platform_fee_e8s: nat64;
+   promo_code: opt text;
    requirements: vec text;
    service_id: ServiceId;
+   special_instructions: text;
    status: BookingStatus;
    time_remaining_hours: nat;
    title: text;
    total_amount_e8s: nat64;
+   transaction_id: text;
    updated_at: int;
+   upsells: vec record {
+                  category: text;
+                  id: text;
+                  name: text;
+                  price_e8s: nat64;
+                };
    work_completed_at: opt int;
    work_started_at: opt int;
  };
@@ -217,37 +254,27 @@ type ApiError =
    Unauthorized: text;
  };
 service : {
-  addBookingReview: (bookingId: BookingId, rating: float64, comment: 
-   text, isClient: bool) -> (Result_1);
-  bookPackage: (clientId: UserId, packageId: PackageId, idempotencyKey: 
-   text, specialInstructions: text) -> (Result_9);
-  createBooking: (service_id: ServiceId, package_id: PackageId, title: 
-   text, description: text, requirements: vec text, deadline: int) ->
+  addBookingReview: (BookingId, UserId, float64, text, bool) -> (Result_1);
+  bookPackage: (UserId, text, PackageId, text, text) -> (Result_9);
+  createBooking: (ServiceId, PackageId, text, text, vec text, int) ->
    (Result_8);
-  createChatRelationshipFromBooking: (bookingId: BookingId,
-   clientDisplayName: opt text, freelancerDisplayName: opt text) ->
-   (Result_7);
-  createPackage: (service_id: ServiceId, name: text, description: text,
-   price_e8s: nat64, delivery_time_days: nat, delivery_timeline: text,
-   revisions: nat, features: vec text) -> (Result_6);
-  createPackageForBooking: (service_id: ServiceId, package_id: PackageId,
-   name: text, description: text, price_e8s: nat64, delivery_time_days: 
-   nat, delivery_timeline: text, revisions: nat, features: vec text) ->
+  createChatRelationshipFromBooking: (BookingId, UserId, opt text,
+   opt text) -> (Result_7);
+  createPackage: (ServiceId, text, text, nat64, nat, text, nat, vec text) ->
    (Result_6);
-  createService: (title: text, main_category: text, sub_category: text,
-   description: text, whats_included: text, delivery_time_days: nat,
-   starting_from_e8s: nat64, tags: vec text) -> (Result_5);
-  createServiceForBooking: (service_id: ServiceId, freelancer_id: text,
-   title: text, main_category: text, sub_category: text, description: 
-   text, whats_included: text, delivery_time_days: nat, starting_from_e8s:
-   nat64, tags: vec text) -> (Result_5);
-  deleteService: (service_id: ServiceId) -> (Result);
-  getActiveBookingChatsForUser: (userId: text) -> (Result_2) query;
+  createPackageForBooking: (ServiceId, PackageId, text, text, nat64, 
+   nat, text, nat, vec text) -> (Result_6);
+  createService: (UserId, text, text, text, text, text, nat, nat64,
+   vec text) -> (Result_5);
+  createServiceForBooking: (ServiceId, text, text, text, text, text, 
+   text, nat, nat64, vec text) -> (Result_5);
+  deleteService: (ServiceId) -> (Result);
+  getActiveBookingChatsForUser: (text) -> (Result_2) query;
   getAllServices: () -> (vec Service) query;
-  getBooking: (booking_id: BookingId) -> (opt Booking);
-  getBookingById: (bookingId: BookingId) -> (Result_4) query;
-  getBookingTimeline: (bookingId: BookingId) -> (vec TimelineEvent) query;
-  getChatParticipantsForBooking: (bookingId: BookingId) -> (Result_3) query;
+  getBooking: (BookingId, UserId) -> (opt Booking);
+  getBookingById: (BookingId) -> (Result_4) query;
+  getBookingTimeline: (BookingId) -> (vec TimelineEvent) query;
+  getChatParticipantsForBooking: (BookingId) -> (Result_3) query;
   getMarketplaceStats: () ->
    (record {
       active_bookings: nat;
@@ -256,27 +283,30 @@ service : {
       total_revenue_e8s: nat64;
       total_services: nat;
     }) query;
-  getService: (service_id: ServiceId) -> (opt Service);
-  getServicesByFreelancer: (freelancer_id: UserId, pagination:
-   PaginationParams) -> (vec Service) query;
-  getUserBookings: (user_id: UserId, role: variant {
-                                             Client;
-                                             Freelancer;
-                                           }, pagination:
-   PaginationParams) -> (vec Booking) query;
-  listBookingsForClient: (clientId: UserId, statusFilter: opt BookingStatus,
-   limit: nat, offset: nat) -> (Result_2) query;
-  listBookingsForFreelancer: (freelancerId: UserId, statusFilter:
-   opt BookingStatus, limit: nat, offset: nat) -> (Result_2) query;
-  searchServices: (filter: ServiceFilter, sort: SortOption, pagination:
-   PaginationParams) -> (vec Service) query;
-  submitReview: (booking_id: BookingId, rating: float64, comment: text) ->
+  getPackagesByServiceId: (ServiceId) -> (vec Package) query;
+  getService: (ServiceId) -> (opt Service);
+  getServicesByFreelancer: (UserId, PaginationParams) -> (vec Service) query;
+  getUserBookings: (UserId, variant {
+                              Client;
+                              Freelancer;
+                            }, PaginationParams) -> (vec Booking) query;
+  listBookingsForClient: (UserId, opt BookingStatus, nat, nat) ->
+   (Result_2) query;
+  listBookingsForFreelancer: (UserId, opt BookingStatus, nat, nat) ->
+   (Result_2) query;
+  searchServices: (ServiceFilter, SortOption, PaginationParams) ->
+   (vec Service) query;
+  submitReview: (BookingId, UserId, float64, text) -> (Result);
+  updateBookingEnrichedData: (BookingId, text, text, text, text, text, 
+   text, vec record {
+               category: text;
+               id: text;
+               name: text;
+               price_e8s: nat64;
+             }, opt text, nat64, opt nat64) -> (Result_1);
+  updateBookingStatus: (BookingId, UserId, BookingStatus) -> (Result);
+  updateBookingStatusWithTimeline: (BookingId, UserId, BookingStatus,
+   text) -> (Result_1);
+  updateService: (ServiceId, text, text, text, nat, nat64, vec text) ->
    (Result);
-  updateBookingStatus: (booking_id: BookingId, status: BookingStatus) ->
-   (Result);
-  updateBookingStatusWithTimeline: (bookingId: BookingId, status:
-   BookingStatus, description: text) -> (Result_1);
-  updateService: (service_id: ServiceId, title: text, description: text,
-   whats_included: text, delivery_time_days: nat, starting_from_e8s: 
-   nat64, tags: vec text) -> (Result);
 }

@@ -1,5 +1,6 @@
 export const idlFactory = ({ IDL }) => {
   const BookingId = IDL.Text;
+  const UserId = IDL.Text;
   const ApiError = IDL.Variant({
     'InvalidInput' : IDL.Text,
     'PaymentFailed' : IDL.Text,
@@ -13,7 +14,6 @@ export const idlFactory = ({ IDL }) => {
     'InsufficientFunds' : IDL.Null,
   });
   const Result_1 = IDL.Variant({ 'ok' : IDL.Null, 'err' : ApiError });
-  const UserId = IDL.Text;
   const PackageId = IDL.Text;
   const BookingResponse = IDL.Record({
     'escrow_account' : IDL.Text,
@@ -44,38 +44,63 @@ export const idlFactory = ({ IDL }) => {
   });
   const StageId = IDL.Text;
   const Booking = IDL.Record({
+    'transaction_id' : IDL.Text,
+    'package_features' : IDL.Vec(IDL.Text),
     'status' : BookingStatus,
+    'discount_amount_e8s' : IDL.Nat64,
+    'package_title' : IDL.Text,
     'title' : IDL.Text,
     'updated_at' : IDL.Int,
     'delivery_days' : IDL.Nat,
     'time_remaining_hours' : IDL.Nat,
+    'package_description' : IDL.Text,
     'client_rating' : IDL.Opt(IDL.Float64),
     'payment_completed_at_readable' : IDL.Text,
+    'upsells' : IDL.Vec(
+      IDL.Record({
+        'id' : IDL.Text,
+        'name' : IDL.Text,
+        'category' : IDL.Text,
+        'price_e8s' : IDL.Nat64,
+      })
+    ),
+    'client_name' : IDL.Text,
     'freelancer_id' : UserId,
     'dispute_id' : IDL.Opt(IDL.Text),
     'description' : IDL.Text,
     'deadline' : IDL.Int,
+    'base_amount_e8s' : IDL.Nat64,
     'freelancer_rating' : IDL.Opt(IDL.Float64),
     'created_at' : IDL.Int,
     'payment_status' : PaymentStatus,
+    'payment_method' : IDL.Text,
     'client_review' : IDL.Opt(IDL.Text),
+    'platform_fee_e8s' : IDL.Nat64,
+    'freelancer_name' : IDL.Text,
     'delivery_deadline' : IDL.Int,
     'service_id' : ServiceId,
     'total_amount_e8s' : IDL.Nat64,
+    'escrow_amount_e8s' : IDL.Nat64,
     'currency' : IDL.Text,
     'work_completed_at' : IDL.Opt(IDL.Int),
     'payment_completed_at' : IDL.Opt(IDL.Int),
+    'special_instructions' : IDL.Text,
     'freelancer_review' : IDL.Opt(IDL.Text),
     'delivery_deadline_readable' : IDL.Text,
     'client_id' : UserId,
     'requirements' : IDL.Vec(IDL.Text),
+    'payment_id' : IDL.Text,
     'client_reviewed_at' : IDL.Opt(IDL.Int),
     'booking_id' : BookingId,
     'package_id' : PackageId,
+    'promo_code' : IDL.Opt(IDL.Text),
+    'package_tier' : IDL.Text,
     'freelancer_reviewed_at' : IDL.Opt(IDL.Int),
+    'ledger_deposit_block' : IDL.Opt(IDL.Nat64),
     'current_milestone' : IDL.Opt(StageId),
     'booking_confirmed_at' : IDL.Opt(IDL.Int),
     'booking_confirmed_at_readable' : IDL.Text,
+    'package_revisions' : IDL.Nat,
     'created_at_readable' : IDL.Text,
     'work_started_at' : IDL.Opt(IDL.Int),
     'milestones' : IDL.Vec(StageId),
@@ -136,6 +161,19 @@ export const idlFactory = ({ IDL }) => {
     'ok' : IDL.Tuple(IDL.Text, IDL.Text),
     'err' : ApiError,
   });
+  const Package = IDL.Record({
+    'delivery_timeline' : IDL.Text,
+    'features' : IDL.Vec(IDL.Text),
+    'revisions' : IDL.Nat,
+    'name' : IDL.Text,
+    'description' : IDL.Text,
+    'created_at' : IDL.Int,
+    'service_id' : ServiceId,
+    'is_active' : IDL.Bool,
+    'price_e8s' : IDL.Nat64,
+    'delivery_time_days' : IDL.Nat,
+    'package_id' : PackageId,
+  });
   const PaginationParams = IDL.Record({
     'offset' : IDL.Nat,
     'limit' : IDL.Nat,
@@ -162,12 +200,12 @@ export const idlFactory = ({ IDL }) => {
   });
   return IDL.Service({
     'addBookingReview' : IDL.Func(
-        [BookingId, IDL.Float64, IDL.Text, IDL.Bool],
+        [BookingId, UserId, IDL.Float64, IDL.Text, IDL.Bool],
         [Result_1],
         [],
       ),
     'bookPackage' : IDL.Func(
-        [UserId, PackageId, IDL.Text, IDL.Text],
+        [UserId, IDL.Text, PackageId, IDL.Text, IDL.Text],
         [Result_9],
         [],
       ),
@@ -177,7 +215,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'createChatRelationshipFromBooking' : IDL.Func(
-        [BookingId, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
+        [BookingId, UserId, IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [Result_7],
         [],
       ),
@@ -212,6 +250,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'createService' : IDL.Func(
         [
+          UserId,
           IDL.Text,
           IDL.Text,
           IDL.Text,
@@ -247,7 +286,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getAllServices' : IDL.Func([], [IDL.Vec(Service)], ['query']),
-    'getBooking' : IDL.Func([BookingId], [IDL.Opt(Booking)], []),
+    'getBooking' : IDL.Func([BookingId, UserId], [IDL.Opt(Booking)], []),
     'getBookingById' : IDL.Func([BookingId], [Result_4], ['query']),
     'getBookingTimeline' : IDL.Func(
         [BookingId],
@@ -270,6 +309,11 @@ export const idlFactory = ({ IDL }) => {
             'total_revenue_e8s' : IDL.Nat64,
           }),
         ],
+        ['query'],
+      ),
+    'getPackagesByServiceId' : IDL.Func(
+        [ServiceId],
+        [IDL.Vec(Package)],
         ['query'],
       ),
     'getService' : IDL.Func([ServiceId], [IDL.Opt(Service)], []),
@@ -302,10 +346,42 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(Service)],
         ['query'],
       ),
-    'submitReview' : IDL.Func([BookingId, IDL.Float64, IDL.Text], [Result], []),
-    'updateBookingStatus' : IDL.Func([BookingId, BookingStatus], [Result], []),
+    'submitReview' : IDL.Func(
+        [BookingId, UserId, IDL.Float64, IDL.Text],
+        [Result],
+        [],
+      ),
+    'updateBookingEnrichedData' : IDL.Func(
+        [
+          BookingId,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Vec(
+            IDL.Record({
+              'id' : IDL.Text,
+              'name' : IDL.Text,
+              'category' : IDL.Text,
+              'price_e8s' : IDL.Nat64,
+            })
+          ),
+          IDL.Opt(IDL.Text),
+          IDL.Nat64,
+          IDL.Opt(IDL.Nat64),
+        ],
+        [Result_1],
+        [],
+      ),
+    'updateBookingStatus' : IDL.Func(
+        [BookingId, UserId, BookingStatus],
+        [Result],
+        [],
+      ),
     'updateBookingStatusWithTimeline' : IDL.Func(
-        [BookingId, BookingStatus, IDL.Text],
+        [BookingId, UserId, BookingStatus, IDL.Text],
         [Result_1],
         [],
       ),

@@ -334,7 +334,13 @@ export async function POST(request: NextRequest) {
       upsells,
       promoCode,
       paymentId,
-      transactionId
+      transactionId,
+      serviceId: bodyServiceId, // Get serviceId from body if provided
+      serviceTitle,
+      freelancerId,
+      packageTitle,
+      packageDescription,
+      deliveryDays
     } = body;
 
     // Use logged-in user email if available, otherwise fall back to clientId from body
@@ -383,66 +389,259 @@ export async function POST(request: NextRequest) {
       // Get marketplace actor
       const actor = await getMarketplaceActor();
 
-      // Extract service ID from package ID (assuming packageId contains service info or we need to parse it)
-      // For now, we'll use a simple approach - this may need adjustment based on your ID format
-      const serviceId = packageId.split('_')[0]; // Adjust this logic based on your actual ID format
+      // Get service ID from body if provided (for escrow-created bookings), otherwise try to extract from packageId
+      const serviceId = bodyServiceId || (packageId.includes('_') ? packageId.split('_')[0] : null);
 
-      // Get service data from canister
-      console.log('🔍 Looking for service:', serviceId);
-      const serviceResult = await actor.getService(serviceId);
-
-      if ('err' in serviceResult) {
-        console.error('❌ Service not found in canister:', serviceId);
+      if (!serviceId) {
+        console.error('❌ Service ID is required but not provided. PackageId:', packageId);
         return NextResponse.json({
           success: false,
-          error: { NotFound: 'Service not found' }
+          error: 'Service ID is required. Please provide serviceId in the request body.'
         }, { status: 400 });
       }
 
-      const serviceData = serviceResult.ok;
+      console.log('🔍 Using service ID:', serviceId, '(from bodyServiceId:', bodyServiceId, ', packageId:', packageId, ')');
 
-      // Find package in service packages
-      const packageData = serviceData.packages?.find((pkg: any) => pkg.package_id === packageId);
-      if (!packageData) {
-        console.error('❌ Package not found in service packages:', packageId);
+      // Import helper functions for creating services and packages
+      const { ensureServiceExistsInCanister, ensurePackageExistsInCanister, createBookingInCanister } = await import('@/lib/booking-utils');
+
+      // Get service data from canister (optional for escrow-created bookings)
+      let serviceData = null;
+      let serviceResult = null;
+      let packageData: any = null; // Declare at higher scope
+      
+      try {
+        serviceResult = await actor.getService(serviceId);
+        if ('ok' in serviceResult) {
+          serviceData = serviceResult.ok;
+        }
+      } catch (error) {
+        console.warn('⚠️ Could not fetch service from canister:', error);
+      }
+
+      // For escrow-created bookings, create service and package if they don't exist
+      if (body.createdFromEscrow) {
+        console.log('📦 Creating booking from escrow - ensuring service and package exist');
+        
+        // If service doesn't exist, create it
+        if (!serviceData) {
+          console.log('🏢 Service not found in canister, creating it...');
+          const serviceDataToCreate = {
+            service_id: serviceId,
+            freelancer_email: freelancerId || 'freelancer@example.com',
+            title: serviceTitle || 'Service',
+            description: packageDescription || 'Service description',
+            main_category: 'General',
+            sub_category: 'Service',
+            delivery_time_days: deliveryDays || 7,
+            starting_from_e8s: Math.floor(totalAmount * 100000000),
+            tags: []
+          };
+          
+          const serviceCreateResult = await ensureServiceExistsInCanister(serviceDataToCreate);
+          if (!serviceCreateResult.success) {
+            console.error('❌ Failed to create service in canister:', serviceCreateResult.error);
         return NextResponse.json({
           success: false,
-          error: { NotFound: 'Package not found' }
+              error: `Failed to create service: ${serviceCreateResult.error}`
+            }, { status: 500 });
+      }
+
+          // Fetch the newly created service
+          try {
+            serviceResult = await actor.getService(serviceId);
+            if ('ok' in serviceResult) {
+              serviceData = serviceResult.ok;
+            }
+          } catch (error) {
+            console.warn('⚠️ Could not fetch newly created service:', error);
+          }
+        }
+
+        // Create package data structure
+        const packageDataToCreate = {
+          package_id: packageId,
+          name: packageTitle || 'Package',
+          title: packageTitle || 'Package',
+          description: packageDescription || 'Package description',
+          price_e8s: Math.floor(totalAmount * 100000000),
+          delivery_time_days: deliveryDays || 7,
+          delivery_timeline: `${deliveryDays || 7} days delivery`,
+          revisions_included: 1,
+          features: []
+        };
+
+        // Ensure package exists in canister
+        const packageCreateResult = await ensurePackageExistsInCanister(packageDataToCreate, serviceId);
+        if (!packageCreateResult.success) {
+          console.error('❌ Failed to create package in canister:', packageCreateResult.error);
+          return NextResponse.json({
+            success: false,
+            error: `Failed to create package: ${packageCreateResult.error}`
+          }, { status: 500 });
+        }
+
+        // Fetch package from canister to get full data
+        if (serviceData) {
+          packageData = serviceData.packages?.find((pkg: any) => pkg.package_id === packageId);
+        }
+        
+        if (!packageData) {
+          // If package still not found, use the data we created
+          packageData = {
+            package_id: packageId,
+            name: packageTitle || 'Package',
+          description: packageDescription || '',
+          price_e8s: BigInt(Math.floor(totalAmount * 100000000)),
+          delivery_time_days: deliveryDays || 7,
+          revisions: 1,
+          features: []
+        };
+        }
+      } else {
+        // For regular bookings, service must exist
+        if (!serviceData) {
+          console.error('❌ Service not found in canister:', serviceId);
+          return NextResponse.json({
+            success: false,
+            error: { NotFound: 'Service not found' }
+          }, { status: 400 });
+        }
+
+        // Find package in service packages
+        packageData = serviceData.packages?.find((pkg: any) => pkg.package_id === packageId);
+        if (!packageData) {
+          console.error('❌ Package not found in service packages:', packageId);
+          console.error('Available packages:', serviceData.packages?.map((p: any) => p.package_id));
+          return NextResponse.json({
+            success: false,
+            error: { NotFound: 'Package not found in service' }
+          }, { status: 400 });
+        }
+      }
+
+      // Ensure packageData is defined
+      if (!packageData) {
+        console.error('❌ Package data is null or undefined');
+        return NextResponse.json({
+          success: false,
+          error: 'Package data is required'
         }, { status: 400 });
       }
 
       console.log('✅ Found package and service data');
-      console.log('📦 Package:', packageData);
-      console.log('🛠️ Service:', serviceData);
+      console.log('📦 Package:', packageData ? {
+        ...packageData,
+        price_e8s: typeof packageData.price_e8s === 'bigint' 
+          ? packageData.price_e8s.toString() 
+          : packageData.price_e8s
+      } : null);
+      console.log('🛠️ Service:', serviceData ? {
+        ...serviceData,
+        packages: serviceData.packages?.map((p: any) => ({
+          ...p,
+          price_e8s: typeof p.price_e8s === 'bigint' ? p.price_e8s.toString() : p.price_e8s
+        }))
+      } : undefined);
 
-      // Create a mock booking response since we're using local storage
-      const bookingId = `BK_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const escrowAccount = `escrow-${bookingId}`;
+      // Get user emails for chat initiation and booking creation
+      const clientEmail = await getClientEmail(effectiveClientId) || effectiveClientId;
+      // Use the helper function to safely get freelancer email, with fallback
+      let freelancerEmail = null;
+      if (serviceData) {
+        freelancerEmail = await getFreelancerEmailFromService(actor, serviceId) 
+          || serviceData.freelancer_email 
+          || serviceData.freelancer_id;
+      }
+      freelancerEmail = freelancerEmail || freelancerId || null;
+      const serviceTitleValue = serviceData?.title || serviceTitle || 'Service';
 
-      const bookingResponse = {
-        booking_id: bookingId,
-        escrow_account: escrowAccount,
-        amount_e8s: Number(packageData.price_e8s),
-        ledger_block: Math.floor(Math.random() * 1000000) // Mock block number
+      // Create booking in canister
+      console.log('🏗️ Creating booking in canister...');
+      const bookingDataForCanister = {
+        client_id: effectiveClientId,
+        client_email: clientEmail,
+        package_id: packageId,
+        special_instructions: instructions,
+        payment_method: paymentMethod || 'escrow',
+        payment_id: paymentId || null,
+        transaction_id: transactionId || null
       };
 
-      console.log('📊 Created mock booking:', bookingResponse);
+      // Create booking using bookPackage method
+      // Note: The deployed canister expects 5 text parameters (confirmed by Candid UI):
+      // 1. clientId (text)
+      // 2. clientEmail (text)
+      // 3. packageId (text)
+      // 4. idempotencyKey (text)
+      // 5. specialInstructions (text)
+      const idempotencyKey = `booking-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      let bookingResponse = null;
+      
+      // Ensure all parameters are strings (canister expects all 5 as text type)
+      const params = [
+        String(effectiveClientId || ''),    // 1. clientId: text
+        String(clientEmail || ''),          // 2. clientEmail: text
+        String(packageId || ''),            // 3. packageId: text
+        String(idempotencyKey || ''),       // 4. idempotencyKey: text
+        String(instructions || '')           // 5. specialInstructions: text
+      ];
+      
+      // Validate all parameters are non-empty
+      if (params.some(p => !p || p.trim() === '')) {
+        console.error('❌ Invalid parameters for bookPackage:', params);
+        return NextResponse.json({
+          success: false,
+          error: 'All booking parameters are required and must be non-empty'
+        }, { status: 400 });
+      }
+      
+      try {
+        // Type assertion needed because DID file is outdated - canister actually expects 5 params
+        console.log('📞 Calling bookPackage with 5 parameters:', {
+          clientId: params[0],
+          clientEmail: params[1],
+          packageId: params[2],
+          idempotencyKey: params[3],
+          specialInstructions: params[4]
+        });
+        
+        const bookResult = await (actor as any).bookPackage(
+          params[0],  // clientId: text
+          params[1],  // clientEmail: text
+          params[2],  // packageId: text
+          params[3],  // idempotencyKey: text
+          params[4]   // specialInstructions: text
+        );
+
+        if ('ok' in bookResult) {
+          bookingResponse = bookResult.ok;
+          console.log('✅ Booking created successfully in canister:', bookingResponse);
+        } else {
+          console.error('❌ Failed to create booking in canister:', bookResult.err);
+          return NextResponse.json({
+            success: false,
+            error: `Failed to create booking: ${JSON.stringify(bookResult.err)}`
+          }, { status: 500 });
+        }
+      } catch (bookingError: any) {
+        console.error('❌ Error creating booking in canister:', bookingError);
+        return NextResponse.json({
+          success: false,
+          error: `Booking creation failed: ${bookingError.message || 'Unknown error'}`
+        }, { status: 500 });
+      }
 
       // Convert BigInt values to numbers for JSON serialization
       const safeBookingData = {
         booking_id: bookingResponse.booking_id,
-        escrow_account: bookingResponse.escrow_account,
-        amount_e8s: bookingResponse.amount_e8s,
-        ledger_block: bookingResponse.ledger_block
+        escrow_account: bookingResponse.escrow_account || `escrow-${bookingResponse.booking_id}`,
+        amount_e8s: Number(bookingResponse.amount_e8s),
+        ledger_block: bookingResponse.ledger_block ? Number(bookingResponse.ledger_block) : null
       };
 
-      // Get user emails for chat initiation
-      const clientEmail = await getClientEmail(clientId);
-      const freelancerEmail = serviceData.freelancer_email;
-      const serviceTitle = serviceData.title;
-
       console.log('📧 User emails:', { clientEmail, freelancerEmail });
-      console.log('📋 Service title:', serviceTitle);
+      console.log('📋 Service title:', serviceTitleValue);
       console.log('💬 Initiating chat after successful booking...');
 
       // Initiate chat after successful booking
@@ -459,7 +658,7 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify({
               clientEmail,
               freelancerEmail,
-              serviceTitle,
+              serviceTitle: serviceTitleValue,
               bookingId: safeBookingData.booking_id,
               projectId: safeBookingData.booking_id // Use booking ID as project ID for context
             }),
@@ -539,7 +738,7 @@ export async function POST(request: NextRequest) {
             client: clientEmail,
             freelancer: freelancerEmail
           },
-          serviceTitle,
+          serviceTitle: serviceTitleValue,
           paymentDetails: {
             paymentMethod,
             totalAmount,

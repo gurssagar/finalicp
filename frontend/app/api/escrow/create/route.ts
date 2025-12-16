@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentSession } from '@/lib/actions/auth';
-import { getUserActor, getEscrowActor } from '@/lib/ic-agent';
+import { idlFactory as escrowIdlFactory } from '@/lib/declarations/escrow/escrow.did.js';
+import { getUserActor } from '@/lib/ic-agent';
+import { Actor, HttpAgent } from '@dfinity/agent';
+import { Principal } from '@dfinity/principal';
+import { getMarketplaceActor } from '@/lib/ic-marketplace-agent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +17,15 @@ export async function POST(request: NextRequest) {
       }, { status: 401 });
     }
 
-    const { projectId, freelancerUserId, amountE8s }: {
+    const { projectId, freelancerUserId, amountE8s, clientPrincipal, packageId, serviceTitle, packageTitle, specialInstructions }: {
       projectId: string;
       freelancerUserId: string;
       amountE8s: number;
+      clientPrincipal?: string; // Optional: if provided, use directly
+      packageId?: string; // Optional: for creating booking
+      serviceTitle?: string; // Optional: for creating booking
+      packageTitle?: string; // Optional: for creating booking
+      specialInstructions?: string; // Optional: for creating booking
     } = await request.json();
 
     if (!projectId || !freelancerUserId || !amountE8s) {
@@ -33,68 +42,168 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Get client principal (current user)
-
-    // Get freelancer wallet info
+    // Get client principal - use provided principal or fetch from user canister
     const userActor = await getUserActor();
-    const freelancerWalletResult = await userActor.getWalletInfo(freelancerUserId);
+    let clientPrincipalObj: Principal;
+    
+    if (clientPrincipal) {
+      // Use principal provided from frontend (from connected wallet)
+      try {
+        clientPrincipalObj = Principal.fromText(clientPrincipal);
+      } catch (error: any) {
+        console.error('Invalid principal provided:', error);
+        return NextResponse.json({
+          success: false,
+          error: 'Invalid principal format provided',
+        }, { status: 400 });
+      }
+    } else {
+      // Fallback: Get from user canister
+      try {
+        const user = await userActor.getUserById(session.userId);
+        if (!user || user.length === 0) {
+          throw new Error('User not found');
+        }
+        const userData = user[0];
+        // walletPrincipal is optional: [] or [Principal]
+        if (!userData.walletPrincipal || userData.walletPrincipal.length === 0) {
+          throw new Error('Client wallet not connected in profile');
+        }
+        clientPrincipalObj = userData.walletPrincipal[0];
+      } catch (error: any) {
+        console.error('Error getting client principal from canister:', error);
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to get client principal. Please ensure your wallet is connected in your profile settings, or connect your wallet in the escrow component.',
+        }, { status: 400 });
+      }
+    }
 
-    if ('err' in freelancerWalletResult) {
+    // Get freelancer principal from user canister
+    let freelancerPrincipal: Principal;
+    try {
+      console.log('Looking up freelancer with ID/Email:', freelancerUserId);
+      
+      // Try to get user by ID first, then by email if ID lookup returns empty
+      let freelancerUser: any = null;
+      let lookupMethod = 'unknown';
+      
+      // Try getUserById first
+      freelancerUser = await userActor.getUserById(freelancerUserId);
+      lookupMethod = 'getUserById';
+      console.log('getUserById result:', freelancerUser ? `Found (length: ${freelancerUser.length})` : 'null');
+      
+      // If getUserById returns empty, try getUserByEmail (freelancer_id might be an email)
+      if (!freelancerUser || freelancerUser.length === 0) {
+        console.log('getUserById returned empty, trying getUserByEmail...');
+        try {
+          freelancerUser = await userActor.getUserByEmail(freelancerUserId);
+          lookupMethod = 'getUserByEmail';
+          console.log('getUserByEmail result:', freelancerUser ? `Found (length: ${freelancerUser.length})` : 'null');
+        } catch (e2) {
+          console.error('getUserByEmail also failed:', e2);
+          throw new Error(`Freelancer not found. Tried both getUserById and getUserByEmail with: ${freelancerUserId}`);
+        }
+      }
+
+      // Handle optional return type: [] or [User]
+      if (!freelancerUser || freelancerUser.length === 0) {
+        console.error('Freelancer user is empty or null. Lookup method:', lookupMethod);
+        throw new Error(`Freelancer not found (empty result from ${lookupMethod})`);
+      }
+
+      const freelancerData = freelancerUser[0];
+      console.log('Freelancer data retrieved. Has walletPrincipal:', !!freelancerData.walletPrincipal);
+      
+      // walletPrincipal is optional: [] or [Principal]
+      if (!freelancerData.walletPrincipal || freelancerData.walletPrincipal.length === 0) {
+        console.error('Freelancer walletPrincipal is missing or empty');
+        throw new Error('Freelancer wallet not connected');
+      }
+
+      freelancerPrincipal = freelancerData.walletPrincipal[0];
+      console.log('Freelancer principal extracted:', freelancerPrincipal.toText());
+    } catch (error: any) {
+      console.error('Error getting freelancer principal:', error);
       return NextResponse.json({
         success: false,
-        error: 'Freelancer wallet not connected',
+        error: error.message || 'Failed to get freelancer principal. Please ensure the freelancer has connected their wallet in their profile.',
       }, { status: 400 });
     }
 
-    const freelancerWallet = freelancerWalletResult.ok;
-    if (!freelancerWallet.wallet_principal || freelancerWallet.wallet_principal.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Freelancer wallet not connected',
-      }, { status: 400 });
-    }
-
-    const freelancerPrincipal = freelancerWallet.wallet_principal[0];
-
-    // Get client wallet info (current user)
-    const clientWalletResult = await userActor.getWalletInfo(session.userId);
-
-    if ('err' in clientWalletResult) {
-      return NextResponse.json({
-        success: false,
-        error: 'Client wallet not connected',
-      }, { status: 400 });
-    }
-
-    const clientWallet = clientWalletResult.ok;
-    if (!clientWallet.wallet_principal || clientWallet.wallet_principal.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Client wallet not connected',
-      }, { status: 400 });
-    }
-
-    const clientPrincipal = clientWallet.wallet_principal[0];
-
-    // Create escrow
-    const escrowActor = await getEscrowActor();
+    // Create escrow using mainnet
+    const escrowActor = await getMainnetEscrowActor();
 
     try {
-      const result = await escrowActor.create(
+      const result: any = await escrowActor.create(
         projectId,
-        clientPrincipal,
+        clientPrincipalObj,
         freelancerPrincipal,
         BigInt(amountE8s)
       );
 
+      const escrowId = result[0];
+      const depositAccount = result[1];
+
+      // Create booking in marketplace canister if packageId is provided
+      let bookingId = null;
+      if (packageId) {
+        try {
+          console.log('📝 Creating booking for escrow:', escrowId);
+          
+          // Create booking via marketplace API (internal call)
+          const bookingResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/marketplace/bookings`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              clientId: session.email || session.userId,
+              packageId: packageId,
+              specialInstructions: specialInstructions || '',
+              paymentMethod: 'escrow',
+              totalAmount: amountE8s / 100000000,
+              paymentId: escrowId,
+              transactionId: escrowId,
+              serviceId: projectId,
+              serviceTitle: serviceTitle,
+              freelancerId: freelancerUserId,
+              packageTitle: packageTitle,
+              packageDescription: '',
+              deliveryDays: 7,
+              createdFromEscrow: true,
+            }),
+          });
+
+          if (bookingResponse.ok) {
+            const bookingData = await bookingResponse.json();
+            if (bookingData.success) {
+              bookingId = bookingData.data?.booking_id;
+              console.log('✅ Booking created for escrow:', bookingId);
+            } else {
+              console.error('❌ Booking creation failed:', bookingData.error);
+            }
+          } else {
+            const errorData = await bookingResponse.json();
+            console.error('❌ Booking API error:', errorData);
+          }
+        } catch (bookingError: any) {
+          console.error('⚠️ Failed to create booking for escrow (non-critical):', bookingError);
+          // Don't fail escrow creation if booking creation fails
+        }
+      } else {
+        console.log('ℹ️ No packageId provided, skipping booking creation');
+      }
+
       return NextResponse.json({
         success: true,
         data: {
-          escrowId: result[0],
+          escrowId: escrowId,
+          bookingId: bookingId,
           depositAccount: {
-            owner: result[1].owner.toString(),
-            subaccount: result[1].subaccount && result[1].subaccount.length > 0
-              ? Array.from(result[1].subaccount[0])
+            owner: depositAccount.owner.toString(),
+            subaccount: depositAccount.subaccount && depositAccount.subaccount.length > 0
+              ? Array.from(depositAccount.subaccount[0])
               : null,
           },
         },
@@ -111,7 +220,28 @@ export async function POST(request: NextRequest) {
     console.error('Escrow create API error:', error);
     return NextResponse.json({
       success: false,
-      error: 'Failed to create escrow',
+      error: error instanceof Error ? error.message : 'Failed to create escrow',
     }, { status: 500 });
   }
+}
+
+// Get escrow actor for ICP mainnet
+async function getMainnetEscrowActor() {
+  const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST || 'https://icp0.io';
+  const agent = new HttpAgent({ host: IC_HOST });
+
+  // Only fetch root key for localhost development
+  if (IC_HOST.includes('localhost') || IC_HOST.includes('127.0.0.1')) {
+    await agent.fetchRootKey();
+  }
+
+  if (!process.env.NEXT_PUBLIC_ESCROW_CANISTER_ID) {
+    throw new Error('NEXT_PUBLIC_ESCROW_CANISTER_ID is required');
+  }
+
+  const canisterId = Principal.fromText(process.env.NEXT_PUBLIC_ESCROW_CANISTER_ID);
+  return Actor.createActor(escrowIdlFactory, {
+    agent,
+    canisterId,
+  });
 }

@@ -61,6 +61,8 @@ export interface User {
   'isVerified' : boolean,
   'passwordHash' : PasswordHash,
   'profile' : [] | [ProfileData],
+  'walletPrincipal' : [] | [Principal],
+  'walletAccountId' : [] | [string],
 }
 export type UserId = string;
 export interface _SERVICE {
@@ -81,6 +83,12 @@ export interface _SERVICE {
   'updateProfileSubmissionStatus' : ActorMethod<[UserId, boolean], Result_1>,
   'verifyEmail' : ActorMethod<[UserId], Result_1>,
   'verifyOTP' : ActorMethod<[Email, string], Result>,
+  'getWalletInfo' : ActorMethod<[UserId], [] | [PrincipalWalletInfo]>,
+  'updateWalletInfo' : ActorMethod<[UserId, [] | [Principal], [] | [string]], Result_1>,
+}
+export interface PrincipalWalletInfo {
+  'principal' : Principal,
+  'accountId' : string,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

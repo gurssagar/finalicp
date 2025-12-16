@@ -61,6 +61,8 @@ export interface User {
   'isVerified' : boolean,
   'profileSubmitted' : boolean,
   'passwordHash' : PasswordHash,
+  'walletPrincipal' : [] | [Principal],
+  'walletAccountId' : [] | [string],
   'profile' : [] | [ProfileData],
 }
 export type UserId = string;
@@ -74,12 +76,17 @@ export interface _SERVICE {
   'getProfile' : ActorMethod<[UserId], [] | [ProfileData]>,
   'getUserByEmail' : ActorMethod<[Email], [] | [User]>,
   'getUserById' : ActorMethod<[UserId], [] | [User]>,
+  'getWalletInfo' : ActorMethod<[UserId], [] | [[Principal, string]]>,
   'isProfileSubmitted' : ActorMethod<[UserId], boolean>,
   'markProfileAsSubmitted' : ActorMethod<[UserId], Result_1>,
   'updateLastLogin' : ActorMethod<[UserId], Result_1>,
   'updatePassword' : ActorMethod<[UserId, PasswordHash], Result_1>,
   'updateProfile' : ActorMethod<[UserId, ProfileData], Result_1>,
   'updateProfileSubmissionStatus' : ActorMethod<[UserId, boolean], Result_1>,
+  'updateWalletInfo' : ActorMethod<
+    [UserId, [] | [Principal], [] | [string]],
+    Result_1
+  >,
   'verifyEmail' : ActorMethod<[UserId], Result_1>,
   'verifyOTP' : ActorMethod<[Email, string], Result>,
 }

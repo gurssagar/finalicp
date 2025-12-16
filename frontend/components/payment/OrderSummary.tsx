@@ -18,21 +18,29 @@ interface OrderSummaryProps {
   upsells: UpsellItem[];
   promoApplied: PromoApplied | null;
   total: number;
+  platformFee?: number;
+  transferFee?: number;
+  subtotal?: number;
 }
 
 export function OrderSummary({
   packagePrice,
   upsells,
   promoApplied,
-  total
+  total,
+  platformFee: providedPlatformFee,
+  transferFee: providedTransferFee,
+  subtotal: providedSubtotal
 }: OrderSummaryProps) {
   const upsellTotal = upsells.reduce((sum, upsell) => sum + upsell.price, 0);
-  const subtotal = packagePrice + upsellTotal;
-  const platformFee = subtotal * 0.05; // 5% platform fee
+  const subtotal = providedSubtotal ?? (packagePrice + upsellTotal);
   const discountAmount = promoApplied ? subtotal * (promoApplied.discount / 100) : 0;
+  const afterDiscount = subtotal - discountAmount;
+  const platformFee = providedPlatformFee ?? (afterDiscount * 0.05); // 5% platform fee on amount after discount
+  const TRANSFER_FEE_ICP = providedTransferFee ?? 0.0004; // Fixed transfer fee in ICP
 
   return (
-    <div className="bg-white rounded-xl border-2 border-purple-100 shadow-lg p-6 sticky top-6">
+    <div className="bg-white rounded-xl border-2 border-purple-100 shadow-lg p-6">
       {/* Header with gradient */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-2">
@@ -46,7 +54,7 @@ export function OrderSummary({
       <div className="space-y-3 mb-4">
         <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
           <span className="text-sm font-medium text-gray-700">Package Price</span>
-          <span className="text-lg font-bold text-gray-900">${packagePrice.toFixed(2)}</span>
+          <span className="text-lg font-bold text-gray-900">{packagePrice.toFixed(6)} ICP</span>
         </div>
       </div>
 
@@ -61,7 +69,7 @@ export function OrderSummary({
             {upsells.map((upsell) => (
               <div key={upsell.id} className="flex items-center justify-between p-2 bg-purple-50 rounded-lg">
                 <span className="text-sm text-gray-700">{upsell.name}</span>
-                <span className="text-sm font-semibold text-purple-700">+${upsell.price.toFixed(2)}</span>
+                <span className="text-sm font-semibold text-purple-700">+{upsell.price.toFixed(6)} ICP</span>
               </div>
             ))}
           </div>
@@ -73,8 +81,18 @@ export function OrderSummary({
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600">Subtotal</span>
-            <span className="font-medium text-gray-900">${subtotal.toFixed(2)}</span>
+            <span className="font-medium text-gray-900">{subtotal.toFixed(6)} ICP</span>
           </div>
+
+          {promoApplied && (
+            <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-green-700 font-medium">Discount ({promoApplied.code})</span>
+                <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full">-{promoApplied.discount}%</span>
+              </div>
+              <span className="text-sm text-green-700 font-bold">-{discountAmount.toFixed(6)} ICP</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-2">
@@ -94,18 +112,13 @@ export function OrderSummary({
                 </div>
               </div>
             </div>
-            <span className="font-medium text-gray-900">${platformFee.toFixed(2)}</span>
+            <span className="font-medium text-gray-900">{platformFee.toFixed(6)} ICP</span>
           </div>
 
-          {promoApplied && (
-            <div className="flex items-center justify-between p-2 bg-green-50 rounded-lg">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-green-700 font-medium">Discount ({promoApplied.code})</span>
-                <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded-full">-{promoApplied.discount}%</span>
-              </div>
-              <span className="text-sm text-green-700 font-bold">-${discountAmount.toFixed(2)}</span>
-            </div>
-          )}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">Network Transfer Fee</span>
+            <span className="font-medium text-gray-900">{TRANSFER_FEE_ICP.toFixed(6)} ICP</span>
+          </div>
         </div>
       </div>
 
@@ -115,7 +128,7 @@ export function OrderSummary({
           <span className="text-lg font-bold text-gray-900">Total</span>
           <div className="text-right">
             <div className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600">
-              ${total.toFixed(2)}
+              {total.toFixed(6)} ICP
             </div>
           </div>
         </div>

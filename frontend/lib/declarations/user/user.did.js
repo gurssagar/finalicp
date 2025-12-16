@@ -50,6 +50,8 @@ export const idlFactory = ({ IDL }) => {
     'otpData' : IDL.Opt(OTPData),
     'lastLoginAt' : IDL.Opt(IDL.Int),
     'createdAt' : IDL.Int,
+    'walletPrincipal' : IDL.Opt(IDL.Principal),
+    'walletAccountId' : IDL.Opt(IDL.Text),
     'email' : Email,
     'isVerified' : IDL.Bool,
     'passwordHash' : PasswordHash,
@@ -78,6 +80,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'verifyEmail' : IDL.Func([UserId], [Result_1], []),
     'verifyOTP' : IDL.Func([Email, IDL.Text], [Result], []),
+    'getWalletInfo' : IDL.Func([UserId], [IDL.Opt(IDL.Record({
+      'accountId' : IDL.Text,
+      'principal' : IDL.Principal,
+    }))], []),
+    'updateWalletInfo' : IDL.Func([UserId, IDL.Opt(IDL.Principal), IDL.Opt(IDL.Text)], [Result_1], []),
   });
 };
 export const init = ({ IDL }) => { return []; };

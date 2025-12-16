@@ -14,6 +14,7 @@ import { UpsellSection } from '@/components/payment/UpsellSection';
 import { OrderSummary } from '@/components/payment/OrderSummary';
 import { PaymentProcessing } from '@/components/payment/PaymentProcessing';
 import { PaymentSuccess } from '@/components/payment/PaymentSuccess';
+import EscrowManager from '@/components/escrow/EscrowManager';
 
 interface Service {
   service_id: string;
@@ -21,6 +22,7 @@ interface Service {
   description: string;
   freelancer_email: string;
   freelancer_name: string;
+  freelancer_id: string;
   rating_avg: number;
   total_orders: number;
   cover_image_url: string;
@@ -117,13 +119,37 @@ export default function PaymentPage() {
   }, [id, packageId, packageTier]);
 
 
-  const calculateTotal = (): number => {
+  // Calculate fees and totals
+  const calculateSubtotal = (): number => {
     if (!selectedPackage) return 0;
     const packagePrice = selectedPackage.price_e8s / 100000000; // Convert from e8s
     const upsellsTotal = selectedUpsells.reduce((sum, item) => sum + item.price, 0);
-    const subtotal = packagePrice + upsellsTotal;
+    return packagePrice + upsellsTotal;
+  };
+
+  const calculatePlatformFee = (): number => {
+    const subtotal = calculateSubtotal();
     const discount = promoApplied ? subtotal * (promoApplied.discount / 100) : 0;
-    return subtotal - discount;
+    const afterDiscount = subtotal - discount;
+    return afterDiscount * 0.05; // 5% platform fee
+  };
+
+  const TRANSFER_FEE_ICP = 0.0004; // Fixed transfer fee
+
+  const calculateTotal = (): number => {
+    const subtotal = calculateSubtotal();
+    const discount = promoApplied ? subtotal * (promoApplied.discount / 100) : 0;
+    const afterDiscount = subtotal - discount;
+    const platformFee = calculatePlatformFee();
+    return afterDiscount + platformFee + TRANSFER_FEE_ICP;
+  };
+
+  const calculateTotalForEscrow = (): number => {
+    // Total amount user needs to deposit to escrow (including all fees)
+    // This includes: package price + platform fee (5%) + transfer fee (0.0004 ICP)
+    // When released, escrow will deduct 5% platform fee and send rest to freelancer
+    // Round to 6 decimal places to match Order Summary display and avoid floating point precision issues
+    return parseFloat(calculateTotal().toFixed(6));
   };
 
   const handlePaymentSuccess = async (paymentData: any) => {
@@ -293,6 +319,8 @@ export default function PaymentPage() {
             <ServiceSummary
               service={service}
               selectedPackage={selectedPackage}
+              specialInstructions={specialInstructions}
+              onInstructionsChange={setSpecialInstructions}
             />
 
             {/* Upsells */}
@@ -313,37 +341,67 @@ export default function PaymentPage() {
               />
             </div>
 
-            {/* Payment Widget */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="font-medium text-lg mb-4">Payment Method</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Pay securely with ICP tokens using the ICPay payment widget
+        {/* Payment Widget */}
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <h3 className="font-medium text-lg mb-4">
+            Payment Method (ICPay SDK)
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Pay securely with ICP tokens using the ICPay payment widget
+            (default flow – leave active while we integrate escrow)
+          </p>
+          <ICPayWidget
+            amountUsd={calculateTotal()}
+            onSuccess={handlePaymentSuccess}
+            onError={handlePaymentError}
+            metadata={{
+              serviceId: service?.service_id,
+              packageId: selectedPackage?.package_id,
+              clientEmail: profile?.email,
+            }}
+          />
+        </div>
+
+        {/* Escrow Payment via Plug */}
+        {service && selectedPackage && (
+          <div className="bg-white rounded-lg border border-dashed border-purple-200 p-6">
+            <div className="mb-4">
+              <h3 className="font-semibold text-lg mb-2">Escrow Payment (Plug Wallet)</h3>
+              <p className="text-sm text-gray-600">
+                Connect your Plug wallet, fund the escrow with ICP, and release payment when the work is delivered.
+                Your payment is securely held in escrow until project completion.
               </p>
-              <ICPayWidget
-                amountUsd={calculateTotal()}
-                onSuccess={handlePaymentSuccess}
-                onError={handlePaymentError}
-                metadata={{
-                  serviceId: service?.service_id,
-                  packageId: selectedPackage?.package_id,
-                  clientEmail: profile?.email,
-                }}
-              />
             </div>
+
+            <EscrowManager
+              projectId={service.service_id}
+              freelancerUserId={service.freelancer_id}
+              expectedAmountICP={calculateTotalForEscrow()}
+              packageId={selectedPackage.package_id}
+              serviceTitle={service.title}
+              packageTitle={selectedPackage.title}
+              specialInstructions={specialInstructions}
+              isClient
+            />
+          </div>
+        )}
           </div>
 
           {/* Right Column - Order Summary */}
           <div className="lg:col-span-1">
-            <div className="sticky top-8">
+            <div className="sticky top-8 space-y-4">
               <OrderSummary
                 packagePrice={selectedPackage.price_e8s / 100000000}
                 upsells={selectedUpsells}
                 promoApplied={promoApplied}
                 total={calculateTotal()}
+                platformFee={calculatePlatformFee()}
+                transferFee={TRANSFER_FEE_ICP}
+                subtotal={calculateSubtotal()}
               />
 
               {/* Promo Code */}
-              <div className="mt-4 bg-white rounded-lg border border-gray-200 p-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Promo Code
                 </label>
@@ -365,7 +423,7 @@ export default function PaymentPage() {
               </div>
 
               {/* Trust Badges */}
-              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg shadow-sm">
                 <div className="flex items-center space-x-2 mb-2">
                   <Shield className="text-green-600" size={20} />
                   <span className="font-medium text-green-900">Secure Payment</span>
