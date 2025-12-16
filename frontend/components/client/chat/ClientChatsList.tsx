@@ -272,7 +272,11 @@ export function ClientChatsList({
   useEffect(() => {
     if (userEmail && bookingChats.length > 0) {
       console.log('[ClientChatsList] Auto-refreshing chat history for', bookingChats.length, 'chats')
-      loadChatHistoryForChats(bookingChats)
+      // Use a timeout to debounce and avoid race conditions
+      const timeoutId = setTimeout(() => {
+        loadChatHistoryForChats(bookingChats)
+      }, 100)
+      return () => clearTimeout(timeoutId)
     }
   }, [userEmail, bookingChats.length])
 

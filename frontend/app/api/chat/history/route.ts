@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatStorageApi } from '@/lib/chat-storage-agent';
+import { chatDbService } from '@/lib/chat-db-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,37 +18,33 @@ export async function GET(request: NextRequest) {
 
     console.log(`[ChatHistory] Loading chat history: ${userEmail} <-> ${contactEmail}`);
     
-    // Load all messages (use a high limit to get all messages)
-    const allMessages = await chatStorageApi.getChatHistory(
+    // Load messages from PostgreSQL database
+    const messages = await chatDbService.getChatHistory(
       userEmail,
       contactEmail,
-      1000, // High limit to get all messages
-      0
+      limit > 0 ? limit : 1000, // Use high limit if 0 or negative
+      offset
     );
 
-    // Sort messages by timestamp (oldest first, newest last)
-    const sortedMessages = allMessages.sort((a, b) => {
-      const timestampA = new Date(a.timestamp).getTime();
-      const timestampB = new Date(b.timestamp).getTime();
-      return timestampA - timestampB; // Oldest first
-    });
-
-    console.log(`[ChatHistory] Loaded ${sortedMessages.length} messages, sorted by timestamp`);
+    console.log(`[ChatHistory] Loaded ${messages.length} messages from database`);
 
     return NextResponse.json({
       success: true,
-      messages: sortedMessages,
+      messages: messages,
       pagination: {
         limit,
         offset,
-        count: sortedMessages.length,
-        total: sortedMessages.length
+        count: messages.length,
+        total: messages.length
       }
     });
   } catch (error) {
-    console.error('Get chat history error:', error);
+    console.error('[ChatHistory] Get chat history error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: error instanceof Error ? error.message : 'Internal server error',
+        success: false
+      },
       { status: 500 }
     );
   }

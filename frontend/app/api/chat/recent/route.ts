@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatStorageApi } from '@/lib/chat-storage-agent';
+import { chatDbService } from '@/lib/chat-db-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const recentChats = await chatStorageApi.getRecentChats(userEmail, limit);
+    const recentChats = await chatDbService.getRecentChats(userEmail, limit);
 
     return NextResponse.json({
       success: true,
@@ -22,9 +22,12 @@ export async function GET(request: NextRequest) {
       count: recentChats.length
     });
   } catch (error) {
-    console.error('Get recent chats error:', error);
+    console.error('[ChatRecent] Get recent chats error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: error instanceof Error ? error.message : 'Internal server error',
+        success: false
+      },
       { status: 500 }
     );
   }

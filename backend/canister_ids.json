@@ -1,26 +1,16 @@
 {
   "__Candid_UI": {
-    "local": "vizcg-th777-77774-qaaea-cai"
-  },
-  "basic_backend": {
-    "local": "uxrrr-q7777-77774-qaaaq-cai"
-  },
-  "chat_storage": {
-    "local": "u6s2n-gx777-77774-qaaba-cai"
+    "local": "bkyz2-fmaaa-aaaaa-qaaaq-cai"
   },
   "escrow": {
-    "local": "uzt4z-lp777-77774-qaabq-cai"
+    "local": "bnz7o-iuaaa-aaaaa-qaaaa-cai",
+    "ic": "eeofs-5yaaa-aaaai-atmfa-cai"
   },
-  "hackathon": {
-    "local": "umunu-kh777-77774-qaaca-cai"
+  "hackquest": {
+    "ic": "wcpi4-lyaaa-aaaai-atqaq-cai"
   },
-  "marketplace": {
-    "local": "ulvla-h7777-77774-qaacq-cai"
-  },
-  "user": {
-    "local": "ucwa4-rx777-77774-qaada-cai"
-  },
-  "user_v2": {
-    "local": "ufxgi-4p777-77774-qaadq-cai"
+  "user_v3": {
+    "local": "bd3sg-teaaa-aaaaa-qaaba-cai",
+    "ic": "2wchw-3aaaa-aaaam-ae3ua-cai"
   }
 }

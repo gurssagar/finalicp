@@ -31,41 +31,52 @@ export function ClientChatConversation({
 
   // Load chat history from canister
   const loadChatHistory = async () => {
+    // Don't load if chatId or userEmail is missing
+    if (!chatId || !userEmail) {
+      console.log(`[ClientChat] Skipping load - chatId: ${chatId}, userEmail: ${userEmail ? 'present' : 'missing'}`)
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       console.log(`[ClientChat] Loading chat history: ${userEmail} <-> ${chatId}`)
 
       // Try Socket.IO first for real-time history
       if (socketService.isConnected()) {
-        const socketHistory = await socketService.getChatHistory(chatId, 50, 0)
-        if (socketHistory && socketHistory.length > 0) {
-          console.log(`[ClientChat] Loaded ${socketHistory.length} messages from Socket.IO`)
-          const formattedMessages = socketHistory.map(msg => ({
-            id: msg.id,
-            from: msg.from,
-            to: msg.to,
-            text: msg.text,
-            timestamp: msg.timestamp,
-            delivered: msg.delivered,
-            read: msg.read,
-            messageType: msg.messageType || 'text',
-            fileUrl: msg.fileUrl,
-            fileName: msg.fileName,
-            fileSize: msg.fileSize,
-            replyTo: msg.replyTo
-          }))
-          
-          // Sort messages by timestamp (oldest first)
-          const sortedMessages = formattedMessages.sort((a, b) => {
-            const timestampA = new Date(a.timestamp).getTime()
-            const timestampB = new Date(b.timestamp).getTime()
-            return timestampA - timestampB // Oldest first
-          })
-          
-          console.log(`[ClientChat] Socket.IO messages sorted by timestamp: ${sortedMessages.length} messages`)
-          setMessages(sortedMessages)
-          setLoading(false)
-          return
+        try {
+          const socketHistory = await socketService.getChatHistory(chatId, 50, 0)
+          if (socketHistory && socketHistory.length > 0) {
+            console.log(`[ClientChat] Loaded ${socketHistory.length} messages from Socket.IO`)
+            const formattedMessages = socketHistory.map(msg => ({
+              id: msg.id,
+              from: msg.from,
+              to: msg.to,
+              text: msg.text,
+              timestamp: msg.timestamp,
+              delivered: msg.delivered,
+              read: msg.read,
+              messageType: msg.messageType || 'text',
+              fileUrl: msg.fileUrl,
+              fileName: msg.fileName,
+              fileSize: msg.fileSize,
+              replyTo: msg.replyTo
+            }))
+            
+            // Sort messages by timestamp (oldest first)
+            const sortedMessages = formattedMessages.sort((a, b) => {
+              const timestampA = new Date(a.timestamp).getTime()
+              const timestampB = new Date(b.timestamp).getTime()
+              return timestampA - timestampB // Oldest first
+            })
+            
+            console.log(`[ClientChat] Socket.IO messages sorted by timestamp: ${sortedMessages.length} messages`)
+            setMessages(sortedMessages)
+            setLoading(false)
+            return
+          }
+        } catch (socketError) {
+          console.warn('[ClientChat] Socket.IO history load failed, falling back to API:', socketError)
         }
       }
 
@@ -74,6 +85,11 @@ export function ClientChatConversation({
       const response = await fetch(
         `/api/chat/history?userEmail=${encodeURIComponent(userEmail)}&contactEmail=${encodeURIComponent(chatId)}&limit=50&offset=0`
       )
+      
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`)
+      }
+      
       const data = await response.json()
 
       if (data.success) {
@@ -90,9 +106,11 @@ export function ClientChatConversation({
         setMessages(sortedMessages)
       } else {
         console.warn('[ClientChat] Failed to load chat history from API:', data.error)
+        setMessages([]) // Set empty array on error
       }
     } catch (error) {
-      console.error('Error loading chat history:', error)
+      console.error('[ClientChat] Error loading chat history:', error)
+      setMessages([]) // Set empty array on error
     } finally {
       setLoading(false)
     }
@@ -102,20 +120,21 @@ export function ClientChatConversation({
   useEffect(() => {
     if (!chatId || !userEmail) return
 
-    // Initialize Socket.IO connection
+    // Initialize Socket.IO connection (optional - chat works without it)
     const initializeSocket = async () => {
       try {
         const connected = await socketService.connect(userEmail)
-        if (connected) {
-          console.log('[ClientChat] Socket connected')
+        if (connected && socketService.isConnected()) {
+          console.log('[ClientChat] ✅ Socket connected - real-time features enabled')
 
           // Join chat room
           socketService.joinRoom(chatId)
         } else {
-          console.warn('[ClientChat] Socket connection failed')
+          console.log('[ClientChat] ℹ️  Socket server not available - using REST API (chat will work normally)')
         }
       } catch (error) {
-        console.error('[ClientChat] Socket initialization error:', error)
+        // Suppress error - chat works via REST API fallback
+        console.debug('[ClientChat] Socket initialization (REST API fallback available):', error)
       }
     }
 
@@ -280,7 +299,7 @@ export function ClientChatConversation({
     fileSize?: number;
     replyTo?: string;
   }) => {
-    if (!text.trim() && !options?.fileUrl || !chatId || !userEmail) {
+    if ((!text || !text.trim()) && !options?.fileUrl || !chatId || !userEmail) {
       throw new Error('Missing required information to send message')
     }
 
@@ -290,7 +309,7 @@ export function ClientChatConversation({
 
     const messageData = {
       to: recipientEmail,
-      text: text.trim(),
+      text: text.trim() || (options?.fileUrl ? '📷 Image' : ''),
       timestamp: new Date().toISOString(),
       messageType: options?.messageType || 'text',
       fileUrl: options?.fileUrl,
@@ -309,11 +328,14 @@ export function ClientChatConversation({
             id: `socket-${Date.now()}`,
             from: userEmail,
             to: recipientEmail,
-            text: text.trim(),
+            text: text.trim() || (options?.fileUrl ? '📷 Image' : ''),
             timestamp: result.timestamp || messageData.timestamp,
             delivered: true,
             read: false,
-            messageType: options?.messageType || 'text'
+            messageType: options?.messageType || 'text',
+            fileUrl: options?.fileUrl,
+            fileName: options?.fileName,
+            fileSize: options?.fileSize
           }
           setMessages(prev => {
             const newMessages = [...prev, optimisticMessage]
@@ -357,11 +379,14 @@ export function ClientChatConversation({
           id: data.data?.messageId || data.messageId || `storage-${Date.now()}`,
           from: userEmail,
           to: recipientEmail,
-          text: text.trim(),
+          text: text.trim() || (options?.fileUrl ? '📷 Image' : ''),
           timestamp: messageData.timestamp,
           delivered: true,
           read: false,
-          messageType: options?.messageType || 'text'
+          messageType: options?.messageType || 'text',
+          fileUrl: options?.fileUrl,
+          fileName: options?.fileName,
+          fileSize: options?.fileSize
         }
         setMessages(prev => {
           const newMessages = [...prev, storedMessage]
@@ -399,6 +424,9 @@ export function ClientChatConversation({
       ? 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=150&auto=format&fit=crop'
       : `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.from)}&background=9333ea&color=fff`,
     text: msg.text,
+    messageType: msg.messageType || 'text',
+    fileUrl: msg.fileUrl,
+    fileName: msg.fileName,
     time: new Date(msg.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit'
@@ -439,7 +467,14 @@ export function ClientChatConversation({
   // Use real messages only - no more mock data
   const finalMessages = displayMessages
 
-  const handleSendMessage = sendMessage
+  const handleSendMessage = async (message: string, options?: {
+    messageType?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+  }) => {
+    await sendMessage(message, options);
+  }
 
   // Get chat info based on chatId
   const getChatInfo = () => {
@@ -537,37 +572,6 @@ export function ClientChatConversation({
               </>
             )}
           </div>
-
-          <button
-            className="p-2 text-gray-500 hover:text-purple-600 rounded-full hover:bg-purple-50 transition-colors"
-            title="Video call"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M23 7L16 12L23 17V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <rect x="1" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-          </button>
-          <button
-            className="p-2 text-gray-500 hover:text-purple-600 rounded-full hover:bg-purple-50 transition-colors"
-            title="Voice call"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 4.5C15 3.67157 14.3284 3 13.5 3C12.6716 3 12 3.67157 12 4.5V12.5C12 13.3284 12.6716 14 13.5 14C14.3284 14 15 13.3284 15 12.5V4.5Z" stroke="currentColor" strokeWidth="2"/>
-              <path d="M19 10C19 13.866 15.866 17 12 17C8.13401 17 5 13.866 5 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M12 17V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M8 21H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-          <button
-            className="p-2 text-gray-500 hover:text-purple-600 rounded-full hover:bg-purple-50 transition-colors"
-            title="More options"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="1"/>
-              <circle cx="19" cy="12" r="1"/>
-              <circle cx="5" cy="12" r="1"/>
-            </svg>
-          </button>
         </div>
       </div>
 
@@ -604,7 +608,23 @@ export function ClientChatConversation({
                           : 'bg-white border border-gray-200 text-gray-900'
                       }`}
                     >
-                      {message.text}
+                      {message.messageType === 'image' && message.fileUrl ? (
+                        <div className="space-y-2">
+                          <img
+                            src={message.fileUrl}
+                            alt={message.fileName || 'Image'}
+                            className="max-w-full max-h-64 rounded-lg object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Found';
+                            }}
+                          />
+                          {message.text && message.text !== '📷 Image' && (
+                            <p className="text-sm">{message.text}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p>{message.text}</p>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 mt-1 px-1">
                       {message.time}

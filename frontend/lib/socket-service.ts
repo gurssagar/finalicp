@@ -110,7 +110,7 @@ class SocketService {
         this.setupEventListeners()
 
         this.socket.on('connect', () => {
-          console.log(`[Socket] Connected as ${userEmail}`)
+          console.log(`[Socket] ✅ Connected as ${userEmail}`)
           this.connectionStatus = { connected: true }
           this.reconnectAttempts = 0
           this.isConnecting = false
@@ -118,20 +118,30 @@ class SocketService {
           resolve(true)
         })
 
-        this.socket.on('connect_error', (error) => {
-          console.error('[Socket] Connection error:', error)
-          this.connectionStatus = { connected: false, error: error.message }
-          this.isConnecting = false
-          this.emit('connectionStatus', this.connectionStatus)
-          resolve(false)
+        // Suppress websocket errors in console - they're expected when server isn't running
+        this.socket.on('error', (error: any) => {
+          // Only log as warning, not error, since REST API fallback is available
+          console.debug('[Socket] WebSocket error (REST API fallback available):', error?.message || error)
         })
 
-      } catch (error) {
-        console.error('[Socket] Failed to create socket:', error)
-        this.connectionStatus = { connected: false, error: 'Failed to create socket' }
+        this.socket.on('connect_error', (error) => {
+          console.warn('[Socket] Connection error (will use REST API fallback):', error.message)
+          // Don't treat connection errors as fatal - chat will work via REST API
+          this.connectionStatus = { connected: false, error: 'WebSocket unavailable, using REST API' }
+          this.isConnecting = false
+          this.emit('connectionStatus', this.connectionStatus)
+          // Still resolve as true since REST API fallback is available
+          resolve(true)
+        })
+
+      } catch (error: any) {
+        console.warn('[Socket] Failed to create socket (will use REST API fallback):', error?.message || error)
+        // Don't treat as fatal - chat will work via REST API
+        this.connectionStatus = { connected: false, error: 'WebSocket unavailable, using REST API' }
         this.isConnecting = false
         this.emit('connectionStatus', this.connectionStatus)
-        resolve(false)
+        // Still resolve as true since REST API fallback is available
+        resolve(true)
       }
     })
   }
@@ -173,9 +183,10 @@ class SocketService {
       this.handleReconnect()
     })
 
-    this.socket.on('error', (error) => {
-      console.error('[Socket] Socket error:', error)
-      this.connectionStatus = { connected: false, error: error.message }
+    this.socket.on('error', (error: any) => {
+      // Suppress websocket errors - REST API fallback is available
+      console.debug('[Socket] WebSocket error (REST API fallback available):', error?.message || error)
+      this.connectionStatus = { connected: false, error: 'WebSocket unavailable, using REST API' }
       this.emit('connectionStatus', this.connectionStatus)
     })
   }
@@ -211,22 +222,51 @@ class SocketService {
     text: string
     timestamp?: string
   }): Promise<{ success: boolean; error?: string; timestamp?: string }> {
-    return new Promise((resolve) => {
-      if (!this.socket?.connected) {
-        resolve({ success: false, error: 'Not connected to chat server' })
+    return new Promise(async (resolve) => {
+      // If socket is connected, use websocket
+      if (this.socket?.connected) {
+        this.socket!.emit('privateMessage', message, (response: any) => {
+          if (response?.error) {
+            resolve({ success: false, error: response.error })
+          } else {
+            resolve({
+              success: true,
+              timestamp: response?.timestamp || message.timestamp
+            })
+          }
+        })
         return
       }
 
-      this.socket!.emit('privateMessage', message, (response: any) => {
-        if (response?.error) {
-          resolve({ success: false, error: response.error })
-        } else {
+      // Fallback to REST API if websocket is not available
+      try {
+        console.log('[Socket] WebSocket not available, using REST API fallback')
+        const response = await fetch('/api/chat/messages/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: this.userEmail,
+            to: message.to,
+            text: message.text,
+            timestamp: message.timestamp || new Date().toISOString(),
+          }),
+        })
+
+        const data = await response.json()
+        if (data.success) {
           resolve({
             success: true,
-            timestamp: response?.timestamp || message.timestamp
+            timestamp: data.data?.timestamp || message.timestamp
           })
+        } else {
+          resolve({ success: false, error: data.error || 'Failed to send message' })
         }
-      })
+      } catch (error: any) {
+        console.error('[Socket] REST API fallback failed:', error)
+        resolve({ success: false, error: error?.message || 'Failed to send message' })
+      }
     })
   }
 

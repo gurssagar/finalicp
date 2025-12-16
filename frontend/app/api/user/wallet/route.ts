@@ -44,11 +44,15 @@ export async function POST(request: NextRequest) {
 
     const actor = await getUserActor();
 
+    // Convert principal string to Principal object
+    const principalObj = Principal.fromText(principal);
+
     // Update wallet info in user canister
+    // updateWalletInfo expects: (UserId, ?Principal, ?Text) -> Result<(), Text>
     const result = await actor.updateWalletInfo(
       session.userId,
-      [principal], // Wrap in Option
-      [accountId]  // Wrap in Option
+      [principalObj], // Wrap in Option
+      [accountId]     // Wrap in Option
     );
 
     if ('err' in result) {
@@ -87,19 +91,38 @@ export async function GET(request: NextRequest) {
     const actor = await getUserActor();
 
     // Get wallet info from user canister
-    const result = await actor.getWalletInfo(session.userId);
+    // Use getUserById to get the full user object which includes walletPrincipal and walletAccountId
+    const user = await actor.getUserById(session.userId);
 
-    if ('err' in result) {
-      console.error('Failed to get wallet info:', result.err);
+    // Handle optional return type: [] or [User]
+    if (!user || user.length === 0) {
       return NextResponse.json({
         success: false,
-        error: result.err,
-      }, { status: 500 });
+        error: 'User not found',
+      }, { status: 404 });
     }
+
+    const userData = user[0];
+    
+    // Check if wallet info exists
+    if (!userData.walletPrincipal || userData.walletPrincipal.length === 0 || 
+        !userData.walletAccountId || userData.walletAccountId.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: null,
+        message: 'No wallet information found',
+      });
+    }
+
+    const principal = userData.walletPrincipal[0];
+    const accountId = userData.walletAccountId[0];
 
     return NextResponse.json({
       success: true,
-      data: result.ok,
+      data: {
+        principal: principal.toText(),
+        accountId: accountId,
+      },
     });
 
   } catch (error) {

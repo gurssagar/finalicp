@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
@@ -39,8 +39,6 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   const [documents, setDocuments] = useState<any[]>([]);
   const [releasing, setReleasing] = useState(false);
   const [refunding, setRefunding] = useState(false);
@@ -78,8 +76,8 @@ export default function ProjectDetailPage() {
     fetchSession();
   }, [router]);
 
-  // Fetch project details function
-  const fetchProjectDetails = async () => {
+  // Fetch project details function - wrapped in useCallback to prevent unnecessary re-renders
+  const fetchProjectDetails = useCallback(async () => {
     if (!bookingId || !userId) return;
     
     try {
@@ -99,24 +97,13 @@ export default function ProjectDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Fetch project details
-  useEffect(() => {
-    fetchProjectDetails();
   }, [bookingId, userId]);
 
-  // Auto-refresh project details every 30 seconds
+  // Fetch project details on mount or when bookingId/userId changes
   useEffect(() => {
-    if (!autoRefresh || !bookingId || !userId) return;
+    fetchProjectDetails();
+  }, [fetchProjectDetails]);
 
-    const interval = setInterval(() => {
-      fetchProjectDetails();
-      setLastUpdate(Date.now());
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [autoRefresh, bookingId, userId, fetchProjectDetails]);
 
   
   const handleApproveStage = async (stageId: string) => {
@@ -905,9 +892,6 @@ export default function ProjectDetailPage() {
         {/* Header with navigation */}
         <ProjectDetailHeader
           project={project}
-          autoRefresh={autoRefresh}
-          setAutoRefresh={setAutoRefresh}
-          lastUpdate={lastUpdate}
           onChatWithFreelancer={handleChatWithFreelancer}
         />
 
@@ -953,7 +937,15 @@ export default function ProjectDetailPage() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-600">Delivery Time:</span>
-                            <span className="text-sm">{project.package_details.delivery_time_days} days</span>
+                            <span className="text-sm">
+                              {project.delivery_days 
+                                ? (project.delivery_days === 1 ? '1 day' : `${project.delivery_days} days`)
+                                : project.package_details?.delivery_time_days 
+                                  ? (project.package_details.delivery_time_days === 1 ? '1 day' : `${project.package_details.delivery_time_days} days`)
+                                  : project.package_delivery_days
+                                    ? (project.package_delivery_days === 1 ? '1 day' : `${project.package_delivery_days} days`)
+                                    : 'N/A'}
+                            </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-sm text-gray-600">Starting Price:</span>
@@ -986,7 +978,8 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
 
-                    {project.delivery_deadline && (
+                    {/* Only show delivery deadline if project is not completed */}
+                    {project.delivery_deadline && getStatusString(project.status) !== 'Completed' && (
                       <div>
                         <h3 className="font-medium mb-2">Delivery Deadline</h3>
                         <div className={`flex items-center gap-2 ${isOverdue(project.delivery_deadline) ? 'text-red-600' : 'text-orange-600'}`}>
@@ -1049,16 +1042,19 @@ export default function ProjectDetailPage() {
 
           {/* Right Column - Financial Info */}
           <div className="space-y-6">
-            <FinancialInformation
-              project={project}
-              onViewTransaction={handleViewTransaction}
-              onReleaseFunds={handleReleaseFunds}
-              onRefundFunds={handleRefundFunds}
-              onMarkComplete={handleMarkAsComplete}
-              releasing={releasing}
-              refunding={refunding}
-              completing={completing}
-            />
+            {/* Only show Financial Information if project is not completed */}
+            {getStatusString(project.status) !== 'Completed' && (
+              <FinancialInformation
+                project={project}
+                onViewTransaction={handleViewTransaction}
+                onReleaseFunds={handleReleaseFunds}
+                onRefundFunds={handleRefundFunds}
+                onMarkComplete={handleMarkAsComplete}
+                releasing={releasing}
+                refunding={refunding}
+                completing={completing}
+              />
+            )}
 
             {/* Project Timeline */}
             <Card>
@@ -1082,27 +1078,38 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">In Progress</div>
-                      <div className="text-xs text-gray-500">
-                        {project.deadline_readable ? 
-                          `Due: ${new Date(project.deadline_readable).toLocaleDateString()}` :
-                          project.delivery_deadline ? 
-                            `Due: ${formatBookingDateShort(project.delivery_deadline)}` : 
-                            'No deadline set'
+                  {getStatusString(project.status) !== 'Completed' && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">In Progress</div>
+                        <div className="text-xs text-gray-500">
+                          {project.deadline_readable ? 
+                            `Due: ${new Date(project.deadline_readable).toLocaleDateString()}` :
+                            project.delivery_deadline ? 
+                              `Due: ${formatBookingDateShort(project.delivery_deadline)}` : 
+                              'No deadline set'
                         }
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">Completed</div>
-                      <div className="text-xs text-gray-500">Pending</div>
+                  )}
+                  {getStatusString(project.status) === 'Completed' && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="text-sm font-medium">Completed</div>
+                        <div className="text-xs text-gray-500">
+                          {project.work_completed_at ? 
+                            formatBookingDateShort(project.work_completed_at) :
+                            project.updated_at ?
+                              formatBookingDateShort(project.updated_at) :
+                              'Completed'
+                          }
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -11,9 +11,6 @@ import {
 
 interface ProjectDetailHeaderProps {
   project: any;
-  autoRefresh: boolean;
-  setAutoRefresh: (value: boolean) => void;
-  lastUpdate: number;
   onChatWithFreelancer: () => void;
 }
 
@@ -44,9 +41,6 @@ const getStatusIcon = (status: any) => {
 
 export default function ProjectDetailHeader({
   project,
-  autoRefresh,
-  setAutoRefresh,
-  lastUpdate,
   onChatWithFreelancer
 }: ProjectDetailHeaderProps) {
   const router = useRouter();
@@ -74,16 +68,6 @@ export default function ProjectDetailHeader({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-              autoRefresh
-                ? 'bg-green-100 text-green-700 border border-green-300'
-                : 'bg-gray-100 text-gray-700 border border-gray-300'
-            }`}
-          >
-            {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
-          </button>
           <Button onClick={onChatWithFreelancer}>
             <MessageSquare className="w-4 h-4 mr-2" />
             Chat with Freelancer
@@ -109,10 +93,6 @@ export default function ProjectDetailHeader({
             {project.payment_method.replace('-', ' ').toUpperCase()}
           </Badge>
         )}
-        <span className="text-sm text-gray-500 flex items-center gap-1">
-          <Activity size={12} />
-          Last updated: {new Date(lastUpdate).toLocaleTimeString()}
-        </span>
       </div>
     </div>
   );

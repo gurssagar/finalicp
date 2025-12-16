@@ -1,8 +1,8 @@
 {
   "version": 1,
   "networks": {
-    "testnet": {
-      "providers": ["https://icp0.io"], 
+    "local": {
+      "bind": "127.0.0.1:4943",
       "type": "persistent"
     }
   },
@@ -12,6 +12,10 @@
       "main": "src/simple_backend.mo"
     },
     "user": {
+      "type": "motoko",
+      "main": "canisters/user.mo"
+    },
+    "user_v3": {
       "type": "motoko",
       "main": "canisters/user.mo"
     },

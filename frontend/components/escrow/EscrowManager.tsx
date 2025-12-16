@@ -121,33 +121,9 @@ export default function EscrowManager({
       setWalletPrincipal(principalText);
       setIsWalletConnected(true);
 
-      // Save wallet to user profile - wait for it to complete
-      try {
-        const response = await fetch('/api/user/wallet', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            principal: principalText,
-            accountId: '', // Account ID not required for escrow
-          }),
-        });
-
-        const result = await response.json();
-        if (!result.success) {
-          console.warn('Failed to save wallet to profile:', result.error);
-          // Still allow wallet to be used, but warn user
-          setError('Wallet connected but failed to save to profile. You can still create escrow.');
-        } else {
-          // Clear any previous errors
-          setError(null);
-        }
-      } catch (err) {
-        console.warn('Error saving wallet to profile:', err);
-        // Still allow wallet to be used
-        setError('Wallet connected but failed to save to profile. You can still create escrow.');
-      }
+      // Wallet saving removed - not needed when connecting to escrow
+      // Clear any previous errors
+      setError(null);
 
       // Fetch wallet balance
       await fetchWalletBalance(principalText);
@@ -487,7 +463,7 @@ export default function EscrowManager({
                   Connect Your Wallet First
                 </div>
                 <div className="text-xs text-blue-700 mb-3">
-                  You need to connect your Plug wallet to create an escrow payment. This will also save your wallet to your profile.
+                  You need to connect your Plug wallet to create an escrow payment.
                 </div>
                 <Button
                   onClick={connectWallet}

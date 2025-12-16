@@ -1,3 +1,10 @@
+/**
+ * @deprecated This file is deprecated. Chat storage has been migrated to PostgreSQL.
+ * Please use @/lib/chat-db-service instead.
+ * 
+ * This file is kept for backward compatibility but should not be used for new code.
+ */
+
 // Types matching the canister
 export interface ChatMessage {
   id: string;

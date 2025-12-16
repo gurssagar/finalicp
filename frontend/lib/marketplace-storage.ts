@@ -64,47 +64,36 @@ export async function createChatRelationshipsFromBookings(bookings: any[]): Prom
 
     for (const booking of bookings) {
       try {
-        // Check if chat relationship already exists
-        const existingResponse = await fetch('/api/chat/relationships', {
-          method: 'GET',
+        if (!booking.client_email || !booking.freelancer_email) {
+          console.warn('Skipping booking without client/freelancer email:', booking.booking_id);
+          continue;
+        }
+
+        // Create new chat relationship (database handles duplicates)
+        const createResponse = await fetch('/api/chat/relationships', {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            bookingId: booking.booking_id,
+            clientEmail: booking.client_email,
+            freelancerEmail: booking.freelancer_email,
+            serviceTitle: booking.service_title || booking.title,
+            serviceId: booking.service_id,
+            packageId: booking.package_id,
+            bookingStatus: booking.status || 'Active'
+          }),
         });
 
-        if (existingResponse.ok) {
-          const existingData = await existingResponse.json();
-          const existingRelationship = existingData.data?.relationships?.find(
-            (rel: any) => rel.clientEmail === booking.client_email && rel.freelancerEmail === booking.freelancer_email
-          );
-
-          if (!existingRelationship) {
-            // Create new chat relationship
-            const createResponse = await fetch('/api/chat/relationships', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                bookingId: booking.booking_id,
-                clientEmail: booking.client_email,
-                freelancerEmail: booking.freelancer_email
-              }),
-            });
-
-            if (createResponse.ok) {
-              const relationshipData = await createResponse.json();
-              chatRelationships.push({
-                ...relationshipData.data,
-                booking: booking
-              });
-            }
-          } else {
-            chatRelationships.push({
-              ...existingRelationship,
-              booking: booking
-            });
-          }
+        if (createResponse.ok) {
+          const relationshipData = await createResponse.json();
+          chatRelationships.push({
+            ...relationshipData.data,
+            booking: booking
+          });
+        } else {
+          console.warn('Failed to create chat relationship for booking:', booking.booking_id);
         }
       } catch (error) {
         console.error('Error creating chat relationship for booking:', booking.booking_id, error);

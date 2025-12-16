@@ -15,7 +15,6 @@ import {
   DollarSign,
   User,
   RefreshCw,
-  Activity,
   Wallet,
   Send,
   ArrowLeft
@@ -26,8 +25,6 @@ export default function ClientProjects() {
   const [session, setSession] = useState<any>(null);
   const [userId, setUserId] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
   const [escrowStatuses, setEscrowStatuses] = useState<Record<string, { funded: boolean; balanceE8s: number; status: string }>>({});
   const [escrowIds, setEscrowIds] = useState<Record<string, string>>({}); // Map booking_id to escrowId
   const [processingEscrow, setProcessingEscrow] = useState<Record<string, 'releasing' | 'refunding'>>({});
@@ -76,23 +73,6 @@ export default function ClientProjects() {
     }
   }, [fetchBookings, userId, statusFilter]);
 
-  // Auto-refresh bookings every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh || !userId) return;
-
-    const interval = setInterval(() => {
-      fetchBookings();
-      setLastUpdate(Date.now());
-    }, 30000); // 30 seconds
-
-    return () => clearInterval(interval);
-  }, [autoRefresh, userId, fetchBookings]);
-
-  // Manual refresh function
-  const handleRefresh = () => {
-    fetchBookings();
-    setLastUpdate(Date.now());
-  };
 
   // Get escrow ID from booking - try multiple formats since escrow ID is projectId:number
   // Also try to find escrows even if there's no booking (for escrows created before booking creation was added)
@@ -434,30 +414,8 @@ export default function ClientProjects() {
         <div className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-[#161616]">My Projects</h1>
-            <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
-              <Activity size={14} />
-              <span>Last updated: {new Date(lastUpdate).toLocaleTimeString()}</span>
-              <button
-                onClick={handleRefresh}
-                className="flex items-center gap-1 text-purple-600 hover:text-purple-700 transition-colors"
-                disabled={bookingsLoading}
-              >
-                <RefreshCw size={14} className={bookingsLoading ? 'animate-spin' : ''} />
-                Refresh
-              </button>
-            </div>
           </div>
           <div className="flex gap-2 items-center">
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-3 py-2 rounded-lg text-sm transition-colors ${
-                autoRefresh
-                  ? 'bg-green-100 text-green-700 border border-green-300'
-                  : 'bg-gray-100 text-gray-700 border border-gray-300'
-              }`}
-            >
-              {autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
-            </button>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -479,29 +437,6 @@ export default function ClientProjects() {
           </div>
         )}
 
-        {/* Debug Info */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-xs">
-            <p><strong>Debug Info:</strong></p>
-            <p>Bookings loaded: {bookings.length}</p>
-            <p>Escrow IDs found: {Object.keys(escrowIds).length}</p>
-            <p>Escrow statuses: {Object.keys(escrowStatuses).length}</p>
-            <p>User ID: {userId || 'Not set'}</p>
-            <details className="mt-2">
-              <summary className="cursor-pointer font-semibold">Bookings Details</summary>
-              <pre className="mt-2 text-xs overflow-auto max-h-40">
-                {JSON.stringify(bookings.map(b => ({
-                  booking_id: b.booking_id,
-                  service_id: b.service_id,
-                  payment_method: b.payment_method,
-                  payment_status: getStatusString(b.payment_status),
-                  escrow_id: escrowIds[b.booking_id],
-                  escrow_funded: escrowIds[b.booking_id] ? escrowStatuses[escrowIds[b.booking_id]]?.funded : 'not checked'
-                })), null, 2)}
-              </pre>
-            </details>
-          </div>
-        )}
 
         {bookings.length === 0 && !bookingsLoading && (
           <div className="text-center py-12">
@@ -614,7 +549,7 @@ export default function ClientProjects() {
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-semibold text-[#0B1F36]">
-                        {formatICP(BigInt(booking.escrow_amount_e8s))}
+                        {booking.escrow_amount_e8s ? (Number(booking.escrow_amount_e8s) / 100_000_000).toFixed(6) + ' ICP' : '0.000000 ICP'}
                       </div>
                       {booking.escrow_amount_dollars && (
                         <div className="text-sm text-green-600 font-medium">

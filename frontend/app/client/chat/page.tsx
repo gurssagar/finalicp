@@ -1,24 +1,26 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { MessageSquare, Users, Plus, Search } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
 import { ClientChatsList } from '../../../components/client/chat/ClientChatsList'
 import { ClientChatConversation } from '../../../components/client/chat/ClientChatConversation'
 import ClientLayout from '../layout'
 
 export default function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState<string | null>('1')
-  const [activeTab, setActiveTab] = useState<'chats' | 'teams'>('chats')
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(true)
 
   // Load user email from server session
   useEffect(() => {
     const fetchUserSession = async () => {
       try {
+        setIsLoading(true)
         const response = await fetch('/api/auth/session')
         const data = await response.json()
 
-        if (data.success && data.session) {
-          setUserEmail(data.session.email)
+        if (data.success && data.session?.email) {
+          const email = data.session.email
+          setUserEmail(email)
           
           // Check if we should pre-select a chat from URL params
           if (typeof window !== 'undefined') {
@@ -27,35 +29,29 @@ export default function ChatPage() {
 
             if (withParam) {
               setSelectedChatId(withParam)
-              console.log(`[DEBUG] Chat URL param: with=${withParam}, userEmail=${data.session.email}`)
+              console.log(`[DEBUG] Chat URL param: with=${withParam}, userEmail=${email}`)
             }
           }
 
-          // Authenticate with the canister
-          const authenticateWithCanister = async () => {
-            try {
-              const response = await fetch('/api/chat/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: data.session.email,
-                  displayName: 'Client User'
-                })
-              })
-              const authData = await response.json()
-              console.log('Authentication result:', authData)
-            } catch (error) {
-              console.error('Authentication error:', error)
-            }
-          }
-
-          authenticateWithCanister()
+          // Authenticate with the canister (non-blocking)
+          fetch('/api/chat/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              displayName: 'Client User'
+            })
+          }).then(res => res.json())
+            .then(authData => console.log('Authentication result:', authData))
+            .catch(error => console.error('Authentication error:', error))
         } else {
           console.warn('[ClientChat] No user session found')
         }
       } catch (error) {
         console.error('Error fetching user session:', error)
         console.warn('[ClientChat] No user email available for authentication')
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -73,127 +69,74 @@ export default function ChatPage() {
     }
   }
 
-  const handleTabChange = (tab: 'chats' | 'teams') => {
-    setActiveTab(tab)
+
+  if (isLoading) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading messages...</p>
+        </div>
+      </div>
+    )
   }
 
-  const handleNewChat = () => {
-    // Logic to create new chat
-    console.log('Create new chat')
+  if (!userEmail) {
+    return (
+      <div className="h-full flex items-center justify-center bg-white">
+        <div className="text-center p-8">
+          <div className="text-red-500 mb-4">
+            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Please log in</h3>
+          <p className="text-sm text-gray-500 mb-4">You need to be logged in to view messages</p>
+        </div>
+      </div>
+    )
   }
 
   return (
-   
-      <div className="h-full flex flex-col bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
-        {/* Chat Header */}
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
-
-            {/* Tabs */}
-            <div className="flex border-b border-gray-200 -mb-4">
-              <button
-                onClick={() => handleTabChange('chats')}
-                className={`px-4 py-2 text-sm font-medium relative ${
-                  activeTab === 'chats'
-                    ? 'text-purple-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <MessageSquare size={16} />
-                  <span>Chats</span>
-                </div>
-                {activeTab === 'chats' && (
-                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-600"></div>
-                )}
-              </button>
-              <button
-                onClick={() => handleTabChange('teams')}
-                className={`px-4 py-2 text-sm font-medium relative ${
-                  activeTab === 'teams'
-                    ? 'text-purple-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Users size={16} />
-                  <span>Teams</span>
-                </div>
-                {activeTab === 'teams' && (
-                  <div className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-600"></div>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search conversations..."
-                className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
-            </div>
-            <button
-              onClick={handleNewChat}
-              className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-              title="New conversation"
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-        </div>
-
-        {/* Chat Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Panel - Chat List */}
-          <div className="w-full md:w-1/3 border-r border-gray-200 flex flex-col">
-            {activeTab === 'chats' && (
-              <ClientChatsList
-                onSelectChat={handleSelectChat}
-                selectedChatId={selectedChatId}
-                userEmail={userEmail}
-              />
-            )}
-            {activeTab === 'teams' && (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
-                <div className="text-center">
-                  <Users size={48} className="mx-auto mb-4 text-gray-300" />
-                  <p className="font-medium">Team Chat</p>
-                  <p className="text-sm mt-2">Connect with your hackathon teams</p>
-                  <button className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm">
-                    Create New Team
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Right Panel - Chat Conversation */}
-          {selectedChatId ? (
-            <div className="hidden md:flex flex-1 flex-col">
-              <ClientChatConversation chatId={selectedChatId} userEmail={userEmail} />
-            </div>
-          ) : (
-            <div className="hidden md:flex flex-1 items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <MessageSquare size={64} className="mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
-                <p className="text-gray-500">Choose a chat from the left to start messaging</p>
-              </div>
-            </div>
-          )}
-
-          {/* Mobile - Show conversation when selected */}
-          {selectedChatId && (
-            <div className="md:hidden flex-1 flex flex-col absolute inset-0 bg-white z-10">
-              <ClientChatConversation chatId={selectedChatId} userEmail={userEmail} />
-            </div>
-          )}
-        </div>
+    <div className="h-full flex flex-col bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
+      {/* Chat Header */}
+      <div className="p-4 border-b border-gray-200 flex-shrink-0">
+        <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
       </div>
-   
+
+      {/* Chat Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel - Chat List */}
+        <div className="w-full md:w-1/3 border-r border-gray-200 flex flex-col">
+          <ClientChatsList
+            onSelectChat={handleSelectChat}
+            selectedChatId={selectedChatId}
+            userEmail={userEmail}
+          />
+        </div>
+
+        {/* Right Panel - Chat Conversation */}
+        {selectedChatId && userEmail ? (
+          <div className="hidden md:flex flex-1 flex-col">
+            <ClientChatConversation chatId={selectedChatId} userEmail={userEmail} />
+          </div>
+        ) : (
+          <div className="hidden md:flex flex-1 items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <MessageSquare size={64} className="mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Select a conversation</h3>
+              <p className="text-gray-500">Choose a chat from the left to start messaging</p>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile - Show conversation when selected */}
+        {selectedChatId && userEmail && (
+          <div className="md:hidden flex-1 flex flex-col absolute inset-0 bg-white z-10">
+            <ClientChatConversation chatId={selectedChatId} userEmail={userEmail} />
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

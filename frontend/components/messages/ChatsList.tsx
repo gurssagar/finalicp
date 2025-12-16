@@ -46,41 +46,89 @@ export function ChatsList({
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Early return if no userEmail - show message instead of loading
+  if (!userEmail) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center p-8">
+        <p className="text-gray-500 text-center">Please log in to view messages</p>
+      </div>
+    )
+  }
+
   // Load recent chats from API
   const loadRecentChats = async () => {
     try {
+      if (!userEmail) {
+        console.warn('[ChatsList] Cannot load recent chats: no userEmail')
+        return
+      }
+
       const response = await fetch(`/api/chat/recent?userEmail=${encodeURIComponent(userEmail)}&limit=20`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load recent chats: ${response.status} ${response.statusText}`)
+      }
+
       const data = await response.json()
 
       if (data.success) {
-        setChats(data.chats)
+        console.log('[ChatsList] Loaded recent chats:', data.chats?.length || 0)
+        setChats(data.chats || [])
+      } else {
+        console.warn('[ChatsList] API returned unsuccessful response:', data.error)
+        setChats([])
       }
     } catch (error) {
-      console.error('Error loading recent chats:', error)
+      console.error('[ChatsList] Error loading recent chats:', error)
+      setChats([]) // Set empty array on error to prevent UI issues
     }
   }
 
   // Load booking contacts
   const loadBookingContacts = async () => {
     try {
+      if (!userEmail) {
+        console.warn('[ChatsList] Cannot load booking contacts: no userEmail')
+        return
+      }
+
       // Import marketplace storage functions
       const { getBookingsByFreelancerEmail, createChatRelationshipsFromBookings } = await import('@/lib/marketplace-storage')
       const { getUserProfileByEmail } = await import('@/lib/user-profile')
 
       // Get bookings for freelancer
       const bookings = await getBookingsByFreelancerEmail(userEmail)
-      console.log('Loaded bookings for freelancer:', bookings)
+      console.log('[ChatsList] Loaded bookings for freelancer:', bookings?.length || 0)
 
-      // Create chat relationships from bookings
-      await createChatRelationshipsFromBookings(bookings)
+      if (!bookings || bookings.length === 0) {
+        setBookingContacts([])
+        return
+      }
+
+      // Create chat relationships from bookings (non-blocking)
+      createChatRelationshipsFromBookings(bookings).catch(err => {
+        console.warn('[ChatsList] Error creating chat relationships (non-critical):', err)
+      })
 
       // Extract unique client emails from bookings
-      const uniqueClientEmails = [...new Set(bookings.map(booking => booking.client_email))]
-      console.log('Fetching profiles for clients:', uniqueClientEmails)
+      const uniqueClientEmails = [...new Set(bookings.map(booking => booking.client_email).filter(Boolean))]
+      console.log('[ChatsList] Fetching profiles for clients:', uniqueClientEmails.length)
 
-      // Fetch client profiles
+      if (uniqueClientEmails.length === 0) {
+        setBookingContacts([])
+        return
+      }
+
+      // Fetch client profiles with timeout
       const clientProfiles = await Promise.allSettled(
-        uniqueClientEmails.map(email => getUserProfileByEmail(email))
+        uniqueClientEmails.map(email => 
+          Promise.race([
+            getUserProfileByEmail(email),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+            )
+          ])
+        )
       )
 
       // Create a map of email to profile
@@ -89,15 +137,17 @@ export function ChatsList({
         const email = uniqueClientEmails[index]
         if (result.status === 'fulfilled') {
           profileMap.set(email, result.value)
-          console.log('✅ Got profile for client:', email, result.value.displayName)
+          console.log('[ChatsList] ✅ Got profile for client:', email)
         } else {
-          console.error('❌ Failed to fetch profile for:', email, result.reason)
+          console.warn('[ChatsList] ⚠️ Failed to fetch profile for:', email, result.reason)
         }
       })
 
       // Extract unique client contacts from bookings with real profile data
       const uniqueContacts = bookings.reduce((contacts: any[], booking: any) => {
         const clientEmail = booking.client_email
+        if (!clientEmail) return contacts
+
         const existingContact = contacts.find(c => c.email === clientEmail)
 
         if (!existingContact) {
@@ -105,7 +155,7 @@ export function ChatsList({
 
           // Use real profile data or fallback to email-based name
           const displayName = clientProfile?.displayName ||
-                            clientProfile?.firstName + (clientProfile?.lastName ? ' ' + clientProfile.lastName : '') ||
+                            (clientProfile?.firstName ? clientProfile.firstName + (clientProfile?.lastName ? ' ' + clientProfile.lastName : '') : '') ||
                             clientEmail.split('@')[0].charAt(0).toUpperCase() + clientEmail.split('@')[0].slice(1)
 
           contacts.push({
@@ -113,42 +163,66 @@ export function ChatsList({
             name: displayName,
             type: 'client' as const,
             profile: clientProfile,
-            serviceTitle: booking.service_title,
+            serviceTitle: booking.service_title || 'Service',
             bookingId: booking.booking_id,
-            status: booking.status
+            status: booking.status || 'Active'
           })
         }
 
         return contacts
       }, [])
 
+      console.log('[ChatsList] Created booking contacts:', uniqueContacts.length)
       setBookingContacts(uniqueContacts)
     } catch (error) {
-      console.error('Error loading booking contacts:', error)
+      console.error('[ChatsList] Error loading booking contacts:', error)
+      setBookingContacts([]) // Set empty array on error
     }
   }
 
   // Load both chats and booking contacts
   useEffect(() => {
-    if (userEmail) {
-      setLoading(true)
-      Promise.all([loadRecentChats(), loadBookingContacts()])
-        .finally(() => setLoading(false))
+    if (!userEmail) {
+      console.warn('[ChatsList] No userEmail provided, skipping load')
+      setLoading(false)
+      return
     }
-  }, [userEmail, userType])
 
-  // Filter chats based on search query
-  const filteredChats = chats.filter(chat =>
-    chat.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.lastMessage.text.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+    setLoading(true)
+    console.log('[ChatsList] Loading chats for user:', userEmail)
+    
+    Promise.all([
+      loadRecentChats().catch(err => {
+        console.error('[ChatsList] Error loading recent chats:', err)
+        return [] // Return empty array on error
+      }),
+      loadBookingContacts().catch(err => {
+        console.error('[ChatsList] Error loading booking contacts:', err)
+        return [] // Return empty array on error
+      })
+    ])
+      .finally(() => {
+        console.log('[ChatsList] Finished loading chats')
+        setLoading(false)
+      })
+  }, [userEmail]) // Removed userType from dependencies to avoid unnecessary reloads
 
-  // Filter booking contacts based on search query
-  const filteredBookingContacts = bookingContacts.filter(contact =>
-    contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    contact.serviceTitle.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  // Filter chats based on search query (search by contact name/email)
+  const filteredChats = chats.filter(chat => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return chat.contact.toLowerCase().includes(query) ||
+           chat.lastMessage.text.toLowerCase().includes(query);
+  });
+
+  // Filter booking contacts based on search query (search by name, email, or service title)
+  const filteredBookingContacts = bookingContacts.filter(contact => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return contact.email.toLowerCase().includes(query) ||
+           contact.name.toLowerCase().includes(query) ||
+           (contact.serviceTitle && contact.serviceTitle.toLowerCase().includes(query));
+  });
 
   // Convert chat data to display format
   const displayChats = filteredChats.map(chat => ({

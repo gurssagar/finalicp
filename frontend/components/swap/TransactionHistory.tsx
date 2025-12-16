@@ -1,51 +1,67 @@
 'use client'  
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, CheckCircle, AlertTriangle, ArrowUpRight } from 'lucide-react';
+
+interface Transaction {
+  id: string;
+  type: 'Swap';
+  from: string;
+  fromAmount: string;
+  to: string;
+  toAmount: string;
+  status: 'pending' | 'completed' | 'failed';
+  timestamp: number;
+  txHash?: string;
+}
+
 interface TransactionHistoryProps {
   activeTab: string;
 }
-export function TransactionHistory({
-  activeTab
-}: TransactionHistoryProps) {
-  // Mock transaction data
-  const pendingTransactions = [{
-    id: 'tx1',
-    type: 'Swap',
-    from: 'ETH',
-    fromAmount: '0.5',
-    to: 'EOS',
-    toAmount: '1635.21',
-    status: 'pending',
-    timestamp: new Date().getTime() - 5 * 60 * 1000 // 5 minutes ago
-  }];
-  const completedTransactions = [{
-    id: 'tx2',
-    type: 'Swap',
-    from: 'ETH',
-    fromAmount: '1.2',
-    to: 'EOS',
-    toAmount: '3924.50',
-    status: 'completed',
-    timestamp: new Date().getTime() - 2 * 60 * 60 * 1000 // 2 hours ago
-  }, {
-    id: 'tx3',
-    type: 'Swap',
-    from: 'EOS',
-    fromAmount: '200',
-    to: 'ETH',
-    toAmount: '0.061',
-    status: 'completed',
-    timestamp: new Date().getTime() - 1 * 24 * 60 * 60 * 1000 // 1 day ago
-  }, {
-    id: 'tx4',
-    type: 'Swap',
-    from: 'ETH',
-    fromAmount: '0.3',
-    to: 'ICP',
-    toAmount: '5.43',
-    status: 'failed',
-    timestamp: new Date().getTime() - 3 * 24 * 60 * 60 * 1000 // 3 days ago
-  }];
+
+export function TransactionHistory({ activeTab }: TransactionHistoryProps) {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+
+  // Load transactions from localStorage on mount
+  useEffect(() => {
+    const savedTransactions = localStorage.getItem('swapTransactions');
+    if (savedTransactions) {
+      try {
+        const parsed = JSON.parse(savedTransactions);
+        setTransactions(parsed);
+      } catch (error) {
+        console.error('Error loading transactions:', error);
+      }
+    }
+  }, []);
+
+  // Listen for new transactions from storage events
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const savedTransactions = localStorage.getItem('swapTransactions');
+      if (savedTransactions) {
+        try {
+          const parsed = JSON.parse(savedTransactions);
+          setTransactions(parsed);
+        } catch (error) {
+          console.error('Error loading transactions:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    // Also check periodically for updates from same window
+    const interval = setInterval(handleStorageChange, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Filter transactions based on active tab
+  const pendingTransactions = transactions.filter(tx => tx.status === 'pending');
+  const completedTransactions = transactions.filter(tx => tx.status === 'completed' || tx.status === 'failed');
+
   // Format timestamp
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -55,6 +71,7 @@ export function TransactionHistory({
     const diffMins = Math.floor(diffSecs / 60);
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
+    
     if (diffDays > 0) {
       return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
     } else if (diffHours > 0) {
@@ -65,12 +82,19 @@ export function TransactionHistory({
       return 'Just now';
     }
   };
-  return <div className="mt-4">
-      {activeTab === 'pending' && <div>
-          {pendingTransactions.length === 0 ? <div className="text-center py-8">
+
+  return (
+    <div className="mt-4">
+      {activeTab === 'pending' && (
+        <div>
+          {pendingTransactions.length === 0 ? (
+            <div className="text-center py-8">
               <p className="text-gray-500">No pending transactions</p>
-            </div> : <div className="space-y-4">
-              {pendingTransactions.map(tx => <div key={tx.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingTransactions.map(tx => (
+                <div key={tx.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-2">
                       <Clock size={18} className="text-yellow-500" />
@@ -88,26 +112,55 @@ export function TransactionHistory({
                       <p className="text-xs text-gray-500">
                         {formatTime(tx.timestamp)}
                       </p>
+                      {tx.txHash && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Hash: {tx.txHash.slice(0, 10)}...{tx.txHash.slice(-8)}
+                        </p>
+                      )}
                     </div>
-                    <button className="text-blue-600 hover:underline text-sm flex items-center gap-1">
-                      <span>View</span>
-                      <ArrowUpRight size={14} />
-                    </button>
+                    {tx.txHash && (
+                      <button
+                        className="text-blue-600 hover:underline text-sm flex items-center gap-1"
+                        onClick={() => {
+                          // Open transaction in explorer (you can customize this)
+                          window.open(`https://explorer.ic0.app/transaction/${tx.txHash}`, '_blank');
+                        }}
+                      >
+                        <span>View</span>
+                        <ArrowUpRight size={14} />
+                      </button>
+                    )}
                   </div>
-                </div>)}
-            </div>}
-        </div>}
-      {activeTab === 'history' && <div>
-          {completedTransactions.length === 0 ? <div className="text-center py-8">
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {activeTab === 'history' && (
+        <div>
+          {completedTransactions.length === 0 ? (
+            <div className="text-center py-8">
               <p className="text-gray-500">No transaction history</p>
-            </div> : <div className="space-y-4">
-              {completedTransactions.map(tx => <div key={tx.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {completedTransactions.map(tx => (
+                <div key={tx.id} className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center gap-2">
-                      {tx.status === 'completed' ? <CheckCircle size={18} className="text-green-500" /> : <AlertTriangle size={18} className="text-red-500" />}
+                      {tx.status === 'completed' ? (
+                        <CheckCircle size={18} className="text-green-500" />
+                      ) : (
+                        <AlertTriangle size={18} className="text-red-500" />
+                      )}
                       <span className="font-medium">{tx.type}</span>
                     </div>
-                    <div className={`text-sm flex items-center ${tx.status === 'completed' ? 'text-green-500' : 'text-red-500'}`}>
+                    <div
+                      className={`text-sm flex items-center ${
+                        tx.status === 'completed' ? 'text-green-500' : 'text-red-500'
+                      }`}
+                    >
                       <span>
                         {tx.status === 'completed' ? 'Completed' : 'Failed'}
                       </span>
@@ -121,14 +174,31 @@ export function TransactionHistory({
                       <p className="text-xs text-gray-500">
                         {formatTime(tx.timestamp)}
                       </p>
+                      {tx.txHash && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Hash: {tx.txHash.slice(0, 10)}...{tx.txHash.slice(-8)}
+                        </p>
+                      )}
                     </div>
-                    <button className="text-blue-600 hover:underline text-sm flex items-center gap-1">
-                      <span>View</span>
-                      <ArrowUpRight size={14} />
-                    </button>
+                    {tx.txHash && (
+                      <button
+                        className="text-blue-600 hover:underline text-sm flex items-center gap-1"
+                        onClick={() => {
+                          // Open transaction in explorer
+                          window.open(`https://explorer.ic0.app/transaction/${tx.txHash}`, '_blank');
+                        }}
+                      >
+                        <span>View</span>
+                        <ArrowUpRight size={14} />
+                      </button>
+                    )}
                   </div>
-                </div>)}
-            </div>}
-        </div>}
-    </div>;
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

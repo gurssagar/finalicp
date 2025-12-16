@@ -1,15 +1,25 @@
 'use client'
 import React, { useState, useEffect, useRef } from 'react';
-import { Paperclip, Image, Mic, Send } from 'lucide-react';
+import { Paperclip, Image, Send, Loader2 } from 'lucide-react';
+import { uploadImageToTebi } from '@/lib/tebi-s3-upload';
+
 interface MessageInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, options?: {
+    messageType?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+  }) => void;
   onTypingIndicator?: (isTyping: boolean) => void;
 }
+
 export function MessageInput({
   onSendMessage,
   onTypingIndicator
 }: MessageInputProps) {
   const [message, setMessage] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Handle typing indicator
@@ -36,7 +46,7 @@ export function MessageInput({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (message.trim()) {
+    if (message.trim() && !uploading) {
       await onSendMessage(message);
       setMessage('');
 
@@ -44,6 +54,53 @@ export function MessageInput({
       if (onTypingIndicator && typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
         onTypingIndicator(false);
+      }
+    }
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('Invalid file type. Only images are allowed.');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('File too large. Maximum size is 10MB.');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      
+      // Upload image to Tebi S3
+      const result = await uploadImageToTebi(file, 'chat-images');
+      
+      if (result.success && result.url) {
+        // Send message with image
+        await onSendMessage('', {
+          messageType: 'image',
+          fileUrl: result.url,
+          fileName: file.name,
+          fileSize: file.size
+        });
+      } else {
+        alert(result.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
     }
   };
@@ -56,10 +113,28 @@ export function MessageInput({
       }
     };
   }, []);
-  return <div className="p-4 border-t border-gray-200">
+  return (
+    <div className="p-4 border-t border-gray-200 bg-white">
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
-        <button type="button" className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100">
-          <Paperclip size={20} />
+        <input
+          type="file"
+          ref={fileInputRef}
+          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+          onChange={handleImageSelect}
+          className="hidden"
+        />
+        <button 
+          type="button" 
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Send image"
+        >
+          {uploading ? (
+            <Loader2 size={20} className="animate-spin" />
+          ) : (
+            <Image size={20} />
+          )}
         </button>
         <div className="flex-1 relative">
           <input
@@ -67,20 +142,18 @@ export function MessageInput({
             value={message}
             onChange={e => handleTyping(e.target.value)}
             placeholder="Type a message here"
-            className="w-full py-3 pl-4 pr-10 rounded-full border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            disabled={uploading}
+            className="w-full py-3 pl-4 pr-10 rounded-full border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
           />
         </div>
-        <div className="flex gap-2">
-          <button type="button" className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100">
-            <Image size={20} />
-          </button>
-          <button type="button" className="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100">
-            <Mic size={20} />
-          </button>
-          <button type="submit" className="p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600" disabled={!message.trim()}>
-            <Send size={20} />
-          </button>
-        </div>
+        <button 
+          type="submit" 
+          className="p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed" 
+          disabled={(!message.trim() && !uploading) || uploading}
+        >
+          <Send size={20} />
+        </button>
       </form>
-    </div>;
+    </div>
+  );
 }

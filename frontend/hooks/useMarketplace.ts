@@ -254,8 +254,12 @@ export function useBookings(userId: string, userType: 'client' | 'freelancer', s
   const [error, setError] = useState<string | null>(null);
 
   const fetchBookings = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('❌ useBookings: No userId provided');
+      return;
+    }
     
+    console.log('🔍 useBookings: Fetching bookings for userId:', userId, 'userType:', userType);
     setLoading(true);
     setError(null);
     
@@ -265,16 +269,29 @@ export function useBookings(userId: string, userType: 'client' | 'freelancer', s
       queryParams.append('user_type', userType);
       if (statusFilter) queryParams.append('status', statusFilter);
 
-      const response = await fetch(`/api/marketplace/bookings?${queryParams.toString()}`);
+      const url = `/api/marketplace/bookings?${queryParams.toString()}`;
+      console.log('📡 useBookings: Fetching from:', url);
+      
+      const response = await fetch(url);
       const data = await response.json();
 
+      console.log('📥 useBookings: Response:', {
+        success: data.success,
+        dataLength: data.data?.length || 0,
+        error: data.error,
+        fullData: data
+      });
+
       if (data.success) {
-        setBookings(data.data);
+        console.log(`✅ useBookings: Received ${data.data.length} bookings`);
+        setBookings(data.data || []);
       } else {
+        console.error('❌ useBookings: Failed to fetch bookings:', data.error);
         setError(data.error || 'Failed to fetch bookings');
       }
-    } catch (err) {
-      setError('Network error occurred');
+    } catch (err: any) {
+      console.error('❌ useBookings: Network error:', err);
+      setError('Network error occurred: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }

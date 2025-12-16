@@ -537,6 +537,17 @@ app.get("/health", (req, res) => {
 httpServer.listen(port, () => {
   console.log(`🚀 Socket.IO server running on port ${port}`);
   console.log(`📊 Health check available at http://localhost:${port}/health`);
+  console.log(`💡 Note: Chat will work via REST API if this server is not running`);
+});
+
+// Handle server errors gracefully
+httpServer.on('error', (error: any) => {
+  if (error.code === 'EADDRINUSE') {
+    console.error(`❌ Port ${port} is already in use. Please stop the existing server or use a different port.`);
+  } else {
+    console.error(`❌ Server error:`, error);
+  }
+  process.exit(1);
 });
 
 export default app;

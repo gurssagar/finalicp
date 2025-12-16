@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatStorageApi } from '@/lib/chat-storage-agent';
+import { chatDbService } from '@/lib/chat-db-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,9 +51,9 @@ export async function POST(request: NextRequest) {
     // Use provided timestamp or create new one
     const messageTimestamp = timestamp || new Date().toISOString();
 
-    // Save message to canister
+    // Save message to PostgreSQL database
     console.log(`[ChatMessage] Attempting to save message: ${from} -> ${to}`);
-    const messageId = await chatStorageApi.saveMessage(
+    const messageId = await chatDbService.saveMessage(
       from,
       to,
       text || '',
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       console.error(`[ChatMessage] Failed to save message: ${from} -> ${to}`);
       return NextResponse.json({
         success: false,
-        error: 'Failed to save message to canister'
+        error: 'Failed to save message to database'
       }, { status: 500 });
     }
 
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     console.error('[ChatMessage] Error saving message:', error);
     return NextResponse.json({
       success: false,
-      error: 'Internal server error'
+      error: error instanceof Error ? error.message : 'Internal server error'
     }, { status: 500 });
   }
 }

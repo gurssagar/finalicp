@@ -8,7 +8,7 @@ import {
   Shield,
   Info
 } from 'lucide-react';
-import { ICPayWidget } from '@/components/payment/ICPayWidget';
+// import { ICPayWidget } from '@/components/payment/ICPayWidget'; // Commented out - no longer using ICPay SDK, only escrow
 import { ServiceSummary } from '@/components/payment/ServiceSummary';
 import { UpsellSection } from '@/components/payment/UpsellSection';
 import { OrderSummary } from '@/components/payment/OrderSummary';
@@ -341,8 +341,8 @@ export default function PaymentPage() {
               />
             </div>
 
-        {/* Payment Widget */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
+        {/* Payment Widget - Commented out - no longer using ICPay SDK, only escrow */}
+        {/* <div className="bg-white rounded-lg border border-gray-200 p-6">
           <h3 className="font-medium text-lg mb-4">
             Payment Method (ICPay SDK)
           </h3>
@@ -360,7 +360,7 @@ export default function PaymentPage() {
               clientEmail: profile?.email,
             }}
           />
-        </div>
+        </div> */}
 
         {/* Escrow Payment via Plug */}
         {service && selectedPackage && (

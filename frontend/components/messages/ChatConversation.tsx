@@ -39,20 +39,21 @@ export function ChatConversation({
   useEffect(() => {
     if (!chatId || !userEmail) return
 
-    // Initialize Socket.IO connection
+    // Initialize Socket.IO connection (optional - chat works without it)
     const initializeSocket = async () => {
       try {
         const connected = await socketService.connect(userEmail)
-        if (connected) {
-          console.log('[FreelancerChat] Socket connected')
+        if (connected && socketService.isConnected()) {
+          console.log('[FreelancerChat] ✅ Socket connected - real-time features enabled')
 
           // Join chat room
           socketService.joinRoom(chatId)
         } else {
-          console.warn('[FreelancerChat] Socket connection failed')
+          console.log('[FreelancerChat] ℹ️  Socket server not available - using REST API (chat will work normally)')
         }
       } catch (error) {
-        console.error('[FreelancerChat] Socket initialization error:', error)
+        // Suppress error - chat works via REST API fallback
+        console.debug('[FreelancerChat] Socket initialization (REST API fallback available):', error)
       }
     }
 
@@ -214,6 +215,9 @@ export function ChatConversation({
       ? 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=150&auto=format&fit=crop'
       : `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.from)}&background=9333ea&color=fff`,
     text: msg.text,
+    messageType: msg.messageType || 'text',
+    fileUrl: msg.fileUrl,
+    fileName: msg.fileName,
     time: new Date(msg.timestamp).toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit'
@@ -277,11 +281,14 @@ export function ChatConversation({
             id: `socket-${Date.now()}`,
             from: userEmail,
             to: chatId,
-            text: text.trim(),
+            text: text.trim() || (options?.fileUrl ? '📷 Image' : ''),
             timestamp: result.timestamp || messageData.timestamp,
             delivered: true,
             read: false,
-            messageType: options?.messageType || 'text'
+            messageType: options?.messageType || 'text',
+            fileUrl: options?.fileUrl,
+            fileName: options?.fileName,
+            fileSize: options?.fileSize
           }
           setMessages(prev => [...prev, optimisticMessage])
           return // Success, no need to try storage
@@ -313,14 +320,17 @@ export function ChatConversation({
       const data = await response.json()
       if (response.ok && data.success) {
         const storedMessage: Message = {
-          id: data.messageId || `storage-${Date.now()}`,
+          id: data.data?.messageId || data.messageId || `storage-${Date.now()}`,
           from: userEmail,
           to: chatId,
-          text: text.trim(),
+          text: text.trim() || (options?.fileUrl ? '📷 Image' : ''),
           timestamp: messageData.timestamp,
           delivered: true,
           read: false,
-          messageType: options?.messageType || 'text'
+          messageType: options?.messageType || 'text',
+          fileUrl: options?.fileUrl,
+          fileName: options?.fileName,
+          fileSize: options?.fileSize
         }
         setMessages(prev => [...prev, storedMessage])
         return // Success
@@ -340,13 +350,18 @@ export function ChatConversation({
     }
   }
 
-  const handleSendMessage = async (message: string) => {
-    await sendMessage(message)
+  const handleSendMessage = async (message: string, options?: {
+    messageType?: string;
+    fileUrl?: string;
+    fileName?: string;
+    fileSize?: number;
+  }) => {
+    await sendMessage(message, options)
   }
 
   if (loading) {
-    return (
-      <div className="flex flex-col h-full bg-white">
+  return (
+    <div className="flex flex-col h-full w-full bg-white overflow-hidden">
         <div className="p-4 border-b border-gray-200 animate-pulse">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
@@ -385,38 +400,6 @@ export function ChatConversation({
           <h3 className="font-medium text-gray-900">{chatId}</h3>
           <p className="text-sm text-green-600">Online</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors"
-            title="Video call"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M23 7L16 12L23 17V7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <rect x="1" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-          </button>
-          <button
-            className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors"
-            title="Voice call"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M15 4.5C15 3.67157 14.3284 3 13.5 3C12.6716 3 12 3.67157 12 4.5V12.5C12 13.3284 12.6716 14 13.5 14C14.3284 14 15 13.3284 15 12.5V4.5Z" stroke="currentColor" strokeWidth="2"/>
-              <path d="M19 10C19 13.866 15.866 17 12 17C8.13401 17 5 13.866 5 10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M12 17V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M8 21H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-          <button
-            className="p-2 text-gray-500 hover:text-blue-600 rounded-full hover:bg-blue-50 transition-colors"
-            title="More options"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="1"/>
-              <circle cx="19" cy="12" r="1"/>
-              <circle cx="5" cy="12" r="1"/>
-            </svg>
-          </button>
-        </div>
       </div>
 
       {/* Messages Area */}
@@ -452,7 +435,23 @@ export function ChatConversation({
                           : 'bg-white border border-gray-200 text-gray-900'
                       }`}
                     >
-                      {message.text}
+                      {message.messageType === 'image' && message.fileUrl ? (
+                        <div className="space-y-2">
+                          <img
+                            src={message.fileUrl}
+                            alt={message.fileName || 'Image'}
+                            className="max-w-full max-h-64 rounded-lg object-contain"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'https://via.placeholder.com/300x200?text=Image+Not+Found';
+                            }}
+                          />
+                          {message.text && message.text !== '📷 Image' && (
+                            <p className="text-sm">{message.text}</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p>{message.text}</p>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 mt-1 px-1">
                       {message.time}

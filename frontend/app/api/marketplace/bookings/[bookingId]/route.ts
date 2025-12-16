@@ -65,7 +65,7 @@ export async function GET(
       
       // Fetch service details to get real freelancer email and package info
       let serviceData = null;
-      let packageDetails = null;
+      let packageData = null;
       
       try {
         const serviceResult = await actor.getService(bookingData.service_id);
@@ -74,6 +74,20 @@ export async function GET(
         }
       } catch (error) {
         console.warn('Failed to fetch service data from canister:', error);
+      }
+      
+      // Fetch package details from canister
+      try {
+        if (bookingData.service_id) {
+          const packagesResult = await actor.getPackagesByServiceId(bookingData.service_id);
+          // Find the specific package that matches this booking
+          if (packagesResult && Array.isArray(packagesResult) && packagesResult.length > 0) {
+            packageData = packagesResult.find((pkg: any) => pkg.package_id === bookingData.package_id) || packagesResult[0];
+            console.log('✅ Found package data:', packageData?.package_id, 'delivery_days:', packageData?.delivery_time_days);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch package data from canister:', error);
       }
       
       // Get freelancer email from canister only
@@ -158,8 +172,11 @@ export async function GET(
       const updated_at_ms = bookingData.updated_at ? Number(bookingData.updated_at) / 1000000 : Date.now();
       const deadline_ms_raw = bookingData.deadline ? Number(bookingData.deadline) / 1000000 : null;
       
-      // Get delivery time days from service or package
-      const delivery_time_days = serviceData?.delivery_time_days || 7;
+      // Get delivery time days from package first, then service, then booking data
+      const packageDeliveryDays = packageData?.delivery_time_days || packageData?.delivery_days;
+      const serviceDeliveryDays = serviceData?.delivery_time_days;
+      const bookingDeliveryDays = bookingData?.delivery_days;
+      const delivery_time_days = packageDeliveryDays || bookingDeliveryDays || serviceDeliveryDays || 7;
       
       // Calculate deadline: use provided deadline if valid, otherwise calculate from created_at + delivery_days
       let deadline_ms = deadline_ms_raw;
@@ -200,6 +217,10 @@ export async function GET(
           starting_from_e8s: serviceData?.starting_from_e8s || 100000000,
           starting_from_usd: serviceData?.starting_from_e8s ? (Number(serviceData.starting_from_e8s) / 100000000) * 10 : 10,
         },
+        
+        // Add delivery days to root level for easier access
+        delivery_days: delivery_time_days,
+        package_delivery_days: delivery_time_days,
         
         // Add timestamps (in milliseconds)
         created_at: created_at_ms,

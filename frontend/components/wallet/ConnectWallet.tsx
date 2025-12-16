@@ -235,6 +235,26 @@ export default function ConnectWallet({ onConnect, className = '' }: ConnectWall
         throw new Error(result.error || 'Failed to save wallet information');
       }
 
+      // Verify wallet was saved by fetching it back
+      try {
+        const verifyResponse = await fetch('/api/user/wallet', {
+          method: 'GET',
+        });
+        const verifyResult = await verifyResponse.json();
+        
+        if (verifyResult.success && verifyResult.data) {
+          console.log('✅ Wallet successfully saved to canister:', {
+            principal: verifyResult.data.principal,
+            accountId: verifyResult.data.accountId,
+          });
+        } else {
+          console.warn('⚠️ Wallet saved but verification failed');
+        }
+      } catch (verifyErr) {
+        console.warn('Could not verify wallet save:', verifyErr);
+        // Don't throw - wallet might still be saved
+      }
+
       setIsConnected(true);
 
       // Call onConnect callback if provided
